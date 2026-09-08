@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-08",
+  "run": "run.MJIupxKX",
+  "reports": 19,
+  "state": "passed-with-accepted-risks",
+  "advisoryUpdatedAt": "2026-09-08T13:46:54Z",
+  "advisorySource": "source=NVD API",
+  "acceptedAdvisories": [
+    "CVE-2026-53914",
+    "CVE-2026-62380"
+  ],
+  "scopes": {
+    "backend": {
+      "state": "passed-with-accepted-risks",
+      "acceptedFindings": 175,
+      "policySha256": "05a67abe7f8dbe24fc2a47985919fe8333b7209aba4a9590e3fa65368cf95a96"
+    },
+    "build-logic": {
+      "state": "passed-with-accepted-risks",
+      "acceptedFindings": 24,
+      "policySha256": "05a67abe7f8dbe24fc2a47985919fe8333b7209aba4a9590e3fa65368cf95a96"
+    }
+  },
+  "rawFindingsPreserved": true,
+  "expiry": "2026-10-08T00:00:00Z",
+  "remoteCiOrDeployment": false
+}

@@ -1,0 +1,35 @@
+{
+  "keycloak": "26.7.3",
+  "augmentation": "passed",
+  "provider": "playsay-lesson-assertion",
+  "environment": "isolated temporary image files, host Java 21, temporary dev-file database",
+  "containerExecution": false,
+  "startup": "passed",
+  "oidcDiscoveryStatus": 200,
+  "processStopped": true,
+  "date": "2026-09-08",
+  "latestStableVerified": "26.7.3",
+  "releaseSources": [
+    "https://www.keycloak.org/downloads",
+    "https://github.com/keycloak/keycloak/releases/tag/26.7.3",
+    "https://repo.maven.apache.org/maven2/org/keycloak/keycloak-services/maven-metadata.xml"
+  ],
+  "nvdApiKeyValidation": {
+    "httpStatus": 200,
+    "secretPrinted": false
+  },
+  "scanRun": "run.GroaBcMX",
+  "scanSource": "source=NVD API",
+  "advisoryUpdatedAt": "2026-09-08T12:41:16Z",
+  "scanExitCode": 1,
+  "remainingAdvisories": {
+    "standaloneKeycloak": [
+      "CVE-2026-62380"
+    ],
+    "buildLogic": [
+      "CVE-2026-53914"
+    ]
+  },
+  "standaloneProviderTests": "passed",
+  "productionOrRemoteOperations": false
+}

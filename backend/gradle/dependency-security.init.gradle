@@ -1,0 +1,214 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import org.owasp.dependencycheck.gradle.DependencyCheckPlugin
+import org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension
+
+// An init-script classloader keeps the scanner independent of application build plugins.
+initscript {
+    repositories { gradlePluginPortal(); mavenCentral() }
+    dependencies { classpath 'org.owasp:dependency-check-gradle:13.0.0' }
+}
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    // Included builds are scanned explicitly, with their own inventory and report.
+    def requestedRoot = System.getenv('DEPENDENCY_SECURITY_BUILD_ROOT')
+    if (!requestedRoot || root.rootDir.canonicalPath != new File(requestedRoot).canonicalPath) return
+    def reportRoot = new File(System.getenv('DEPENDENCY_SECURITY_REPORT_DIR'))
+    def dataRoot = new File(System.getenv('DEPENDENCY_SECURITY_DATA_DIR'))
+    def policyDir = gradle.startParameter.initScripts.find { it.name == 'dependency-security.init.gradle' }.parentFile
+    def approvalsFile = new File(policyDir, 'dependency-security-accepted-risks.json')
+    def policy = approvalsFile.isFile() ? new JsonSlurper().parse(approvalsFile) : [schemaVersion: 1, approvals: []]
+    if (policy.schemaVersion != 1 || !(policy.approvals instanceof List)) throw new GradleException('Invalid accepted-risk policy')
+    policy.approvals.each { approval ->
+        if (!(approval.cve ==~ /CVE-\d{4}-\d+/) || !approval.id || !approval.owner || !approval.approvedBy ||
+            !approval.reason || !approval.evidence || !(approval.artifacts instanceof List) || approval.artifacts.empty) {
+            throw new GradleException('Accepted risks require explicit approval, CVE, owner, evidence and exact artifacts')
+        }
+        def approved = java.time.LocalDate.parse(approval.approvedOn)
+        def expires = java.time.LocalDate.parse(approval.expires)
+        if (!expires.isAfter(approved)) throw new GradleException('Accepted-risk expiry must follow approval')
+        approval.artifacts.each { artifact ->
+            if (!(artifact.packageUrl ==~ /pkg:maven\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[A-Za-z0-9_.+-]+/) ||
+                !(artifact.scopes instanceof List) || artifact.scopes.empty || artifact.scopes.any {
+                    !(it.build ==~ /[A-Za-z0-9_.-]+/) || !(it.project ==~ /:(?:[A-Za-z0-9_.-]+(?::[A-Za-z0-9_.-]+)*)?/)
+                }) throw new GradleException('Accepted risks cannot contain wildcard artifacts, versions or module scopes')
+        }
+    }
+    def suppressions = new File(policyDir, 'dependency-check-suppressions.xml')
+    if (suppressions.isFile()) {
+        new groovy.xml.XmlSlurper().parse(suppressions).suppress.each { rule ->
+            if (!(rule.@until.text() ==~ /\d{4}-\d{2}-\d{2}Z/) || !rule.notes.text().contains('Owner:') ||
+                !rule.notes.text().contains('https://') || rule.packageUrl.size() != 1 ||
+                rule.packageUrl.@regex.text() == 'true' || !rule.packageUrl.text().startsWith('pkg:maven/') ||
+                !rule.packageUrl.text().contains('@') || (rule.cve.size() == 0 && rule.cpe.size() == 0) ||
+                rule.children().any { !(it.name() in ['notes', 'packageUrl', 'cve', 'cpe']) }) {
+                throw new GradleException('Suppressions require exact Maven PURL, CVE/CPE, owner, evidence URL and UTC expiry')
+            }
+            java.time.LocalDate.parse(rule.@until.text().replace('Z', ''))
+        }
+    }
+    def jvmProjects = root.allprojects.findAll { it.plugins.hasPlugin('java') }.sort { it.path }
+    def requested = System.getenv('DEPENDENCY_SECURITY_MODULE') ?: 'all'
+    def selected = new LinkedHashSet()
+    def visit
+    visit = { p ->
+        if (!selected.add(p)) return
+        p.configurations.each { c ->
+            c.allDependencies.withType(org.gradle.api.artifacts.ProjectDependency).each { d ->
+                visit(root.project(d.path))
+            }
+        }
+    }
+    if (requested == 'all') selected.addAll(jvmProjects)
+    else {
+        def target = root.findProject(requested.startsWith(':') ? requested : ':' + requested)
+        if (target == null || !jvmProjects.contains(target)) throw new GradleException('Unknown JVM module: ' + requested)
+        visit(target)
+    }
+    selected.retainAll(jvmProjects)
+    if (selected.empty) throw new GradleException('No JVM projects selected for dependency verification')
+    def configureScanner = { p ->
+        p.pluginManager.apply(DependencyCheckPlugin)
+        p.extensions.configure(DependencyCheckExtension) { dc ->
+            // Keep raw findings visible. The required dependencySecurity task below
+            // enforces CVSS >= 7 with exact, approved, expiring release exceptions.
+            dc.failBuildOnCVSS = 11.0f
+            dc.failOnError = true
+            dc.skipTestGroups = false
+            dc.scanBuildEnv = true
+            dc.scanConfigurations = p.configurations.findAll { it.canBeResolved }.collect { it.name }.sort()
+            dc.scanSet = []
+            dc.formats = ['HTML', 'JSON']
+            if (suppressions.isFile()) dc.suppressionFile = suppressions.absolutePath
+            dc.outputDirectory = new File(reportRoot, p.path == ':' ? 'root' : p.path.substring(1).replace(':', '/'))
+            dc.data.directory = dataRoot.absolutePath
+            dc.autoUpdate = false
+            dc.nvd.validForHours = 0
+            dc.nvd.maxRetryCount = 3
+            dc.connectionTimeout = java.time.Duration.ofSeconds(30)
+            dc.readTimeout = java.time.Duration.ofSeconds(60)
+            def key = System.getenv('NVD_API_KEY')
+            if (key) dc.nvd.apiKey = key
+            else dc.nvd.datafeedUrl = 'https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz'
+            // JVM-only scan; no remote package inventory uploads to OSS Index.
+            dc.analyzers.ossIndex.enabled = false
+            dc.analyzers.assemblyEnabled = false
+            dc.analyzers.nodeEnabled = false
+            dc.analyzers.nodePackage.enabled = false
+            dc.analyzers.nodeAudit.enabled = false
+            dc.analyzers.nodeAudit.yarnEnabled = false
+            dc.analyzers.nodeAudit.pnpmEnabled = false
+            dc.analyzers.retirejs.enabled = false
+        }
+        // 13.0.0 initializes the task's data.directory with set(), overriding its
+        // convention from the project extension. Bind it on each task explicitly.
+        p.tasks.withType(org.owasp.dependencycheck.gradle.tasks.ConfiguredTask).configureEach {
+            data.directory = dataRoot.absolutePath
+        }
+    }
+    configureScanner(root)
+    selected.findAll { it != root }.each(configureScanner)
+    root.tasks.named('dependencyCheckUpdate') {
+        doFirst {
+            reportRoot.mkdirs()
+            if (!System.getenv('NVD_API_KEY')) {
+                def connection = new URI('https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-modified.meta').toURL().openConnection()
+                connection.connectTimeout = 30000
+                connection.readTimeout = 30000
+                def meta = connection.inputStream.withCloseable { it.getText('UTF-8') }
+                def modified = meta.readLines().find { it.startsWith('lastModifiedDate:') }?.substring('lastModifiedDate:'.length())?.trim()
+                if (!modified) throw new GradleException('NVD feed does not declare freshness')
+                def instant = java.time.OffsetDateTime.parse(modified).toInstant()
+                def age = java.time.Duration.between(instant, java.time.Instant.now())
+                if (age.isNegative() || age > java.time.Duration.ofHours(48)) throw new GradleException('NVD feed is stale or has an invalid timestamp')
+                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD official JSON 2.0 feeds\nlastModifiedDate=' + modified + '\n'
+            } else {
+                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD API\n'
+            }
+        }
+    }
+    def inventory = root.tasks.register('dependencySecurityInventory') {
+        doLast {
+            reportRoot.mkdirs()
+            def modules = selected.sort { it.path }.collect { p ->
+                def configurations = p.configurations.findAll { it.canBeResolved }.sort { it.name }.collect { c ->
+                    // Strict resolution: a partial graph must never be a successful inventory.
+                    def artifacts = c.resolvedConfiguration.resolvedArtifacts.collect { a ->
+                        [coordinate: a.moduleVersion.id.toString(), file: a.file.name]
+                    }.unique().sort { it.coordinate }
+                    def edges = c.incoming.resolutionResult.allDependencies.collect { d ->
+                        [from: d.from.id.displayName, requested: d.requested.displayName,
+                         selected: d.selected.id.displayName]
+                    }.unique()
+                    [name: c.name, artifacts: artifacts, dependencyEdges: edges]
+                }
+                def buildArtifacts = p.buildscript.configurations.findByName('classpath')?.resolvedConfiguration?.resolvedArtifacts?.collect {
+                    [coordinate: it.moduleVersion.id.toString(), file: it.file.name]
+                } ?: []
+                [project: p.path, configurations: configurations, buildEnvironment: buildArtifacts]
+            }
+            new File(reportRoot, 'coverage.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                build: root.name, selection: requested, discoveredProjects: jvmProjects.collect { it.path },
+                scanner: '13.0.0', generatedAt: java.time.Instant.now().toString(), modules: modules
+            ]))
+        }
+    }
+    root.tasks.register('dependencySecurity') {
+        dependsOn(inventory)
+        dependsOn(selected.collect { it.tasks.named('dependencyCheckAnalyze') })
+        doLast {
+            def accepted = []
+            def blocking = []
+            def today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+            selected.each { p ->
+                def moduleReports = new File(reportRoot, p.path == ':' ? 'root' : p.path.substring(1).replace(':', '/'))
+                ['json', 'html'].each { format ->
+                    def report = new File(moduleReports, 'dependency-check-report.' + format)
+                    if (!report.isFile() || report.length() == 0) {
+                        throw new GradleException('Missing dependency security report for ' + p.path + ': ' + format)
+                    }
+                }
+                def report = new JsonSlurper().parse(new File(moduleReports, 'dependency-check-report.json'))
+                if (!(report.dependencies instanceof List)) throw new GradleException('Invalid dependency report for ' + p.path)
+                report.dependencies.each { dependency ->
+                    (dependency.vulnerabilities ?: []).each { vulnerability ->
+                        def scores = ['cvssv2', 'cvssv3', 'cvssv4'].collect { vulnerability[it]?.baseScore }.findAll { it != null }
+                        def score = scores ? scores.max() : ([CRITICAL: 9.0, HIGH: 7.0, MEDIUM: 5.0, LOW: 3.0][vulnerability.severity?.toUpperCase()] ?: 0.0)
+                        if (score >= 7.0) {
+                            def packages = (dependency.packages ?: []).collect { it.id }
+                            def approval = policy.approvals.find { a ->
+                                a.cve == vulnerability.name && !today.isBefore(java.time.LocalDate.parse(a.approvedOn)) &&
+                                today.isBefore(java.time.LocalDate.parse(a.expires)) && a.artifacts.any { artifact ->
+                                    packages.contains(artifact.packageUrl) && artifact.scopes.any { it.build == root.name && it.project == p.path }
+                                }
+                            }
+                            def finding = [project: p.path, dependency: dependency.fileName, packages: packages, cve: vulnerability.name, score: score]
+                            if (approval) accepted.add(finding + [approval: approval.id, expires: approval.expires])
+                            else blocking.add(finding)
+                        }
+                    }
+                }
+            }
+            def state = blocking ? 'failed' : (accepted ? 'passed-with-accepted-risks' : 'passed')
+            new File(reportRoot, 'gate.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                state: state, threshold: 7.0, evaluatedAt: java.time.Instant.now().toString(),
+                policySha256: approvalsFile.isFile() ? java.security.MessageDigest.getInstance('SHA-256').digest(approvalsFile.bytes).encodeHex().toString() : null,
+                accepted: accepted, blocking: blocking
+            ]))
+            if (accepted) new File(reportRoot, 'accepted-risks.txt').text = 'Known vulnerabilities accepted temporarily; see gate.json and raw OWASP reports.\n'
+            if (blocking) throw new GradleException('Dependency security blocked: ' + blocking.collect { it.cve }.unique().sort().join(', '))
+            logger.lifecycle('Dependency security: ' + state)
+        }
+    }
+    selected.each { p ->
+        p.tasks.named('dependencyCheckAnalyze') {
+            dependsOn(inventory)
+            doFirst {
+                if (!new File(dataRoot, 'honey-update-success').isFile()) {
+                    throw new GradleException('Run scripts/ci/check-jvm-dependencies.sh to refresh advisory data first')
+                }
+            }
+        }
+    }
+}

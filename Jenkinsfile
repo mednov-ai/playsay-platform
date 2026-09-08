@@ -6,7 +6,7 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
-  activeDeadlineSeconds: 2400
+  activeDeadlineSeconds: 5400
   securityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
@@ -228,7 +228,7 @@ spec:
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 75, unit: 'MINUTES')
   }
 
   parameters {
@@ -341,6 +341,21 @@ spec:
       }
     }
 
+
+    stage('Dependency security') {
+      when {
+        expression { env.RUN_API_GATEWAY == 'true' || env.RUN_MEDIA_SERVICE == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true' }
+      }
+      steps {
+        container('gradle') {
+          withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+            timeout(time: 45, unit: 'MINUTES') {
+              sh './scripts/ci/check-jvm-dependencies.sh all'
+            }
+          }
+        }
+      }
+    }
 
     stage('Build, test, and validate') {
       parallel {
@@ -1033,6 +1048,7 @@ JSON
 
   post {
     always {
+      archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: true
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

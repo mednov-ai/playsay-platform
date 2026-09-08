@@ -1,0 +1,1136 @@
+{
+  "schemaVersion": 1,
+  "approvals": [
+    {
+      "id": "WAIT-KOTLIN-2026-09",
+      "cve": "CVE-2026-53914",
+      "owner": "Honey School platform maintainers",
+      "approvedBy": "Project owner, explicit user instruction on 2026-09-08",
+      "approvedOn": "2026-09-08",
+      "expires": "2026-10-08",
+      "reason": "Await a compatible Gradle/Detekt/ABI-tooling fix; application Kotlin is updated, latest Detekt trial still embeds an affected compiler and fails existing lint.",
+      "evidence": "docs/security/dependency-remediation-2026-09-08.md",
+      "artifacts": [
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-assignment-compiler-plugin-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-common@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-cri-impl@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-klib-commonizer-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@1.6.10",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            },
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.1.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-sam-with-receiver-compiler-plugin-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-common@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-impl-embeddable@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-jvm@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.8.0",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@1.8.0",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.0.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            },
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.1.21",
+          "scopes": [
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            },
+            {
+              "build": "playsay-backend-build-logic",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.20",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":ai-tutor-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":api-gateway"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":email-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":keyboard-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":media-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":payment-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":registration-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":vocabulary-service"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":worksheet-import-service"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.4.0",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":architecture-testkit"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:email-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:media-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:payment-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:registration-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":contracts:worksheet-import-internal-contract"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":integration-support"
+            },
+            {
+              "build": "playsay-backend",
+              "project": ":openai-support"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "WAIT-KEYCLOAK-NETTY-2026-09",
+      "cve": "CVE-2026-62380",
+      "owner": "Honey School platform maintainers",
+      "approvedBy": "Project owner, explicit user instruction on 2026-09-08",
+      "approvedOn": "2026-09-08",
+      "expires": "2026-10-08",
+      "reason": "Await a fixed stable Keycloak server release; latest stable 26.7.3 still ships Netty 4.1.136.Final. A provider-only override does not fix server jars.",
+      "evidence": "docs/security/dependency-remediation-2026-09-08.md",
+      "artifacts": [
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-buffer@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec-dns@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec-haproxy@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec-http2@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec-http@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec-socks@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-codec@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-common@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-handler-proxy@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-handler@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-resolver-dns@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-resolver@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-transport-native-unix-common@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        },
+        {
+          "packageUrl": "pkg:maven/io.netty/netty-transport@4.1.136.Final",
+          "scopes": [
+            {
+              "build": "playsay-backend",
+              "project": ":keycloak-lesson-authenticator"
+            },
+            {
+              "build": "keycloak-lesson-authenticator",
+              "project": ":"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,11 @@ plugins {
     id("dev.detekt")
 }
 
+// Spring Boot 4.0.8 supplies 11.0.24; the next Tomcat maintenance release fixes
+// the 2026 access-control and session-expiration advisories.
+extra["tomcat.version"] = "11.0.25"
+extra["kotlin.version"] = "2.4.20"
+
 detekt {
     toolVersion = "2.0.0-alpha.1"
     source.setFrom(files("src/main/kotlin"))

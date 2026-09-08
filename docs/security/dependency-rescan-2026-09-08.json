@@ -1,0 +1,2689 @@
+{
+  "date": "2026-09-08",
+  "scanner": "OWASP Dependency-Check 13.0.0",
+  "run": "run.QXWo5F1g",
+  "state": "failed-vulnerability-gate",
+  "advisorySource": "source=NVD official JSON 2.0 feeds\nlastModifiedDate=2026-09-08T08:00:04-04:00\n",
+  "advisoryUpdatedAt": "2026-09-08T12:26:13Z",
+  "reports": 19,
+  "backendModules": 18,
+  "includedBuilds": [
+    "build-logic"
+  ],
+  "baselineUniqueAdvisories": 210,
+  "remainingUniqueAdvisories": [
+    "CVE-2026-53914",
+    "CVE-2026-62380"
+  ],
+  "note": "Difference includes dependency upgrades, exact false-positive suppressions and exclusion of non-JVM analyzers; absent IDs are not individually asserted confirmed vulnerabilities. Kotlin library-only matches still require component-level triage.",
+  "findings": [
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-assignment-compiler-plugin-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-assignment-compiler-plugin-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinCompilerPluginClasspathMain",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-assignment-compiler-plugin-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-common:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-common@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21",
+          "org.jetbrains.kotlin:kotlin-build-common:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-tools-api:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-build-tools-api:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-tools-api:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-build-tools-api:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-tools-cri-impl:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-cri-impl@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :ai-tutor-service",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-build-tools-cri-impl:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :ai-tutor-service",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-compiler-runner:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :ai-tutor-service",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-runner:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-compiler:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-compiler:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-daemon-client:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21",
+          "org.jetbrains.kotlin:kotlin-daemon-client:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-daemon-client:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-runner:2.4.0",
+          "org.jetbrains.kotlin:kotlin-daemon-client:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-daemon-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinBuildToolsApiClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.0.21",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-daemon-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-daemon-embeddable:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.0",
+          "org.jetbrains.kotlin:kotlin-daemon-embeddable:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-klib-commonizer-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-klib-commonizer-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinKlibCommonizerClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinKlibCommonizerClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-klib-commonizer-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-reflect:1.6.10",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@1.6.10",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        },
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.0",
+          "org.jetbrains.kotlin:kotlin-reflect:1.6.10"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-reflect:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileOnlyDependenciesMetadata",
+            "embeddedKotlin"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compileOnlyDependenciesMetadata",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-reflect:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-reflect:2.1.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.1.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileClasspath",
+            "implementationDependenciesMetadata",
+            "runtimeClasspath",
+            "testCompileClasspath",
+            "testImplementationDependenciesMetadata",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compileClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-reflect:2.1.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-reflect:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-compiler:2.2.20",
+          "org.jetbrains.kotlin:kotlin-reflect:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-sam-with-receiver-compiler-plugin-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-sam-with-receiver-compiler-plugin-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "kotlinCompilerPluginClasspathMain",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-sam-with-receiver-compiler-plugin-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-script-runtime:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compilePluginsBlocksPluginClasspathElements",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest",
+            "kotlinKlibCommonizerClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compilePluginsBlocksPluginClasspathElements",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-jvm:2.0.21",
+          "org.jetbrains.kotlin:kotlin-script-runtime:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-script-runtime:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-compiler:2.2.20",
+          "org.jetbrains.kotlin:kotlin-script-runtime:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-script-runtime:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.0",
+          "org.jetbrains.kotlin:kotlin-script-runtime:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-scripting-common:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-common@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compilePluginsBlocksPluginClasspathElements",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compilePluginsBlocksPluginClasspathElements",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-common:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compilePluginsBlocksPluginClasspathElements",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compilePluginsBlocksPluginClasspathElements",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-impl-embeddable@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compilePluginsBlocksPluginClasspathElements",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compilePluginsBlocksPluginClasspathElements",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-scripting-jvm:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-scripting-jvm@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compilePluginsBlocksPluginClasspathElements",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compilePluginsBlocksPluginClasspathElements",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable:2.0.21",
+          "org.jetbrains.kotlin:kotlin-scripting-jvm:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.8.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "runtimeClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "runtimeClasspath",
+        "path": [
+          "root project :",
+          "com.fasterxml.jackson.module:jackson-module-kotlin:2.22.2",
+          "org.jetbrains.kotlin:kotlin-reflect:2.1.21",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.1.21",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.2.20",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@1.8.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "runtimeClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "runtimeClasspath",
+        "path": [
+          "root project :",
+          "com.fasterxml.jackson.module:jackson-module-kotlin:2.22.2",
+          "org.jetbrains.kotlin:kotlin-reflect:2.1.21",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.1.21",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-compiler:2.2.20",
+          "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.0.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.0.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileOnlyDependenciesMetadata",
+            "compilePluginsBlocksPluginClasspathElements",
+            "embeddedKotlin",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest",
+            "kotlinKlibCommonizerClasspath",
+            "buildEnvironment"
+          ]
+        },
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileOnlyDependenciesMetadata",
+            "compilePluginsBlocksPluginClasspathElements",
+            "embeddedKotlin",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest",
+            "kotlinKlibCommonizerClasspath",
+            "buildEnvironment"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compileOnlyDependenciesMetadata",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.0.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.1.21",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.1.21",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileClasspath",
+            "implementationDependenciesMetadata",
+            "runtimeClasspath",
+            "testCompileClasspath",
+            "testImplementationDependenciesMetadata",
+            "testRuntimeClasspath"
+          ]
+        },
+        {
+          "build": "build-logic",
+          "module": ":",
+          "configurations": [
+            "compileClasspath",
+            "implementationDependenciesMetadata",
+            "runtimeClasspath",
+            "testCompileClasspath",
+            "testImplementationDependenciesMetadata",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "build-logic",
+        "configuration": "compileClasspath",
+        "path": [
+          "root project :",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.1.21"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.2.20",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.2.20",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":ai-tutor-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":api-gateway",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":email-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":keyboard-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":media-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":payment-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":registration-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":vocabulary-service",
+          "configurations": [
+            "detekt"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":worksheet-import-service",
+          "configurations": [
+            "detekt"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "detekt",
+        "path": [
+          "project :ai-tutor-service",
+          "dev.detekt:detekt-cli:2.0.0-alpha.1",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.2.20"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-53914",
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.4.0",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.4.0",
+      "scores": {
+        "cvssv3": 9.8
+      },
+      "references": [
+        "https://www.jetbrains.com/privacy-security/issues-fixed/"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":architecture-testkit",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:email-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:media-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:payment-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:registration-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":contracts:worksheet-import-internal-contract",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":integration-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        },
+        {
+          "build": "backend",
+          "module": ":openai-support",
+          "configurations": [
+            "kotlinAbiValidationCompatClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "kotlinAbiValidationCompatClasspath",
+        "path": [
+          "project :architecture-testkit",
+          "org.jetbrains.kotlin:kotlin-build-tools-impl:2.4.0",
+          "org.jetbrains.kotlin:kotlin-stdlib:2.4.0"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-buffer:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-buffer@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-buffer:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec-dns:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec-dns@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec-dns:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec-haproxy:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec-haproxy@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec-haproxy:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec-http2:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec-http2@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec-http2:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec-http:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec-http@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec-http:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec-socks:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec-socks@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec-socks:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-codec:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-codec@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-codec:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-common:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-common@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-common:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-handler-proxy:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-handler-proxy@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-handler-proxy:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-handler:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-handler@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-handler:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-resolver-dns:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-resolver-dns@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-resolver-dns:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-resolver:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-resolver@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-resolver:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-transport-native-unix-common:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-transport-native-unix-common@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-transport-native-unix-common:4.1.136.Final"
+        ]
+      }
+    },
+    {
+      "advisory": "CVE-2026-62380",
+      "coordinate": "io.netty:netty-transport:4.1.136.Final",
+      "packageUrl": "pkg:maven/io.netty/netty-transport@4.1.136.Final",
+      "scores": {
+        "cvssv3": 7.5,
+        "cvssv4": 6.3
+      },
+      "references": [
+        "https://github.com/netty/netty/security/advisories/GHSA-cc6x-ffm5-83wf",
+        "https://www.vulncheck.com/advisories/netty-before-final-socks-proxy-null-byte-injection"
+      ],
+      "locations": [
+        {
+          "build": "backend",
+          "module": ":keycloak-lesson-authenticator",
+          "configurations": [
+            "compileClasspath",
+            "testCompileClasspath",
+            "testRuntimeClasspath"
+          ]
+        }
+      ],
+      "representativeDependencyPath": {
+        "build": "backend",
+        "configuration": "compileClasspath",
+        "path": [
+          "project :keycloak-lesson-authenticator",
+          "org.keycloak:keycloak-parent:26.7.3",
+          "io.netty:netty-transport:4.1.136.Final"
+        ]
+      }
+    }
+  ]
+}

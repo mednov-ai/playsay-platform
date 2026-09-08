@@ -1,0 +1,39 @@
+{
+  "results": [
+    {
+      "case": "unapproved",
+      "exitCode": 1,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "accepted",
+      "exitCode": 0,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "expired",
+      "exitCode": 1,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "wrong-version",
+      "exitCode": 1,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "wrong-module",
+      "exitCode": 1,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "new-finding",
+      "exitCode": 1,
+      "rawFindingsPreserved": true
+    },
+    {
+      "case": "wildcard",
+      "exitCode": 1,
+      "rawFindingsPreserved": false
+    }
+  ]
+}

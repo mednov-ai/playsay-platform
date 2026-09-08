@@ -3,5 +3,5 @@ plugins {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-test-junit5:2.2.21")
+    implementation("org.jetbrains.kotlin:kotlin-test-junit5:2.4.20")
 }

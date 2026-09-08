@@ -189,7 +189,6 @@ test("shared backend and frontend changes use explicit consumer sets", () => {
   );
   for (const sharedBackendPath of [
     "backend/architecture-testkit/src/main/kotlin/com/playsay/architecture/Rules.kt",
-    "backend/build-logic/src/main/kotlin/playsay.spring-service-conventions.gradle.kts",
     "backend/config/detekt/detekt.yml",
   ]) {
     assertDetection(
@@ -358,4 +357,22 @@ test("historical coarse cases now produce granular work", () => {
   ]);
   assert.deepEqual(apiWebAndCi.deployTargets, ["api-gateway", "web-app"]);
   assert.deepEqual(apiWebAndCi.validationSuites, ["ci-contracts"]);
+});
+
+ test("shared security and tooling changes include every JVM publication target", () => {
+  for (const path of [
+    "scripts/ci/check-jvm-dependencies.sh",
+    "backend/gradle/dependency-security.init.gradle",
+    "backend/build-logic/src/main/kotlin/playsay.spring-service-conventions.gradle.kts",
+    "backend/build.gradle.kts",
+    "backend/settings.gradle.kts",
+    "backend/integration-support/build.gradle.kts",
+  ]) {
+    const result = detectTargetsForPaths([path]);
+    assert.deepEqual(result.deployTargets, [
+      "api-gateway", "ai-tutor-service", "worksheet-import-service", "vocabulary-service",
+      "media-service", "payment-service", "registration-service", "email-service", "keycloak", "keyboard-service",
+    ]);
+    assert.deepEqual(result.validationSuites, ["ci-contracts"]);
+  }
 });

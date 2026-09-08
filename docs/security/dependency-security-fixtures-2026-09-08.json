@@ -1,0 +1,60 @@
+{
+  "results": [
+    {
+      "case": "vulnerable",
+      "exitCode": 1,
+      "findings": [
+        "CVE-2023-31582",
+        "CVE-2023-51775",
+        "CVE-2024-29371"
+      ],
+      "discovered": [
+        ":consumer",
+        ":library",
+        ":new-module"
+      ]
+    },
+    {
+      "case": "fixed",
+      "exitCode": 0,
+      "findings": [],
+      "discovered": [
+        ":consumer",
+        ":library",
+        ":new-module"
+      ]
+    },
+    {
+      "case": "expired",
+      "exitCode": 1,
+      "findings": [
+        "CVE-2023-31582",
+        "CVE-2023-51775",
+        "CVE-2024-29371"
+      ],
+      "discovered": [
+        ":consumer",
+        ":library",
+        ":new-module"
+      ]
+    },
+    {
+      "case": "selected-test-transitive",
+      "exitCode": 1,
+      "selectedProjects": [
+        ":consumer",
+        ":library"
+      ],
+      "verified": "CVE-2023-51775 present in consumer test configuration and upstream compileOnly library"
+    },
+    {
+      "case": "selected-fixed",
+      "exitCode": 0,
+      "selectedProjects": [
+        ":consumer",
+        ":library"
+      ],
+      "verified": "No findings; nonempty JSON and HTML reports required for both selected modules"
+    }
+  ]
+}

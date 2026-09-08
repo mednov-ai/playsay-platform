@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-api-incubator@1.57.0-alpha</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-api@1.41.0</packageUrl>
+    <cve>CVE-2026-39882</cve>
+    <cve>CVE-2026-39883</cve>
+    <cve>CVE-2026-41178</cve>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-api@1.55.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-api@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-common@1.55.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-common@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-context@1.41.0</packageUrl>
+    <cve>CVE-2026-39882</cve>
+    <cve>CVE-2026-39883</cve>
+    <cve>CVE-2026-41178</cve>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-context@1.55.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-context@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-extension-autoconfigure@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. These advisories affect OpenTelemetry Go/JavaScript, not Java Maven artifacts. Evidence: https://github.com/open-telemetry/opentelemetry-js/security/advisories/GHSA-8988-4f7v-96qf and https://github.com/open-telemetry/opentelemetry-go/security/advisories . See docs/security/dependency-baseline-2026-09-08.json for exact advisory URLs.]]></notes>
+    <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk@1.57.0</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. Gradle dependency-management-plugin is misidentified as Spring Framework 1.1.7; the artifact contains no org/springframework classes. Evidence: https://github.com/spring-gradle-plugins/dependency-management-plugin/tree/v1.1.7 . This excludes only the observed Spring Framework CVEs on this exact plugin version.]]></notes>
+    <packageUrl>pkg:maven/io.spring.gradle/dependency-management-plugin@1.1.7</packageUrl>
+    <cve>CVE-2013-4152</cve>
+    <cve>CVE-2013-7315</cve>
+    <cve>CVE-2014-0054</cve>
+    <cve>CVE-2016-9878</cve>
+    <cve>CVE-2018-11039</cve>
+    <cve>CVE-2018-11040</cve>
+    <cve>CVE-2018-1257</cve>
+    <cve>CVE-2018-1270</cve>
+    <cve>CVE-2020-5421</cve>
+    <cve>CVE-2022-22950</cve>
+    <cve>CVE-2022-22965</cve>
+    <cve>CVE-2022-22968</cve>
+    <cve>CVE-2022-22970</cve>
+    <cve>CVE-2023-20861</cve>
+    <cve>CVE-2024-22259</cve>
+    <cve>CVE-2026-22735</cve>
+    <cve>CVE-2026-22737</cve>
+    <cve>CVE-2026-22740</cve>
+    <cve>CVE-2026-22741</cve>
+    <cve>CVE-2026-22745</cve>
+    <cve>CVE-2026-41839</cve>
+    <cve>CVE-2026-47891</cve>
+    <cve>CVE-2026-47893</cve>
+    <cve>CVE-2026-59280</cve>
+    <cve>CVE-2026-59281</cve>
+    <cve>CVE-2026-59282</cve>
+    <cve>CVE-2026-59283</cve>
+    <cve>CVE-2026-59314</cve>
+  </suppress>
+    <suppress until="2026-10-08Z">
+        <notes><![CDATA[Owner: Honey School platform maintainers. Spring Tools IDE YAML editors are a different product from Spring Boot loader tools. https://spring.io/security/cve-2022-31691/]]></notes>
+        <packageUrl>pkg:maven/org.springframework.boot/spring-boot-loader-tools@4.0.8</packageUrl>
+        <cve>CVE-2022-31691</cve>
+    </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-assignment-compiler-plugin-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-build-common@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-klib-commonizer-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-reflect@1.6.10</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-sam-with-receiver-compiler-plugin-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-scripting-common@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-scripting-compiler-impl-embeddable@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-scripting-jvm@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.8.0</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@1.8.0</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+  <suppress until="2026-10-08Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. CVE-2020-29582 affects Kotlin before 1.4.21; this exact version is newer. This does not suppress CVE-2026-53914. Evidence: https://www.jetbrains.com/privacy-security/issues-fixed/ and https://nvd.nist.gov/vuln/detail/CVE-2020-29582 .]]></notes>
+    <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.0.21</packageUrl>
+    <cve>CVE-2020-29582</cve>
+  </suppress>
+</suppressions>

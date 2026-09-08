@@ -221,6 +221,7 @@ private fun InetAddress.isPrivateImportAddress(): Boolean {
             val first = address[0].toInt() and 0xff
             first == 0 || first == 0xfc || first == 0xfd || first == 0xfe
         }
+        else -> true
     }
 }
 

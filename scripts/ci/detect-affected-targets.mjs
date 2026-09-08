@@ -172,6 +172,21 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    // Security policy and common build dependencies also affect the Java Keycloak provider.
+    if (
+      path === "scripts/ci/check-jvm-dependencies.sh" ||
+      path.startsWith("backend/gradle/") ||
+      path.startsWith("backend/build-logic/") ||
+      path === "backend/build.gradle.kts" ||
+      path === "backend/settings.gradle.kts" ||
+      path.startsWith("backend/integration-support/")
+    ) {
+      addAll(deployTargets, BACKEND_TARGETS);
+      deployTargets.add("keycloak");
+      addValidation(validationSuites, "ci-contracts");
+      continue;
+    }
+
     if (MODULE_PIPELINES[path]) {
       deployTargets.add(MODULE_PIPELINES[path]);
       continue;

@@ -5,6 +5,7 @@ import {
   isRoomSessionExpired,
   roomSessionFromScheduledLesson,
   type LessonDiceController,
+  type LessonDiceDeliveryError,
   type LessonDiceRejection,
   type LessonDiceRejectionCode,
   type LessonDiceRoll,
@@ -24,6 +25,14 @@ import type { SessionStatus } from "../../features/profile/ui/ProfileAccountPane
 import type { SessionErrorHandler } from "./types";
 import { publishHomeworkAssignmentChange } from "../../features/homework/model/homeworkRealtime";
 import { realtimeReconnectDelayMs } from "../../features/classroom/model/realtimeLifecycle";
+
+const DICE_RESPONSE_TIMEOUT_MS = 10_000;
+
+type PendingDiceRequest = {
+  deadlineMs: number;
+  lessonId: string;
+  requestId: string;
+};
 
 type LessonRealtimeMessage = {
   type?: string;
@@ -71,6 +80,9 @@ export function useLessonRealtime({
   const [lastDiceRoll, setLastDiceRoll] = useState<LessonDiceRoll | null>(null);
   const [liveDiceRoll, setLiveDiceRoll] = useState<LessonDiceRoll | null>(null);
   const [diceRejection, setDiceRejection] = useState<LessonDiceRejection | null>(null);
+  const [diceDeliveryError, setDiceDeliveryError] = useState<LessonDiceDeliveryError | null>(null);
+  const [dicePending, setDicePending] = useState(false);
+  const [realtimeOpen, setRealtimeOpen] = useState(false);
   const realtimeSocketRef = useRef<WebSocket | null>(null);
   const realtimeReconnectTimerRef = useRef<number | null>(null);
   const realtimeReconnectAttemptRef = useRef(0);
@@ -80,6 +92,8 @@ export function useLessonRealtime({
   const reportedCheckingLessonIdRef = useRef<string | null>(null);
   const scheduleSyncInFlightRef = useRef(false);
   const scheduleSyncPendingRef = useRef(false);
+  const pendingDiceRequestRef = useRef<PendingDiceRequest | null>(null);
+  const diceResponseTimerRef = useRef<number | null>(null);
   const syncScheduleFromServerRef = useRef<(options?: { message?: string }) => Promise<void>>(async () => undefined);
   const roomSessionLessonId = roomSession?.lessonId ?? null;
   const activeLessonId = roomSessionLessonId ?? classroomLessonId;
@@ -98,11 +112,16 @@ export function useLessonRealtime({
       setLastDiceRoll(null);
       setLiveDiceRoll(null);
       setDiceRejection(null);
+      clearPendingDiceRequest();
+      setDiceDeliveryError(null);
       return;
     }
     setLastDiceRoll((current) => current?.lessonId === roomSessionLessonId ? current : null);
     setLiveDiceRoll((current) => current?.lessonId === roomSessionLessonId ? current : null);
     setDiceRejection((current) => current?.lessonId === roomSessionLessonId ? current : null);
+    const pending = pendingDiceRequestRef.current;
+    if (pending && pending.lessonId !== roomSessionLessonId) clearPendingDiceRequest();
+    setDiceDeliveryError(null);
   }, [roomSessionLessonId]);
 
   useEffect(() => {
@@ -122,6 +141,8 @@ export function useLessonRealtime({
 
   useEffect(() => {
     if (status !== "authenticated") {
+      setRealtimeOpen(false);
+      failPendingDiceRequest("UNAVAILABLE");
       realtimeSocketRef.current?.close();
       realtimeSocketRef.current = null;
       if (realtimeReconnectTimerRef.current !== null) {
@@ -162,6 +183,8 @@ export function useLessonRealtime({
       realtimeSocketRef.current = socket;
 
       socket.onopen = () => {
+        setRealtimeOpen(true);
+        setDiceDeliveryError((current) => current === "UNAVAILABLE" ? null : current);
         realtimeReconnectAttemptRef.current = 0;
         void syncScheduleFromServerRef.current();
         const lessonId = activeLessonIdRef.current;
@@ -182,6 +205,8 @@ export function useLessonRealtime({
       socket.onclose = () => {
         if (realtimeSocketRef.current === socket) {
           realtimeSocketRef.current = null;
+          setRealtimeOpen(false);
+          failPendingDiceRequest("UNAVAILABLE");
         }
         scheduleRealtimeReconnect();
       };
@@ -198,15 +223,24 @@ export function useLessonRealtime({
       void connectRealtime();
     };
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") reconnectNow();
+      if (document.visibilityState === "visible") {
+        expirePendingDiceRequest();
+        reconnectNow();
+      }
+    };
+    const handlePageShow = () => {
+      expirePendingDiceRequest();
+      reconnectNow();
     };
     window.addEventListener("online", reconnectNow);
+    window.addEventListener("pageshow", handlePageShow);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     void connectRealtime();
 
     return () => {
       closed = true;
       window.removeEventListener("online", reconnectNow);
+      window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (realtimeReconnectTimerRef.current !== null) {
         window.clearTimeout(realtimeReconnectTimerRef.current);
@@ -214,6 +248,8 @@ export function useLessonRealtime({
       }
       realtimeSocketRef.current?.close();
       realtimeSocketRef.current = null;
+      clearPendingDiceRequest();
+      setRealtimeOpen(false);
     };
   }, [status]);
 
@@ -316,9 +352,13 @@ export function useLessonRealtime({
 
     if ((message.type === "tool.dice.rolled" || message.type === "tool.dice.snapshot")) {
       const roll = lessonDiceRoll(message);
-      if (!roll) return;
+      if (!roll || roll.lessonId !== roomSessionRef.current?.lessonId) return;
       setLastDiceRoll(roll);
       setDiceRejection(null);
+      setDiceDeliveryError(null);
+      if (pendingDiceRequestMatches(roll.lessonId, roll.requestId)) {
+        clearPendingDiceRequest();
+      }
       if (message.type === "tool.dice.rolled") {
         setLiveDiceRoll(roll);
       }
@@ -327,7 +367,12 @@ export function useLessonRealtime({
 
     if (message.type === "tool.dice.rejected") {
       const rejection = lessonDiceRejection(message);
-      if (rejection) setDiceRejection(rejection);
+      if (!rejection || rejection.lessonId !== roomSessionRef.current?.lessonId) return;
+      setDiceRejection(rejection);
+      setDiceDeliveryError(null);
+      if (rejection.requestId && pendingDiceRequestMatches(rejection.lessonId, rejection.requestId)) {
+        clearPendingDiceRequest();
+      }
     }
   }
 
@@ -384,31 +429,86 @@ export function useLessonRealtime({
 
   function rollDice() {
     const lessonId = roomSessionRef.current?.lessonId;
-    if (!lessonId) return;
+    if (!lessonId || pendingDiceRequestRef.current) return;
     setDiceRejection(null);
-    sendLessonRealtimeMessage({
-      type: "tool.dice.roll",
+    setDiceDeliveryError(null);
+
+    let requestId: string;
+    try {
+      requestId = crypto.randomUUID();
+    } catch {
+      setDiceDeliveryError("UNAVAILABLE");
+      return;
+    }
+
+    const pending: PendingDiceRequest = {
+      deadlineMs: Date.now() + DICE_RESPONSE_TIMEOUT_MS,
       lessonId,
-      requestId: crypto.randomUUID(),
-    });
+      requestId,
+    };
+    pendingDiceRequestRef.current = pending;
+    setDicePending(true);
+
+    if (!sendLessonRealtimeMessage({ type: "tool.dice.roll", lessonId, requestId })) {
+      failPendingDiceRequest("UNAVAILABLE", requestId);
+      return;
+    }
+    diceResponseTimerRef.current = window.setTimeout(() => {
+      failPendingDiceRequest("UNCONFIRMED", requestId);
+    }, DICE_RESPONSE_TIMEOUT_MS);
   }
 
-  function sendLessonRealtimeMessage(message: Record<string, string>) {
+  function sendLessonRealtimeMessage(message: Record<string, string>): boolean {
     const socket = realtimeSocketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return;
+      setRealtimeOpen(false);
+      return false;
     }
 
     try {
       socket.send(JSON.stringify(message));
+      return true;
     } catch {
+      setRealtimeOpen(false);
       socket.close();
+      return false;
+    }
+  }
+
+  function pendingDiceRequestMatches(lessonId: string | null, requestId: string): boolean {
+    const pending = pendingDiceRequestRef.current;
+    return Boolean(pending && pending.lessonId === lessonId && pending.requestId === requestId);
+  }
+
+  function clearPendingDiceRequest() {
+    pendingDiceRequestRef.current = null;
+    if (diceResponseTimerRef.current !== null) {
+      window.clearTimeout(diceResponseTimerRef.current);
+      diceResponseTimerRef.current = null;
+    }
+    setDicePending(false);
+  }
+
+  function failPendingDiceRequest(error: LessonDiceDeliveryError, requestId?: string) {
+    const pending = pendingDiceRequestRef.current;
+    if (!pending || (requestId && pending.requestId !== requestId)) return;
+    clearPendingDiceRequest();
+    setDiceDeliveryError(error);
+  }
+
+  function expirePendingDiceRequest() {
+    const pending = pendingDiceRequestRef.current;
+    if (pending && pending.deadlineMs <= Date.now()) {
+      failPendingDiceRequest("UNCONFIRMED", pending.requestId);
     }
   }
 
   const dice: LessonDiceController = {
+    connectionAvailable: realtimeOpen,
+    deliveryError: diceDeliveryError,
     lastRoll: lastDiceRoll,
     liveRoll: liveDiceRoll,
+    pending: dicePending,
     rejection: diceRejection,
     roll: rollDice,
   };

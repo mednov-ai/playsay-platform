@@ -1,6 +1,7 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../api/chatApi";
-import { availableGlobalToolIds, dicePips, mergeMessages, messageStatus } from "./GlobalToolsRail";
+import { availableGlobalToolIds, DiceFaceIcon, dicePips, mergeMessages, messageStatus } from "./GlobalToolsRail";
 
 describe("chat message state", () => {
   it("replaces an optimistic message with the persisted response and keeps chronological order", () => {
@@ -38,6 +39,14 @@ describe("chat message state", () => {
 });
 
 describe("dice pips", () => {
+  it("renders two dotted dice before the first roll instead of an empty checkbox", () => {
+    const markup = renderToStaticMarkup(DiceFaceIcon({ value: null }));
+
+    expect(markup).toContain('data-initial="true"');
+    expect(markup.match(/<rect/g)).toHaveLength(2);
+    expect(markup.match(/<circle/g)).toHaveLength(7);
+  });
+
   it("uses standard D6 layouts and no pips before the first roll", () => {
     expect(dicePips(null)).toHaveLength(0);
     expect(dicePips(1)).toEqual([[12, 12]]);

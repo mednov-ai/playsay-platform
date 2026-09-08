@@ -4,7 +4,6 @@ import {
   BellOff,
   Check,
   CheckCheck,
-  Dices,
   Loader2,
   MessageCircle,
   Search,
@@ -375,6 +374,8 @@ export function GlobalToolsRail({
     (classroomDice.rejection.code !== "COOLDOWN" || diceCoolingDown)
     ? classroomDice.rejection
     : null;
+  const diceDeliveryError = classroomDice?.deliveryError ??
+    (classroomDice && !classroomDice.connectionAvailable ? "UNAVAILABLE" : null);
 
   useEffect(() => {
     setDiceNow(Date.now());
@@ -407,7 +408,7 @@ export function GlobalToolsRail({
   const unreadCount = totalUnreadCount(unreadByConversation);
   const diceValue = classroomDice?.lastRoll?.value ?? null;
   const diceLabel = diceValue === null
-    ? t("dice.roll")
+    ? t("dice.open")
     : diceCoolingDown
       ? t("dice.aria.valueCooling", { value: diceValue })
       : t("dice.aria.value", { value: diceValue });
@@ -421,7 +422,7 @@ export function GlobalToolsRail({
     dice: {
       id: "dice",
       label: diceLabel,
-      icon: diceValue === null ? <Dices aria-hidden="true" /> : <DiceFaceIcon value={diceValue} />,
+      icon: <DiceFaceIcon value={diceValue} />,
     },
   };
   const tools = availableGlobalToolIds(Boolean(classroomDice)).map((toolId) => toolDefinitions[toolId]);
@@ -781,14 +782,25 @@ export function GlobalToolsRail({
                 {t(`dice.errors.${visibleDiceRejection.code}`)}
               </p>
             ) : null}
+            {!visibleDiceRejection && diceDeliveryError ? (
+              <p className="playsay-dice-error" role="alert">
+                {t(`dice.errors.${diceDeliveryError}`)}
+              </p>
+            ) : null}
             <button
+              aria-busy={classroomDice.pending}
               className="playsay-dice-roll-button"
               data-tool-autofocus
-              disabled={diceCoolingDown}
+              data-waiting={classroomDice.pending || diceCoolingDown ? "true" : "false"}
+              disabled={diceCoolingDown || classroomDice.pending || !classroomDice.connectionAvailable}
               onClick={classroomDice.roll}
               type="button"
             >
-              {diceCoolingDown ? t("dice.cooldown") : t("dice.roll")}
+              {classroomDice.pending
+                ? t("dice.pending")
+                : diceCoolingDown
+                  ? t("dice.cooldown")
+                  : t("dice.roll")}
             </button>
           </div>
         </section>
@@ -832,6 +844,21 @@ export function GlobalToolsRail({
 }
 
 export function DiceFaceIcon({ value }: { value: LessonDiceRoll["value"] | null }) {
+  if (value === null) {
+    return (
+      <svg aria-hidden="true" className="playsay-dice-face-icon" data-initial="true" viewBox="0 0 29 24">
+        <rect height="16" rx="3.5" width="12" x="1.5" y="4" />
+        <circle cx="5" cy="8" r="1.35" />
+        <circle cx="10" cy="16" r="1.35" />
+        <rect height="16" rx="3.5" width="12" x="15.5" y="4" />
+        <circle cx="19" cy="8" r="1.35" />
+        <circle cx="24" cy="8" r="1.35" />
+        <circle cx="21.5" cy="12" r="1.35" />
+        <circle cx="19" cy="16" r="1.35" />
+        <circle cx="24" cy="16" r="1.35" />
+      </svg>
+    );
+  }
   return (
     <svg aria-hidden="true" className="playsay-dice-face-icon" viewBox="0 0 24 24">
       <rect height="19" rx="4.5" width="19" x="2.5" y="2.5" />

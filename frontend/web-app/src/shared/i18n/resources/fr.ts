@@ -247,6 +247,7 @@ export const fr = {
     title: "Dé",
     subtitle: "Outil partagé du cours",
     roll: "Lancer",
+    pending: "Résultat en attente…",
     cooldown: "Le dé roule…",
     empty: "Lancez le dé — tous les participants verront le résultat.",
     lastRoller: "Dernier lancer : {{name}}",
@@ -260,6 +261,8 @@ export const fr = {
       COOLDOWN: "Attendez la fin du lancer en cours.",
       LESSON_NOT_ACTIVE: "Le dé est disponible uniquement pendant un cours actif.",
       FORBIDDEN: "Le lancer n’est pas disponible pour ce cours.",
+      UNAVAILABLE: "La connexion au cours est indisponible. Attendez son rétablissement et réessayez.",
+      UNCONFIRMED: "Le résultat n’a pas été confirmé. Vérifiez la connexion et réessayez.",
     },
   },
   shell: {

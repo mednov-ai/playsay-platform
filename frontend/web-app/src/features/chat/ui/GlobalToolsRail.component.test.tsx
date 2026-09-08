@@ -27,11 +27,24 @@ afterEach(cleanup);
 
 it("shows chat then dotted dice, opens without rolling and restores keyboard focus", async () => {
   const roll = vi.fn();
-  const { container } = render(<GlobalToolsRail profile={profile} classroomDice={{ lastRoll: null, liveRoll: null, rejection: null, roll }} />);
+  const { container } = render(
+    <GlobalToolsRail
+      profile={profile}
+      classroomDice={{
+        connectionAvailable: true,
+        deliveryError: null,
+        lastRoll: null,
+        liveRoll: null,
+        pending: false,
+        rejection: null,
+        roll,
+      }}
+    />,
+  );
   await waitFor(() => expect(mocks.contacts).toHaveBeenCalled());
   expect([...container.querySelectorAll("[data-tool]")].map((item) => item.getAttribute("data-tool"))).toEqual(["chat", "dice"]);
-  const dice = screen.getByRole("button", { name: "dice.roll" });
-  expect(dice.querySelector(".lucide-dices")).not.toBeNull();
+  const dice = screen.getByRole("button", { name: "dice.open" });
+  expect(dice.querySelector('[data-initial="true"]')).not.toBeNull();
   fireEvent.click(dice);
   const panel = screen.getByRole("dialog", { name: "dice.title" });
   expect(roll).not.toHaveBeenCalled();

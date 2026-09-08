@@ -32,9 +32,14 @@ export type LessonDiceRejection = {
   retryAt: string | null;
 };
 
+export type LessonDiceDeliveryError = "UNAVAILABLE" | "UNCONFIRMED";
+
 export type LessonDiceController = {
+  connectionAvailable: boolean;
+  deliveryError: LessonDiceDeliveryError | null;
   lastRoll: LessonDiceRoll | null;
   liveRoll: LessonDiceRoll | null;
+  pending: boolean;
   rejection: LessonDiceRejection | null;
   roll: () => void;
 };

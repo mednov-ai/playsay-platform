@@ -247,6 +247,7 @@ export const en = {
     title: "Dice",
     subtitle: "Shared lesson tool",
     roll: "Roll",
+    pending: "Waiting for result…",
     cooldown: "Rolling…",
     empty: "Roll the dice — everyone in the lesson will see the result.",
     lastRoller: "Last roll: {{name}}",
@@ -260,6 +261,8 @@ export const en = {
       COOLDOWN: "Wait for the current roll to finish.",
       LESSON_NOT_ACTIVE: "The dice is available only during an active lesson.",
       FORBIDDEN: "Rolling is not available for this lesson.",
+      UNAVAILABLE: "The lesson connection is unavailable. Wait for it to reconnect and try again.",
+      UNCONFIRMED: "The result was not confirmed. Check the connection and try again.",
     },
   },
   shell: {

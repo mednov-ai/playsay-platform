@@ -247,6 +247,7 @@ export const de = {
     title: "Würfel",
     subtitle: "Gemeinsames Unterrichtswerkzeug",
     roll: "Würfeln",
+    pending: "Ergebnis wird abgerufen…",
     cooldown: "Der Würfel rollt…",
     empty: "Würfle – alle im Unterricht sehen das Ergebnis.",
     lastRoller: "Letzter Wurf: {{name}}",
@@ -260,6 +261,8 @@ export const de = {
       COOLDOWN: "Warte, bis der aktuelle Wurf beendet ist.",
       LESSON_NOT_ACTIVE: "Der Würfel ist nur während einer aktiven Stunde verfügbar.",
       FORBIDDEN: "Würfeln ist für diese Stunde nicht verfügbar.",
+      UNAVAILABLE: "Die Verbindung zum Unterricht ist nicht verfügbar. Warte auf die Wiederherstellung und versuche es erneut.",
+      UNCONFIRMED: "Das Ergebnis wurde nicht bestätigt. Prüfe die Verbindung und versuche es erneut.",
     },
   },
   shell: {

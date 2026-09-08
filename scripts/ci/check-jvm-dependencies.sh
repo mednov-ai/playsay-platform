@@ -44,7 +44,14 @@ finish() {
 trap finish EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
-printf 'state=running\nsource_revision=%s\nstarted_at=%s\n' "$(git -C "$repo" rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$reports/status.txt"
+# The checkout is owned by the Jenkins agent; trust only this exact repository
+# for this command when the Gradle container uses another UID.
+source_revision=$(git -c safe.directory="$repo" -C "$repo" rev-parse HEAD)
+case "$source_revision" in
+  *[!0-9a-f]*|'') echo 'Invalid security source revision' >&2; exit 2 ;;
+esac
+[ "${#source_revision}" -eq 40 ] || { echo 'Invalid security source revision length' >&2; exit 2; }
+printf 'state=running\nsource_revision=%s\nstarted_at=%s\n' "$source_revision" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$reports/status.txt"
 if [ -n "${DEPENDENCY_SECURITY_CACHE_SEED:-}" ]; then
   [ -d "$DEPENDENCY_SECURITY_CACHE_SEED" ] || { echo 'Cache seed is not a directory' >&2; exit 2; }
   cp -R "$DEPENDENCY_SECURITY_CACHE_SEED/." "$DEPENDENCY_SECURITY_DATA_DIR/"

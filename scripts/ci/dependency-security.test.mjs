@@ -1,20 +1,20 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
 const repo = resolve(import.meta.dirname, '../..');
 
-function exercise(selector, fail = '', fileKey = false) {
+function exercise(selector, fail = '', fileKey = false, revision = '0123456789abcdef0123456789abcdef01234567') {
   const dir = mkdtempSync(resolve(tmpdir(), 'honey-dependency-security-'));
   try {
     mkdirSync(resolve(dir, 'scripts/ci'), { recursive: true });
     mkdirSync(resolve(dir, 'backend/build-logic'), { recursive: true });
     mkdirSync(resolve(dir, 'bin'));
     copyFileSync(resolve(repo, 'scripts/ci/check-jvm-dependencies.sh'), resolve(dir, 'scripts/ci/check-jvm-dependencies.sh'));
-    writeFileSync(resolve(dir, 'bin/git'), '#!/bin/sh\nprintf "fixture-revision\\n"\n', { mode: 0o755 });
+    writeFileSync(resolve(dir, 'bin/git'), '#!/bin/sh\nprintf "%s\\n" "$FIXTURE_REVISION"\n', { mode: 0o755 });
     if (fileKey) writeFileSync(resolve(dir, '.env.nvd-api-key'), 'fixture-file-secret$(touch injected)\n', { mode: 0o600 });
     writeFileSync(resolve(dir, 'bin/gradle'), `#!/bin/sh
 set -eu
@@ -37,12 +37,12 @@ esac
 `, { mode: 0o755 });
     const result = spawnSync('sh', [resolve(dir, 'scripts/ci/check-jvm-dependencies.sh'), selector], {
       encoding: 'utf8', env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`,
-        GRADLE_BIN: resolve(dir, 'bin/gradle'), CALL_LOG: resolve(dir, 'calls'), FAIL_MODE: fail,
+        FIXTURE_REVISION: revision, GRADLE_BIN: resolve(dir, 'bin/gradle'), CALL_LOG: resolve(dir, 'calls'), FAIL_MODE: fail,
         NVD_API_KEY: fileKey ? '' : 'fixture-secret-never-in-arguments', NVD_API_KEY_FILE: '',
         EXPECTED_KEY: fileKey ? 'fixture-file-secret$(touch injected)' : 'fixture-secret-never-in-arguments', DEPENDENCY_SECURITY_CACHE_SEED: '' },
     });
     const reports = resolve(dir, 'backend/build/reports/dependency-security');
-    return { result, calls: readFileSync(resolve(dir, 'calls'), 'utf8'),
+    return { result, calls: existsSync(resolve(dir, 'calls')) ? readFileSync(resolve(dir, 'calls'), 'utf8') : '',
       reportParentMode: statSync(reports).mode & 0o777,
       reportMode: statSync(resolve(reports, readdirSync(reports)[0], 'status.txt')).mode & 0o777,
       dataMode: statSync(resolve(dir, 'backend/build/dependency-security-data')).mode & 0o777,
@@ -60,6 +60,7 @@ test('security gate refreshes data once and shares only the invocation-private d
   assert.match(calls, /\/backend\|api-gateway\|/);
   assert.doesNotMatch(calls + result.stdout + result.stderr + status, /fixture-secret/);
   assert.match(status, /state=passed/);
+  assert.match(status, /source_revision=0123456789abcdef0123456789abcdef01234567/);
 });
 
 test('advisory refresh failure prevents every analysis and cannot report a clean gate', () => {
@@ -125,5 +126,15 @@ test('Jenkins can traverse and archive reports from a different container UID wh
     assert.equal(reportParentMode & 0o005, 0o005);
     assert.equal(reportMode & 0o004, 0o004);
     assert.equal(dataMode & 0o077, 0);
+  }
+});
+
+test('missing or malformed source provenance fails before advisory update or analysis', () => {
+  for (const revision of ['', 'not-a-commit', '01234567']) {
+    const { result, calls, status } = exercise('all', '', false, revision);
+    assert.notEqual(result.status, 0);
+    assert.equal(calls, '');
+    assert.match(status, /state=failed-or-incomplete/);
+    assert.doesNotMatch(status, /state=passed/);
   }
 });

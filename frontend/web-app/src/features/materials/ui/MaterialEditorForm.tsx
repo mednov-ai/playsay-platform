@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LayoutGrid, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { useAppTranslation } from "../../../shared/i18n";
-import type { MaterialGameAdaptation, MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import type { MaterialExternalActivityResolution, MaterialGameAdaptation, MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import {
   type MaterialAssetLibraryItem,
   type MaterialEditorBlock,
@@ -34,6 +34,7 @@ export function MaterialEditorForm({
   onRevalidateGameAdaptation,
   onRollbackGameAdaptation,
   onRemoveBlock,
+  onResolveExternalActivity,
   onRequestPalette,
   onSuggestAcceptedAnswers,
   onUpdateBlock,
@@ -58,6 +59,7 @@ export function MaterialEditorForm({
   onRevalidateGameAdaptation: (blockId: string) => void;
   onRollbackGameAdaptation: (blockId: string) => void;
   onRemoveBlock: (blockId: string) => void;
+  onResolveExternalActivity: (blockId: string, resolution: MaterialExternalActivityResolution) => Promise<void>;
   onRequestPalette: () => void;
   onSuggestAcceptedAnswers: (blockId: string, itemIds: string[]) => void;
   onUpdateBlock: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
@@ -145,6 +147,7 @@ export function MaterialEditorForm({
                   onRevalidateGameAdaptation={() => onRevalidateGameAdaptation(block.id)}
                   onRollbackGameAdaptation={() => onRollbackGameAdaptation(block.id)}
                   onRemove={() => onRemoveBlock(block.id)}
+                  onResolveExternalActivity={(resolution) => onResolveExternalActivity(block.id, resolution)}
                   onSuggestAcceptedAnswers={onSuggestAcceptedAnswers}
                   onToggleCollapsed={() => setExpandedBlockId((current) => toggleExpandedMaterialBlock(current, block.id))}
                   onUpdate={(patch) => onUpdateBlock(block.id, patch)}
@@ -159,7 +162,7 @@ export function MaterialEditorForm({
 
       {imageGenerationProgress ? <MaterialImageProgress value={imageGenerationProgress} /> : null}
       {message ? (
-        <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+        <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground" role="alert">
           {message}
         </div>
       ) : null}

@@ -10,6 +10,8 @@ import com.playsay.gateway.utils.MetaData
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.math.BigDecimal
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -24,6 +26,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -289,6 +292,100 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
     }
 
     @Test
+    fun `html game size boundary is authoritative and rejection does not mutate material or lesson`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val reusable = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Boundary game", status = "PUBLISHED"),
+        ).body!!
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                materialId = reusable.id,
+                scheduledStart = activeLessonStart(),
+                scheduledEnd = activeLessonEnd(),
+                participantSubjects = listOf("student-1"),
+            ),
+        ).body!!
+
+        val reusableOversize = assertFailsWith<ProjectResponseException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                reusable.id,
+                htmlFileOfSize(20 * 1024 * 1024 + 1),
+            )
+        }
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, reusableOversize.statusCode)
+        assertEquals(MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE, reusableOversize.errorCode)
+        assertTrue(materialAssetController.listAssets(teacher, reusable.id).isEmpty())
+        assertEquals(1, materialCrudController.get(teacher, reusable.id).document["pages"].size())
+
+        val liveOversize = assertFailsWith<ProjectResponseException> {
+            materialImagePageController.appendLiveLessonHtmlGamePage(
+                teacher,
+                lesson.id,
+                htmlFileOfSize(20 * 1024 * 1024 + 1),
+            )
+        }
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, liveOversize.statusCode)
+        assertEquals(MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE, liveOversize.errorCode)
+        assertEquals(reusable.id, scheduleController.get(teacher, lesson.id).materialId)
+        assertEquals(1, materialCrudController.get(teacher, reusable.id).document["pages"].size())
+        assertTrue(materialAssetController.listAssets(teacher, reusable.id).isEmpty())
+
+        val reusableAccepted = materialAssetController.uploadHtmlGameAsset(
+            teacher,
+            reusable.id,
+            htmlFileOfSize(20 * 1024 * 1024),
+        )
+        assertEquals(HttpStatus.CREATED, reusableAccepted.statusCode)
+
+        val liveAccepted = materialImagePageController.appendLiveLessonHtmlGamePage(
+            teacher,
+            lesson.id,
+            htmlFileOfSize(20 * 1024 * 1024),
+        ).body!!
+        assertTrue(liveAccepted.material.id != reusable.id)
+        assertEquals("HTML_GAME", liveAccepted.material.document["pages"].last()["layout"].asText())
+    }
+
+    @Test
+    fun `supplied sub-limit games reach api content validation`() {
+        val fixtureDirectory = System.getenv("PLAYSAY_HTML_GAME_FIXTURE_DIR")?.let(Path::of)
+        assumeTrue(fixtureDirectory != null && Files.isDirectory(fixtureDirectory))
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(title = "Supplied game fixtures", status = "DRAFT"),
+        ).body!!
+
+        mapOf(
+            "Donut-Buddies-HoneySchool.html" to 3_767_254L,
+            "index.html" to 5_549_030L,
+        ).forEach { (fileName, expectedSize) ->
+            val path = fixtureDirectory!!.resolve(fileName)
+            assumeTrue(Files.isRegularFile(path))
+            val bytes = Files.readAllBytes(path)
+            assertEquals(expectedSize, bytes.size.toLong())
+            val outcome = runCatching {
+                materialAssetController.uploadHtmlGameAsset(
+                    teacher,
+                    material.id,
+                    imageFile(name = fileName, contentType = "text/html", bytes = bytes),
+                )
+            }
+            outcome.exceptionOrNull()?.let { error ->
+                assertTrue(error is ProjectResponseException)
+                error as ProjectResponseException
+                assertTrue(error.statusCode != HttpStatus.PAYLOAD_TOO_LARGE)
+                assertTrue(error.errorCode != MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE)
+            }
+        }
+    }
+
+    @Test
     fun `html game enrichment generates icon and updates linked block`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val created = materialCrudController.create(
@@ -489,7 +586,7 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
             materialAssetController.uploadHtmlGameAsset(
                 teacher,
                 material.id,
-                imageFile(name = "large.html", contentType = "text/html", bytes = ByteArray(5 * 1024 * 1024 + 1) { 1 }),
+                imageFile(name = "large.html", contentType = "text/html", bytes = ByteArray(20 * 1024 * 1024 + 1) { 1 }),
             )
         }
         val studentError = assertFailsWith<ResponseStatusException> {
@@ -501,7 +598,7 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
         assertEquals(HttpStatus.BAD_REQUEST, unsafeFrame.statusCode)
         assertEquals(HttpStatus.BAD_REQUEST, externalScript.statusCode)
         assertEquals(HttpStatus.BAD_REQUEST, relativeScript.statusCode)
-        assertEquals(HttpStatus.BAD_REQUEST, oversized.statusCode)
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, oversized.statusCode)
         assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
 
         val parallelMaterial = materialCrudController.create(
@@ -523,5 +620,15 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
             materialImagePageController.appendLiveLessonHtmlGamePage(teacher, parallelLesson.id, htmlFile())
         }
         assertEquals(HttpStatus.BAD_REQUEST, parallelError.statusCode)
+    }
+
+    private fun htmlFileOfSize(size: Int): MockMultipartFile {
+        val prefix = "<html><head><title>Boundary game</title></head><body><button>Start</button>".toByteArray()
+        val suffix = "</body></html>".toByteArray()
+        require(size >= prefix.size + suffix.size)
+        val bytes = ByteArray(size) { ' '.code.toByte() }
+        prefix.copyInto(bytes)
+        suffix.copyInto(bytes, size - suffix.size)
+        return imageFile(name = "boundary.html", contentType = "text/html", bytes = bytes)
     }
 }

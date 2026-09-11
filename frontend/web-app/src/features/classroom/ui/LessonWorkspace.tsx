@@ -351,7 +351,7 @@ export function LessonWorkspace({
       <div className="playsay-workbench-body">
 
         {assignmentMessage ? (
-          <div className="playsay-lesson-inline-message">
+          <div className="playsay-lesson-inline-message" role="alert">
             {assignmentMessage}
           </div>
         ) : null}

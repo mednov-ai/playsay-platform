@@ -3,9 +3,11 @@ package com.playsay.gateway.controller
 import com.playsay.gateway.dto.LiveLessonImagePageResponse
 import com.playsay.gateway.dto.LiveLessonHtmlGamePageResponse
 import com.playsay.gateway.dto.MaterialImagePageResponse
+import com.playsay.gateway.error.ProjectErrorResponse
 import com.playsay.gateway.service.MaterialImagePageService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -97,7 +99,7 @@ class MaterialImagePageController(
     @Operation(
         operationId = "appendScheduledLessonHtmlGamePage",
         summary = "Append an HTML game during a live scheduled lesson",
-        description = "Uploads a self-contained HTML game and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.",
+        description = "Uploads a self-contained HTML game up to 20 MiB and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(
@@ -107,6 +109,11 @@ class MaterialImagePageController(
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
             ApiResponse(responseCode = "403", description = "Current user cannot manage live lesson materials", content = [Content()]),
             ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
+            ApiResponse(
+                responseCode = "413",
+                description = "HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE",
+                content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ProjectErrorResponse::class))],
+            ),
             ApiResponse(responseCode = "502", description = "Object storage failed", content = [Content()]),
         ],
     )

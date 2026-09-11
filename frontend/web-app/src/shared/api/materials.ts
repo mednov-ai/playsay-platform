@@ -1,5 +1,6 @@
 import { authConfig, clearTokens } from "./auth";
 import { apiErrorFromResponse, apiFetch, isApiStatus } from "./errors";
+import { validateHtmlGameUpload } from "./htmlGameUploadPolicy";
 import { apiJson, authorizedOptions } from "./http";
 import type {
   LessonMaterial,
@@ -200,6 +201,7 @@ export async function uploadMaterialHtmlGameAsset(
   file: File,
   config = authConfig,
 ): Promise<LessonMaterialAsset> {
+  validateHtmlGameUpload(file);
   return uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config);
 }
 
@@ -338,6 +340,7 @@ export async function appendScheduledLessonHtmlGamePage(
   file: File,
   config = authConfig,
 ): Promise<LiveLessonHtmlGamePageResult> {
+  validateHtmlGameUpload(file);
   return uploadImagePage<LiveLessonHtmlGamePageResult>(`/api/schedule/lessons/${lessonId}/html-game-page`, file, null, config);
 }
 

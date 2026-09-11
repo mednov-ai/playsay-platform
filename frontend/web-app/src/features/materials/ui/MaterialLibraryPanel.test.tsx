@@ -26,9 +26,14 @@ vi.hoisted(() => {
   });
 });
 
+const apiMocks = vi.hoisted(() => ({
+  resolveExternalActivity: vi.fn(),
+}));
+
 vi.mock("../../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/api/playsay")>()),
   fetchMaterialAssets: vi.fn().mockResolvedValue([]),
+  resolveMaterialExternalActivity: apiMocks.resolveExternalActivity,
 }));
 
 describe("MaterialLibraryPanel focused editor", () => {
@@ -167,6 +172,78 @@ describe("MaterialLibraryPanel focused editor", () => {
     expect(screen.getByRole("checkbox", { name: "Аудио на английском" })).toBeChecked();
   });
 
+  it("classifies and saves LiveWorksheets 710637 with retryable status", async () => {
+    apiMocks.resolveExternalActivity.mockResolvedValue({
+      host: "liveworksheets.com",
+      normalizedUrl: "https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637",
+      provider: "LIVEWORKSHEETS",
+      supportLevel: "GUARANTEED",
+      warningCode: null,
+    });
+    const onSave = vi.fn(async (input: LessonMaterialInput) => savedMaterial(input));
+    renderPanel({ onSave });
+
+    fireEvent.click(screen.getByRole("button", { name: "Новая" }));
+    fireEvent.click(screen.getByRole("button", { name: "Внешнее задание" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /Ссылка на задание/ }), {
+      target: { value: "https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить ссылку" }));
+
+    await waitFor(() => expect(apiMocks.resolveExternalActivity).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/Поддерживаемый сайт: LIVEWORKSHEETS/)).toBeVisible();
+  });
+
+  it("guides guaranteed providers away from URL import without calling the importer", async () => {
+    const onDraftFromUrl = vi.fn().mockResolvedValue(null);
+    render(
+      <AppProviders>
+        <MaterialLibraryPanel
+          courses={[]}
+          disabled={false}
+          lessons={{}}
+          loading={false}
+          materials={[]}
+          message={null}
+          onArchive={vi.fn()}
+          onDraft={vi.fn().mockResolvedValue(null)}
+          onDraftFromUrl={onDraftFromUrl}
+          onGenerateImages={vi.fn().mockResolvedValue(null)}
+          onLinkLesson={vi.fn()}
+          onRefresh={vi.fn()}
+          onSave={vi.fn().mockResolvedValue(null)}
+          onSuggestAcceptedAnswers={vi.fn().mockResolvedValue(null)}
+          onUpdateAsset={vi.fn().mockResolvedValue(null)}
+          profile={{ roles: ["TEACHER"] } as MeProfile}
+        />
+      </AppProviders>,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Внешняя страница" }), {
+      target: { value: "https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Черновик из ссылки" }));
+
+    expect(onDraftFromUrl).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Внешнее задание");
+  });
+
+  it("rejects an oversized HTML game before creating a material and leaves upload retry available", async () => {
+    const onSave = vi.fn(async (input: LessonMaterialInput) => savedMaterial(input));
+    const { container } = renderPanel({ onSave });
+    fireEvent.click(screen.getByRole("button", { name: "Новая" }));
+    fireEvent.click(screen.getByRole("button", { name: "HTML-игра" }));
+    const input = container.querySelector<HTMLInputElement>('input[type="file"][accept="text/html,.html"]');
+    expect(input).not.toBeNull();
+    const oversized = new File(["x"], "large.html", { type: "text/html" });
+    Object.defineProperty(oversized, "size", { value: 20 * 1024 * 1024 + 1 });
+
+    fireEvent.change(input!, { target: { files: [oversized] } });
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("20 МБ"));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(input).toBeEnabled();
+  });
 });
 
 function renderPanel({

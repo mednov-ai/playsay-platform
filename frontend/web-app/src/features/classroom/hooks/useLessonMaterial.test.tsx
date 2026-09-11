@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import type { LessonRoomSession } from "../model/session";
 import { useLessonMaterial } from "./useLessonMaterial";
+import { ApiError } from "../../../shared/api/errors";
 
 const apiMocks = vi.hoisted(() => ({
   appendHtmlGame: vi.fn(),
@@ -18,6 +19,14 @@ vi.mock("../../../shared/api/playsay", () => ({
 }));
 
 vi.mock("../../../shared/i18n", () => ({
+  i18n: {
+    t: (key: string, options?: { max?: number }) => {
+      if (key === "materials.htmlGameUpload.tooLarge") return `Maximum ${options?.max} MB. Try again.`;
+      if (key === "materials.htmlGameUpload.networkError") return "Connection interrupted. Try again.";
+      if (key === "materials.htmlGameUpload.failed") return "Upload failed. Try again.";
+      return key;
+    },
+  },
   useAppTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -153,5 +162,68 @@ describe("useLessonMaterial live uploads", () => {
     expect(result.current.liveActivePageId).toBe("page-game");
     expect(result.current.selectedMaterialId).toBe("copy-2");
     expect(result.current.uploadingHtmlGamePage).toBe(false);
+  });
+
+  it("settles an oversized upload before calling the API and permits retry", async () => {
+    const { result } = renderHook(() => useLessonMaterial({ onAssignMaterial: vi.fn(), session }));
+    const oversized = { name: "large.html", size: 20 * 1024 * 1024 + 1, type: "text/html" } as File;
+
+    await act(async () => {
+      await result.current.uploadHtmlGamePage(oversized);
+    });
+
+    expect(apiMocks.appendHtmlGame).not.toHaveBeenCalled();
+    expect(result.current.uploadingHtmlGamePage).toBe(false);
+    expect(result.current.assignmentMessage).toContain("20");
+
+    apiMocks.appendHtmlGame.mockResolvedValue({
+      activePageId: "page-game",
+      lesson: { materialId: "copy-2" },
+      material: material("copy-2", "page-game"),
+    });
+    await act(async () => {
+      await result.current.uploadHtmlGamePage(new File(["<html></html>"], "retry.html", { type: "text/html" }));
+    });
+    expect(apiMocks.appendHtmlGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles proxy 413 and network failures without replacing the active material", async () => {
+    apiMocks.fetchMaterial.mockResolvedValue(material("current", "page-current"));
+    apiMocks.appendHtmlGame
+      .mockRejectedValueOnce(new ApiError(413, "HTTP_ERROR", "HTTP 413"))
+      .mockRejectedValueOnce(new ApiError(0, "NETWORK_ERROR", "raw network error"));
+    const { result } = renderHook(() => useLessonMaterial({
+      onAssignMaterial: vi.fn(),
+      session: { ...session, materialId: "current" },
+    }));
+    await waitFor(() => expect(result.current.material?.id).toBe("current"));
+    const file = new File(["<html></html>"], "game.html", { type: "text/html" });
+
+    await act(async () => { await result.current.uploadHtmlGamePage(file); });
+    expect(result.current.assignmentMessage).toContain("20");
+    expect(result.current.material?.id).toBe("current");
+    expect(result.current.uploadingHtmlGamePage).toBe(false);
+
+    await act(async () => { await result.current.uploadHtmlGamePage(file); });
+    expect(result.current.assignmentMessage).not.toContain("raw network error");
+    expect(result.current.material?.id).toBe("current");
+    expect(result.current.uploadingHtmlGamePage).toBe(false);
+  });
+
+  it("ignores completion from an upload attempt after unmount", async () => {
+    let resolveUpload: ((value: { activePageId: string; lesson: { materialId: string }; material: LessonMaterial }) => void) | undefined;
+    apiMocks.appendHtmlGame.mockImplementation(() => new Promise((resolve) => {
+      resolveUpload = resolve;
+    }));
+    const { result, unmount } = renderHook(() => useLessonMaterial({ onAssignMaterial: vi.fn(), session }));
+    const pending = result.current.uploadHtmlGamePage(new File(["<html></html>"], "game.html", { type: "text/html" }));
+
+    unmount();
+    await act(async () => {
+      resolveUpload?.({ activePageId: "late", lesson: { materialId: "late" }, material: material("late", "late") });
+      await pending;
+    });
+
+    expect(await pending).toBeNull();
   });
 });

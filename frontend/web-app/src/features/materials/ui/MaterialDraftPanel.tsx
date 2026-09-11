@@ -11,6 +11,7 @@ export function MaterialDraftPanel({
   draftImageMessage,
   draftPrompt,
   draftUrl,
+  draftUrlGuidance,
   onDraftFromUrl,
   onCreateBlank,
   onDraftImageChange,
@@ -27,6 +28,7 @@ export function MaterialDraftPanel({
   draftImageMessage: string | null;
   draftPrompt: string;
   draftUrl: string;
+  draftUrlGuidance: string | null;
   onDraftFromUrl: () => void;
   onCreateBlank: () => void;
   onDraftImageChange: (file: File | null) => void;
@@ -73,6 +75,11 @@ export function MaterialDraftPanel({
           value={draftUrl}
         />
       </label>
+      {draftUrlGuidance ? (
+        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-bold text-amber-950" role="alert">
+          {draftUrlGuidance}
+        </div>
+      ) : null}
       <label className="mt-2 block">
         <span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase text-muted-foreground">
           <Paperclip className="h-3.5 w-3.5 text-primary" />

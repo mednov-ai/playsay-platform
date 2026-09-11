@@ -582,6 +582,18 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
                 htmlFile(content = "<html><head><script src=\"game.js\"></script></head></html>"),
             )
         }
+        val externalStylesheet = assertFailsWith<ResponseStatusException> {
+            materialAssetController.uploadHtmlGameAsset(
+                teacher,
+                material.id,
+                htmlFile(content = "<html><head><link rel=\"stylesheet\" href=\"game.css\"></head><body></body></html>"),
+            )
+        }
+        val dataFavicon = materialAssetController.uploadHtmlGameAsset(
+            teacher,
+            material.id,
+            htmlFile(content = "<html><head><link rel=\"icon\" href=\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3C/svg%3E\"></head><body><button>Start</button></body></html>"),
+        ).body!!
         val oversized = assertFailsWith<ResponseStatusException> {
             materialAssetController.uploadHtmlGameAsset(
                 teacher,
@@ -598,6 +610,8 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
         assertEquals(HttpStatus.BAD_REQUEST, unsafeFrame.statusCode)
         assertEquals(HttpStatus.BAD_REQUEST, externalScript.statusCode)
         assertEquals(HttpStatus.BAD_REQUEST, relativeScript.statusCode)
+        assertEquals(HttpStatus.BAD_REQUEST, externalStylesheet.statusCode)
+        assertEquals("HTML_GAME", dataFavicon.kind)
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, oversized.statusCode)
         assertEquals(HttpStatus.FORBIDDEN, studentError.statusCode)
 

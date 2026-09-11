@@ -2320,6 +2320,11 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   padding: 0.625rem 0.75rem;
 }
 
+.playsay-student-homework-detail,
+.playsay-homework-panel {
+  min-width: 0;
+}
+
 .playsay-homework-submit-bar {
   position: sticky;
   bottom: 0.75rem;
@@ -2365,9 +2370,43 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   grid-template-columns: 3.25rem minmax(0, 1fr);
 }
 
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"],
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] > .playsay-annotation-toolbar,
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] > .playsay-annotation-toolbar {
+  display: none;
+}
+
 .playsay-controlled-annotation-canvas[data-presentation-mode="image-focus"] .playsay-controlled-annotation-surface {
   min-height: min(72vh, 54rem);
   padding: 0;
+}
+
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-controlled-annotation-surface,
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] .playsay-controlled-annotation-surface {
+  min-width: 0;
+  min-height: min(72vh, 54rem);
+  height: min(72vh, 54rem);
+  overflow: hidden;
+  padding: 0;
+}
+
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-rendered-material,
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-material-focus-stack,
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"],
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] .playsay-html-game,
+.playsay-controlled-annotation-canvas[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] iframe,
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] .playsay-rendered-material,
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] .playsay-material-focus-stack,
+.playsay-controlled-annotation-canvas[data-presentation-mode="external-activity-focus"] .playsay-external-activity-frame {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
 }
 
 .playsay-controlled-annotation-canvas[data-read-only="true"][data-presentation-mode="image-focus"] {

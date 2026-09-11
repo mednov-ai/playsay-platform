@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import { emptyAnnotationContent } from "../model/annotation";
 import { ControlledAnnotationCanvas } from "./ControlledAnnotationCanvas";
 
+const apiMocks = vi.hoisted(() => ({
+  fetchMaterialAssets: vi.fn(),
+  fetchMaterialAssetText: vi.fn(),
+}));
+
 vi.mock("../../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/api/playsay")>()),
-  fetchMaterialAssets: vi.fn().mockResolvedValue([]),
+  fetchMaterialAssets: apiMocks.fetchMaterialAssets,
+  fetchMaterialAssetText: apiMocks.fetchMaterialAssetText,
 }));
 
 vi.mock("../../../shared/i18n", () => ({
@@ -17,6 +23,15 @@ vi.mock("../../../shared/i18n", () => ({
 }));
 
 describe("ControlledAnnotationCanvas", () => {
+  beforeEach(() => {
+    apiMocks.fetchMaterialAssets.mockResolvedValue([]);
+    apiMocks.fetchMaterialAssetText.mockResolvedValue("<html><body><button>Start</button></body></html>");
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("shows annotation tools only when the active homework page contains an image", () => {
     const { container, rerender } = render(
       <ControlledAnnotationCanvas
@@ -71,6 +86,51 @@ describe("ControlledAnnotationCanvas", () => {
     expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
     expect(container.querySelector(".playsay-controlled-annotation-canvas")?.getAttribute("data-read-only")).toBe("true");
   });
+
+  it("opens a homework HTML game as focused material without remounting it on minimize", async () => {
+    apiMocks.fetchMaterialAssets.mockResolvedValue([{
+      contentUrl: "/api/materials/material-html-game/assets/game-asset/content",
+      createdAt: "2026-08-04T10:00:00.000Z",
+      externalUrl: null,
+      id: "game-asset",
+      kind: "HTML_GAME",
+      materialId: "material-html-game",
+      metadata: {},
+      provider: "PLAYSAY",
+      storageKey: "materials/material-html-game/game-asset.html",
+    }]);
+
+    const { container } = render(
+      <ControlledAnnotationCanvas
+        answers={{}}
+        content={emptyAnnotationContent("page-1")}
+        material={materialWithHtmlGame()}
+        onChange={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(apiMocks.fetchMaterialAssetText).toHaveBeenCalledWith("material-html-game", "game-asset"));
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
+
+    await waitFor(() => expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull());
+    expect(container.querySelector(".playsay-controlled-annotation-canvas")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
+    expect(container.querySelector(".playsay-material-focus-stack")?.getAttribute("data-active")).toBe("true");
+    expect(container.querySelector(".playsay-material-focus-stack")?.getAttribute("data-kind")).toBe("htmlGame");
+    expect(container.querySelector(".playsay-html-game")?.getAttribute("data-fill-available")).toBe("true");
+
+    const iframe = container.querySelector(".playsay-html-game iframe");
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
+
+    expect(container.querySelector(".playsay-controlled-annotation-canvas")?.getAttribute("data-presentation-mode")).toBe("default");
+    expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
+    expect(container.querySelector(".playsay-material-focused-game")?.getAttribute("data-active")).toBe("false");
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
+
+    expect(container.querySelector(".playsay-controlled-annotation-canvas")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
+    expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
+  });
 });
 
 function materialWithBlock(type: "image" | "text"): LessonMaterial {
@@ -103,6 +163,34 @@ function materialWithBlock(type: "image" | "text"): LessonMaterial {
     sourceMeta: {},
     status: "PUBLISHED",
     title: "Homework",
+    topicTags: [],
+    updatedAt: "2026-08-04T10:00:00.000Z",
+    visibility: "PRIVATE",
+  };
+}
+
+function materialWithHtmlGame(): LessonMaterial {
+  return {
+    blockCount: 1,
+    cefrLevel: "A2",
+    createdAt: "2026-08-04T10:00:00.000Z",
+    description: null,
+    document: {
+      pages: [{
+        blocks: [{ id: "game-1", title: "Word race", type: "htmlGame", url: "material-asset:game-asset" }],
+        id: "page-1",
+        layout: "FLOW",
+        title: "Task",
+      }],
+      schemaVersion: 1,
+    },
+    id: "material-html-game",
+    language: "en",
+    scoringRubric: {},
+    skillTags: [],
+    sourceMeta: {},
+    status: "PUBLISHED",
+    title: "Homework game",
     topicTags: [],
     updatedAt: "2026-08-04T10:00:00.000Z",
     visibility: "PRIVATE",

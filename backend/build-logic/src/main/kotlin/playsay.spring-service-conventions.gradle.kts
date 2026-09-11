@@ -10,6 +10,7 @@ plugins {
 // the 2026 access-control and session-expiration advisories.
 extra["tomcat.version"] = "11.0.25"
 extra["kotlin.version"] = "2.4.20"
+extra["freemarker.version"] = "2.3.35"
 
 detekt {
     toolVersion = "2.0.0-alpha.1"

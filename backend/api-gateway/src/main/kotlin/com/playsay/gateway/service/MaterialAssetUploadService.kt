@@ -69,7 +69,7 @@ class MaterialAssetUploadService(
         }
         if (file.size > materialHtmlGameMaxBytes) {
             throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
+                HttpStatus.PAYLOAD_TOO_LARGE,
                 MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE,
                 materialHtmlGameMaxMegabytes,
             )
@@ -255,7 +255,7 @@ internal fun String.materialImageExtension(): String =
 
 private const val materialImageMaxMegabytes = 12
 private const val materialImageMaxBytes = materialImageMaxMegabytes * 1024 * 1024
-private const val materialHtmlGameMaxMegabytes = 5
+private const val materialHtmlGameMaxMegabytes = 20
 private const val materialHtmlGameMaxBytes = materialHtmlGameMaxMegabytes * 1024 * 1024
 private val supportedMaterialImageContentTypes = setOf("image/jpeg", "image/png", "image/webp", "image/svg+xml")
 private val materialHtmlDocumentPattern = Regex("""<\s*html\b""", RegexOption.IGNORE_CASE)

@@ -70,6 +70,23 @@ class ProjectErrorLocalizationTest {
     }
 
     @Test
+    fun `html game overflow is a structured localized 413`() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH)
+
+        val response = handler.handleProjectResponseException(
+            ProjectResponseException.localized(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE,
+                20,
+            ),
+        )
+
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.statusCode)
+        assertEquals(MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE, response.body?.errorCode)
+        assertEquals("HTML game file must be at most 20 MB.", response.body?.message)
+    }
+
+    @Test
     fun `project error falls back to russian bundle`() {
         LocaleContextHolder.setLocale(Locale.ITALIAN)
 

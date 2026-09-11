@@ -38,7 +38,7 @@ export function MaterialReaderPreview({
         />
       </div>
       {message ? (
-        <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground">
+        <div className="rounded-2xl border border-border bg-muted/70 p-3 text-sm font-semibold text-muted-foreground" role="alert">
           {message}
         </div>
       ) : null}

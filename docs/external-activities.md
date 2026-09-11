@@ -12,7 +12,7 @@ The following hosts are classified as `GUARANTEED`:
 - `topworksheets.com`
 - `jeopardylabs.com`
 
-Other public HTTPS hosts are stored as `EXPERIMENTAL`. Localhost, `.local`, private/reserved IP literals, credentialed URLs, non-HTTPS URLs, control characters, and URLs longer than 2048 characters are rejected. The API never fetches the submitted URL.
+Other public HTTPS hosts are stored as `EXPERIMENTAL`. Localhost, `.local`, private/reserved IP literals, credentialed URLs, non-HTTPS URLs, control characters, and URLs longer than 2048 characters are rejected. The API never fetches the submitted URL: guaranteed-provider classification and persistence depend only on the normalized URL and must remain successful when the provider blocks server-side HTTP clients.
 
 ## Install the development extension
 
@@ -85,6 +85,7 @@ For each guaranteed provider, test with one teacher and three students in a grou
 Representative URLs:
 
 - LiveWorksheets: `https://www.liveworksheets.com/worksheet/en/english-second-language-esl/808929`
+- LiveWorksheets regression for link insertion: `https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637`
 - Wordwall: `https://wordwall.net/ru/resource/59640205`
 - iSLCollective: `https://en.islcollective.com/english-esl-video-lessons/ordering-food/617641`
 - TopWorksheets: `https://www.topworksheets.com/en/english-language/listening/there-is-there-are-lisntening-64106f5fa9cbb`

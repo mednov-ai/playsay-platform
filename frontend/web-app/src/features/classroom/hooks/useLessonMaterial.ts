@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   appendScheduledLessonImagePage,
   appendScheduledLessonHtmlGamePage,
@@ -8,6 +8,7 @@ import {
   type LiveLessonHtmlGamePageResult,
   type ScheduledLesson,
 } from "../../../shared/api/playsay";
+import { htmlGameUploadErrorMessage, validateHtmlGameUpload } from "../../../shared/api/htmlGameUploadPolicy";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { LessonRoomSession } from "../model/session";
 
@@ -28,6 +29,16 @@ export function useLessonMaterial({
   const [uploadingHtmlGamePage, setUploadingHtmlGamePage] = useState(false);
   const [liveActivePageId, setLiveActivePageId] = useState<string | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
+  const htmlGameUploadAttemptRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      htmlGameUploadAttemptRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedMaterialId(session.materialId ?? "");
@@ -130,10 +141,13 @@ export function useLessonMaterial({
   }
 
   async function uploadHtmlGamePage(file: File): Promise<LiveLessonHtmlGamePageResult | null> {
+    const attempt = ++htmlGameUploadAttemptRef.current;
     setUploadingHtmlGamePage(true);
     setAssignmentMessage(null);
     try {
+      validateHtmlGameUpload(file);
       const result = await appendScheduledLessonHtmlGamePage(session.lessonId, file);
+      if (!mountedRef.current || htmlGameUploadAttemptRef.current !== attempt) return null;
       setMaterial(result.material);
       setSelectedMaterialId(result.lesson.materialId ?? result.material.id);
       setLiveActivePageId(result.activePageId);
@@ -141,10 +155,14 @@ export function useLessonMaterial({
       setAssignmentMessage(t("classroom.messages.htmlGamePageAdded"));
       return result;
     } catch (caught) {
-      setAssignmentMessage(caught instanceof Error ? caught.message : t("classroom.messages.htmlGamePageUploadFailed"));
+      if (mountedRef.current && htmlGameUploadAttemptRef.current === attempt) {
+        setAssignmentMessage(htmlGameUploadErrorMessage(caught));
+      }
       return null;
     } finally {
-      setUploadingHtmlGamePage(false);
+      if (mountedRef.current && htmlGameUploadAttemptRef.current === attempt) {
+        setUploadingHtmlGamePage(false);
+      }
     }
   }
 

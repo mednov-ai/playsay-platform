@@ -23,6 +23,7 @@ import {
   type LessonMaterialUrlDraftInput,
 } from "../../shared/api/playsay";
 import { useAppTranslation } from "../../shared/i18n";
+import { ApiError } from "../../shared/api/errors";
 import type { SessionErrorHandler } from "./types";
 
 export function useMaterialActions({
@@ -67,7 +68,11 @@ export function useMaterialActions({
       setMaterialMessage(materialId ? t("materials.messages.saved") : t("materials.messages.created"));
       return saved;
     } catch (caught) {
-      setMaterialMessage(applySessionError(caught, t("materials.messages.saveFailed")));
+      setMaterialMessage(
+        caught instanceof ApiError && caught.status === 413
+          ? t("materials.messages.requestTooLarge")
+          : applySessionError(caught, t("materials.messages.saveFailed")),
+      );
       return null;
     } finally {
       setMaterialLoading(false);

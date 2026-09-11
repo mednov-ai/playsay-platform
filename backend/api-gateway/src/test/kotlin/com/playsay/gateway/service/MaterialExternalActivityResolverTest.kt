@@ -36,6 +36,20 @@ class MaterialExternalActivityResolverTest {
     }
 
     @Test
+    fun `classifies worksheet 710637 locally as guaranteed LiveWorksheets content`() {
+        val result = resolver.resolve(
+            "https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637",
+        )
+
+        assertEquals(
+            "https://www.liveworksheets.com/worksheet/en/english-second-language-esl/710637",
+            result.normalizedUrl,
+        )
+        assertEquals("LIVEWORKSHEETS", result.provider)
+        assertEquals("GUARANTEED", result.supportLevel)
+    }
+
+    @Test
     fun `marks an unknown public https host experimental`() {
         val result = resolver.resolve("https://example.org/activity?id=7#round-2")
 

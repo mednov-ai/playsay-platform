@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
@@ -18,7 +18,7 @@ import { ExerciseItemsEditor } from "./ExerciseItemsEditor";
 import { materialBlockIcon } from "./materialBlockIcon";
 import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
-import { resolveMaterialExternalActivity, type MaterialGameAdaptation, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
+import { resolveMaterialExternalActivity, type MaterialExternalActivityResolution, type MaterialGameAdaptation, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import { isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 
 export function MaterialBlockEditor({
@@ -46,6 +46,7 @@ export function MaterialBlockEditor({
   onPreview,
   onPreviewEnd,
   onRemove,
+  onResolveExternalActivity,
   onSuggestAcceptedAnswers,
   onToggleCollapsed,
   onUpdate,
@@ -75,6 +76,7 @@ export function MaterialBlockEditor({
   onPreview: () => void;
   onPreviewEnd: () => void;
   onRemove: () => void;
+  onResolveExternalActivity: (resolution: MaterialExternalActivityResolution) => Promise<void>;
   onSuggestAcceptedAnswers?: (blockId: string, itemIds: string[]) => void;
   onToggleCollapsed: () => void;
   onUpdate: (patch: Partial<MaterialEditorBlock>) => void;
@@ -85,8 +87,10 @@ export function MaterialBlockEditor({
   const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   const [uploading, setUploading] = useState(false);
-  const [resolvingExternalActivity, setResolvingExternalActivity] = useState(false);
-  const [externalActivityError, setExternalActivityError] = useState(false);
+  const [externalActivityStatus, setExternalActivityStatus] = useState<"idle" | "validating" | "saving" | "error">("idle");
+  const uploadAttemptRef = useRef(0);
+  const externalActivityAttemptRef = useRef(0);
+  const mountedRef = useRef(true);
   const collapseLabel = collapsed ? t("materials.blockEditor.expandBlock") : t("materials.blockEditor.collapseBlock");
   const summary = materialBlockSummary(block, t);
   const invalidHtmlGameTitle = block.type === "htmlGame"
@@ -101,6 +105,15 @@ export function MaterialBlockEditor({
     setVideoClipStartSource(formatMaterialVideoClipTime(block.videoClip?.startSeconds));
     setVideoClipEndSource(formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   }, [block.id, block.videoClip?.endSeconds, block.videoClip?.startSeconds]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      uploadAttemptRef.current += 1;
+      externalActivityAttemptRef.current += 1;
+    };
+  }, []);
 
   function commitVideoClip(boundary: "startSeconds" | "endSeconds", value: string) {
     const seconds = parseMaterialVideoClipTime(value);
@@ -120,29 +133,33 @@ export function MaterialBlockEditor({
     if (!file) {
       return;
     }
+    const attempt = ++uploadAttemptRef.current;
     setUploading(true);
     try {
       await onUploadAsset(kind, file);
     } finally {
-      setUploading(false);
+      if (mountedRef.current && uploadAttemptRef.current === attempt) {
+        setUploading(false);
+      }
     }
   }
 
   async function resolveExternalActivity() {
     if (!block.url?.trim()) return;
-    setResolvingExternalActivity(true);
-    setExternalActivityError(false);
+    const attempt = ++externalActivityAttemptRef.current;
+    setExternalActivityStatus("validating");
     try {
       const resolved = await resolveMaterialExternalActivity(block.url);
-      onUpdate({
-        url: resolved.normalizedUrl,
-        provider: resolved.provider,
-        externalActivitySupportLevel: resolved.supportLevel,
-      });
+      if (!mountedRef.current || externalActivityAttemptRef.current !== attempt) return;
+      setExternalActivityStatus("saving");
+      await onResolveExternalActivity(resolved);
+      if (mountedRef.current && externalActivityAttemptRef.current === attempt) {
+        setExternalActivityStatus("idle");
+      }
     } catch {
-      setExternalActivityError(true);
-    } finally {
-      setResolvingExternalActivity(false);
+      if (mountedRef.current && externalActivityAttemptRef.current === attempt) {
+        setExternalActivityStatus("error");
+      }
     }
   }
 
@@ -377,10 +394,10 @@ export function MaterialBlockEditor({
               <div className="playsay-material-external-row">
                 <input
                   className="playsay-input min-w-0 flex-1"
-                  disabled={disabled || resolvingExternalActivity}
+                  disabled={disabled || externalActivityStatus === "validating" || externalActivityStatus === "saving"}
                   maxLength={2048}
                   onChange={(event) => {
-                    setExternalActivityError(false);
+                    setExternalActivityStatus("idle");
                     onUpdate({
                       url: event.target.value,
                       provider: "EXPERIMENTAL",
@@ -392,22 +409,26 @@ export function MaterialBlockEditor({
                   value={block.url ?? ""}
                 />
                 <Button
-                  disabled={disabled || resolvingExternalActivity || !block.url?.trim()}
+                  disabled={disabled || externalActivityStatus === "validating" || externalActivityStatus === "saving" || !block.url?.trim()}
                   onClick={() => void resolveExternalActivity()}
                   type="button"
                   variant="outline"
                 >
-                  {resolvingExternalActivity ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  {resolvingExternalActivity
+                  {externalActivityStatus === "validating" || externalActivityStatus === "saving"
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <CheckCircle2 className="h-4 w-4" />}
+                  {externalActivityStatus === "validating"
                     ? t("materials.blockEditor.validatingExternalActivity")
-                    : t("materials.blockEditor.validateExternalActivity")}
+                    : externalActivityStatus === "saving"
+                      ? t("materials.blockEditor.savingExternalActivity")
+                      : t("materials.blockEditor.validateExternalActivity")}
                 </Button>
               </div>
             </FormField>
-            {externalActivityError ? (
+            {externalActivityStatus === "error" ? (
               <p className="flex items-center gap-2 text-xs font-bold text-destructive" role="alert">
                 <AlertTriangle className="h-4 w-4" />
-                {t("materials.blockEditor.externalActivityInvalid")}
+                {t("materials.blockEditor.externalActivitySaveOrValidationFailed")}
               </p>
             ) : block.url ? (
               <p className="text-xs font-bold text-muted-foreground">

@@ -4,9 +4,11 @@ import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
+import com.playsay.gateway.error.ProjectErrorResponse
 import com.playsay.gateway.service.LessonMaterialStore
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -59,8 +61,23 @@ class MaterialAssetController(
     @Operation(
         operationId = "uploadMaterialHtmlGameAsset",
         summary = "Upload a self-contained HTML game",
-        description = "Uploads a validated UTF-8 HTML game without changing the material document.",
+        description = "Uploads a validated UTF-8 HTML game up to 20 MiB without changing the material document.",
         security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "201", description = "HTML game uploaded"),
+            ApiResponse(responseCode = "400", description = "Invalid HTML game", content = [Content()]),
+            ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+            ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
+            ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),
+            ApiResponse(
+                responseCode = "413",
+                description = "HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE",
+                content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ProjectErrorResponse::class))],
+            ),
+            ApiResponse(responseCode = "502", description = "Object storage failed", content = [Content()]),
+        ],
     )
     fun uploadHtmlGameAsset(
         authentication: JwtAuthenticationToken,

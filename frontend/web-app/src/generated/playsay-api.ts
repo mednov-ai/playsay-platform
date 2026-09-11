@@ -717,6 +717,12 @@ export interface LiveLessonImagePageResponse {
   activePageId: string;
 }
 
+export interface ProjectErrorResponse {
+  status: number;
+  errorCode: string;
+  message: string;
+}
+
 export interface LiveLessonHtmlGamePageResponse {
   lesson: ScheduledLessonResponse;
   material: LessonMaterialResponse;
@@ -4876,6 +4882,11 @@ export type appendScheduledLessonHtmlGamePageResponse404 = {
   status: 404
 }
 
+export type appendScheduledLessonHtmlGamePageResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
 export type appendScheduledLessonHtmlGamePageResponse502 = {
   data: void
   status: 502
@@ -4884,7 +4895,7 @@ export type appendScheduledLessonHtmlGamePageResponse502 = {
 export type appendScheduledLessonHtmlGamePageResponseSuccess = (appendScheduledLessonHtmlGamePageResponse201) & {
   headers: Headers;
 };
-export type appendScheduledLessonHtmlGamePageResponseError = (appendScheduledLessonHtmlGamePageResponse400 | appendScheduledLessonHtmlGamePageResponse401 | appendScheduledLessonHtmlGamePageResponse403 | appendScheduledLessonHtmlGamePageResponse404 | appendScheduledLessonHtmlGamePageResponse502) & {
+export type appendScheduledLessonHtmlGamePageResponseError = (appendScheduledLessonHtmlGamePageResponse400 | appendScheduledLessonHtmlGamePageResponse401 | appendScheduledLessonHtmlGamePageResponse403 | appendScheduledLessonHtmlGamePageResponse404 | appendScheduledLessonHtmlGamePageResponse413 | appendScheduledLessonHtmlGamePageResponse502) & {
   headers: Headers;
 };
 
@@ -4899,7 +4910,7 @@ export const getAppendScheduledLessonHtmlGamePageUrl = (lessonId: string,) => {
 }
 
 /**
- * Uploads a self-contained HTML game and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.
+ * Uploads a self-contained HTML game up to 20 MiB and appends it to a lesson-specific material copy. Requires TEACHER or ADMIN role.
  * @summary Append an HTML game during a live scheduled lesson
  */
 export const appendScheduledLessonHtmlGamePage = async (lessonId: string,
@@ -6529,17 +6540,49 @@ if(uploadMaterialImageAssetBody?.file !== undefined) {
 
 
 
-export type uploadMaterialHtmlGameAssetResponse200 = {
+export type uploadMaterialHtmlGameAssetResponse201 = {
   data: MaterialAssetResponse
-  status: 200
+  status: 201
 }
 
-export type uploadMaterialHtmlGameAssetResponseSuccess = (uploadMaterialHtmlGameAssetResponse200) & {
+export type uploadMaterialHtmlGameAssetResponse400 = {
+  data: void
+  status: 400
+}
+
+export type uploadMaterialHtmlGameAssetResponse401 = {
+  data: void
+  status: 401
+}
+
+export type uploadMaterialHtmlGameAssetResponse403 = {
+  data: void
+  status: 403
+}
+
+export type uploadMaterialHtmlGameAssetResponse404 = {
+  data: void
+  status: 404
+}
+
+export type uploadMaterialHtmlGameAssetResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type uploadMaterialHtmlGameAssetResponse502 = {
+  data: void
+  status: 502
+}
+
+export type uploadMaterialHtmlGameAssetResponseSuccess = (uploadMaterialHtmlGameAssetResponse201) & {
   headers: Headers;
 };
-;
+export type uploadMaterialHtmlGameAssetResponseError = (uploadMaterialHtmlGameAssetResponse400 | uploadMaterialHtmlGameAssetResponse401 | uploadMaterialHtmlGameAssetResponse403 | uploadMaterialHtmlGameAssetResponse404 | uploadMaterialHtmlGameAssetResponse413 | uploadMaterialHtmlGameAssetResponse502) & {
+  headers: Headers;
+};
 
-export type uploadMaterialHtmlGameAssetResponse = (uploadMaterialHtmlGameAssetResponseSuccess)
+export type uploadMaterialHtmlGameAssetResponse = (uploadMaterialHtmlGameAssetResponseSuccess | uploadMaterialHtmlGameAssetResponseError)
 
 export const getUploadMaterialHtmlGameAssetUrl = (materialId: string,) => {
 
@@ -6550,7 +6593,7 @@ export const getUploadMaterialHtmlGameAssetUrl = (materialId: string,) => {
 }
 
 /**
- * Uploads a validated UTF-8 HTML game without changing the material document.
+ * Uploads a validated UTF-8 HTML game up to 20 MiB without changing the material document.
  * @summary Upload a self-contained HTML game
  */
 export const uploadMaterialHtmlGameAsset = async (materialId: string,

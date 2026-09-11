@@ -26,9 +26,12 @@ import {
   type LessonMaterialInput,
   type MaterialHtmlGameEnrichment,
   type MaterialGameAdaptation,
+  type MaterialExternalActivityResolution,
   type LessonMaterialUrlDraftInput,
   type MeProfile,
 } from "../../../shared/api/playsay";
+import { htmlGameUploadErrorMessage, validateHtmlGameUpload } from "../../../shared/api/htmlGameUploadPolicy";
+import { isGuaranteedExternalActivityUrl } from "../../../shared/api/externalActivityPolicy";
 
 import {
   MaterialBlockType,
@@ -114,6 +117,7 @@ export function MaterialLibraryPanel({
   const [form, setForm] = useState<MaterialFormState>(() => defaultMaterialForm());
   const [draftPrompt, setDraftPrompt] = useState("");
   const [draftUrl, setDraftUrl] = useState("");
+  const [draftUrlGuidance, setDraftUrlGuidance] = useState<string | null>(null);
   const [draftImage, setDraftImage] = useState<MaterialDraftSourceImage | null>(null);
   const [draftImageMessage, setDraftImageMessage] = useState<string | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<"library" | "edit" | "preview">("library");
@@ -136,6 +140,7 @@ export function MaterialLibraryPanel({
   } | null>(null);
   const enrichmentPollTokensRef = useRef<Record<string, number>>({});
   const adaptationPollTokensRef = useRef<Record<string, number>>({});
+  const assetUploadTokensRef = useRef<Record<string, number>>({});
   const adaptationHydrationKeyRef = useRef("");
   const mountedRef = useRef(true);
   const formRef = useRef(form);
@@ -442,6 +447,11 @@ export function MaterialLibraryPanel({
     if (!url) {
       return;
     }
+    if (isGuaranteedExternalActivityUrl(url)) {
+      setDraftUrlGuidance(t("materials.draft.externalActivityGuidance"));
+      return;
+    }
+    setDraftUrlGuidance(null);
     const draft = await onDraftFromUrl({
       url,
       title: form.title || null,
@@ -628,13 +638,44 @@ export function MaterialLibraryPanel({
     }
   }
 
+  async function persistResolvedExternalActivity(blockId: string, resolution: MaterialExternalActivityResolution) {
+    const currentForm = formRef.current;
+    const nextForm = materialFormWithBlockPatch(currentForm, blockId, {
+      url: resolution.normalizedUrl,
+      provider: resolution.provider,
+      externalActivitySupportLevel: resolution.supportLevel,
+    });
+    const saved = await onSave(materialFormToInput(nextForm), nextForm.id ?? undefined);
+    if (!saved) {
+      throw new Error("EXTERNAL_ACTIVITY_SAVE_FAILED");
+    }
+    if (!mountedRef.current) return;
+    const savedForm = materialToForm(saved);
+    setForm(savedForm);
+    setSavedFormFingerprint(materialFormFingerprint(savedForm));
+  }
+
   async function uploadBlockAsset(blockId: string, kind: "image" | "htmlGame", file: File) {
+    const token = (assetUploadTokensRef.current[blockId] ?? 0) + 1;
+    assetUploadTokensRef.current[blockId] = token;
+    const isCurrentAttempt = () => mountedRef.current
+      && assetUploadTokensRef.current[blockId] === token
+      && formRef.current.document.pages.some((page) => page.blocks.some((block) => block.id === blockId));
     setAssetUploadMessage(null);
+    if (kind === "htmlGame") {
+      try {
+        validateHtmlGameUpload(file);
+      } catch (caught) {
+        if (isCurrentAttempt()) setAssetUploadMessage(htmlGameUploadErrorMessage(caught));
+        return;
+      }
+    }
     const fallbackTitle = file.name.replace(/\.[^.]+$/, "").trim() || t("materials.defaults.materialTitle");
     let workingForm = form.title.trim() ? form : { ...form, title: fallbackTitle };
     let materialId = workingForm.id;
     if (!materialId) {
       const saved = await onSave(materialFormToInput(workingForm));
+      if (!isCurrentAttempt()) return;
       if (!saved) {
         setAssetUploadMessage(t("materials.messages.assetUploadFailed"));
         return;
@@ -649,6 +690,7 @@ export function MaterialLibraryPanel({
       const asset = kind === "image"
         ? await uploadMaterialImageAsset(materialId, file)
         : await uploadMaterialHtmlGameAsset(materialId, file);
+      if (!isCurrentAttempt()) return;
       const gameTitle = typeof asset.metadata.gameTitle === "string" ? asset.metadata.gameTitle.trim() : fallbackTitle;
       const gameTitleSource = normalizeGameTitleSource(typeof asset.metadata.gameTitleSource === "string" ? asset.metadata.gameTitleSource : undefined);
       const gameSyncCompatibility = normalizeGameSyncCompatibility(asset.metadata.syncCompatibility);
@@ -664,6 +706,7 @@ export function MaterialLibraryPanel({
             }),
       });
       const saved = await onSave(materialFormToInput(nextForm), materialId);
+      if (!isCurrentAttempt()) return;
       if (!saved) {
         setForm(nextForm);
         setAssetUploadMessage(t("materials.messages.assetLinkSaveFailed"));
@@ -673,18 +716,28 @@ export function MaterialLibraryPanel({
       setForm(savedForm);
       setSavedFormFingerprint(materialFormFingerprint(savedForm));
       const assets = await fetchMaterialAssets(materialId);
+      if (!isCurrentAttempt()) return;
       syncMaterialAssets(saved, assets);
       if (kind === "htmlGame") {
         try {
           await startHtmlGameEnrichment(materialId, asset.id, blockId);
+          if (!isCurrentAttempt()) return;
         } catch {
-          setAssetUploadMessage(t("materials.messages.htmlGameUploadedIconFailed"));
+          if (isCurrentAttempt()) setAssetUploadMessage(t("materials.messages.htmlGameUploadedIconFailed"));
           return;
         }
       }
-      setAssetUploadMessage(kind === "image" ? t("materials.messages.imageUploaded") : t("materials.messages.htmlGameUploaded"));
+      if (isCurrentAttempt()) {
+        setAssetUploadMessage(kind === "image" ? t("materials.messages.imageUploaded") : t("materials.messages.htmlGameUploaded"));
+      }
     } catch (caught) {
-      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.messages.assetUploadFailed"));
+      if (isCurrentAttempt()) {
+        setAssetUploadMessage(
+          kind === "htmlGame"
+            ? htmlGameUploadErrorMessage(caught)
+            : caught instanceof Error ? caught.message : t("materials.messages.assetUploadFailed"),
+        );
+      }
     }
   }
 
@@ -973,6 +1026,7 @@ export function MaterialLibraryPanel({
                 draftImageMessage={draftImageMessage}
                 draftPrompt={draftPrompt}
                 draftUrl={draftUrl}
+                draftUrlGuidance={draftUrlGuidance}
                 onDraftFromUrl={() => void generateDraftFromUrl()}
                 onCreateBlank={resetForm}
                 onDraftImageChange={(file) => void handleDraftImageChange(file)}
@@ -980,7 +1034,10 @@ export function MaterialLibraryPanel({
                 onOpenWorksheetImport={() => setWorksheetImportOpen(true)}
                 onRemoveDraftImage={() => setDraftImage(null)}
                 onUpdateDraftPrompt={setDraftPrompt}
-                onUpdateDraftUrl={setDraftUrl}
+                onUpdateDraftUrl={(value) => {
+                  setDraftUrl(value);
+                  setDraftUrlGuidance(null);
+                }}
               />
               <MaterialLessonLinkPanel
                 disabled={disabled}
@@ -1061,6 +1118,7 @@ export function MaterialLibraryPanel({
                   onRevalidateGameAdaptation={(blockId) => void revalidateGameAdaptation(blockId)}
                   onRollbackGameAdaptation={(blockId) => void rollbackGameAdaptation(blockId)}
                   onRemoveBlock={removeBlock}
+                  onResolveExternalActivity={(blockId, resolution) => persistResolvedExternalActivity(blockId, resolution)}
                   onRequestPalette={requestPalette}
                   onSuggestAcceptedAnswers={(blockId, itemIds) => void suggestAcceptedAnswers(blockId, itemIds)}
                   onUpdateBlock={updateBlock}

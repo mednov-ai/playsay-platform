@@ -1401,8 +1401,8 @@ paths:
       tags:
       - Materials
       summary: Append an HTML game during a live scheduled lesson
-      description: Uploads a self-contained HTML game and appends it to a lesson-specific
-        material copy. Requires TEACHER or ADMIN role.
+      description: Uploads a self-contained HTML game up to 20 MiB and appends it
+        to a lesson-specific material copy. Requires TEACHER or ADMIN role.
       operationId: appendScheduledLessonHtmlGamePage
       parameters:
       - name: lessonId
@@ -1437,6 +1437,12 @@ paths:
           description: Current user cannot manage live lesson materials
         "404":
           description: Scheduled lesson or material not found
+        "413":
+          description: HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
         "502":
           description: Object storage failed
       security:
@@ -2421,8 +2427,8 @@ paths:
       tags:
       - Materials
       summary: Upload a self-contained HTML game
-      description: Uploads a validated UTF-8 HTML game without changing the material
-        document.
+      description: Uploads a validated UTF-8 HTML game up to 20 MiB without changing
+        the material document.
       operationId: uploadMaterialHtmlGameAsset
       parameters:
       - name: materialId
@@ -2443,12 +2449,28 @@ paths:
               required:
               - file
       responses:
-        "200":
-          description: OK
+        "201":
+          description: HTML game uploaded
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MaterialAssetResponse"
+        "400":
+          description: Invalid HTML game
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Current user cannot edit material
+        "404":
+          description: Material not found
+        "413":
+          description: HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "502":
+          description: Object storage failed
       security:
       - bearerAuth: []
   /materials/{materialId}/answer-suggestions:
@@ -5689,6 +5711,20 @@ components:
       - activePageId
       - lesson
       - material
+    ProjectErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        errorCode:
+          type: string
+        message:
+          type: string
+      required:
+      - errorCode
+      - message
+      - status
     LiveLessonHtmlGamePageResponse:
       type: object
       properties:

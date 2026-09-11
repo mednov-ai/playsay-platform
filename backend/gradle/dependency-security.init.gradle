@@ -91,6 +91,7 @@ gradle.projectsEvaluated {
             def key = System.getenv('NVD_API_KEY')
             if (key) dc.nvd.apiKey = key
             else dc.nvd.datafeedUrl = 'https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz'
+            dc.analyzers.kev.url = System.getenv('DEPENDENCY_SECURITY_KEV_URL') ?: 'https://raw.githubusercontent.com/cisagov/kev-data/refs/heads/develop/known_exploited_vulnerabilities.json'
             // JVM-only scan; no remote package inventory uploads to OSS Index.
             dc.analyzers.ossIndex.enabled = false
             dc.analyzers.assemblyEnabled = false
@@ -122,9 +123,9 @@ gradle.projectsEvaluated {
                 def instant = java.time.OffsetDateTime.parse(modified).toInstant()
                 def age = java.time.Duration.between(instant, java.time.Instant.now())
                 if (age.isNegative() || age > java.time.Duration.ofHours(48)) throw new GradleException('NVD feed is stale or has an invalid timestamp')
-                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD official JSON 2.0 feeds\nlastModifiedDate=' + modified + '\n'
+                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD official JSON 2.0 feeds\nlastModifiedDate=' + modified + '\nkevSource=' + (System.getenv('DEPENDENCY_SECURITY_KEV_URL') ?: 'CISA official GitHub mirror') + '\n'
             } else {
-                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD API\n'
+                new File(reportRoot, 'advisory-source.txt').text = 'source=NVD API\nkevSource=' + (System.getenv('DEPENDENCY_SECURITY_KEV_URL') ?: 'CISA official GitHub mirror') + '\n'
             }
         }
     }

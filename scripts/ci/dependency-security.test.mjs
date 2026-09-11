@@ -120,6 +120,14 @@ test('accepted risks remain distinguishable from a clean scan in runner status',
   assert.doesNotMatch(status, /^state=passed$/m);
 });
 
+test('known exploited vulnerability analyzer uses an approved CISA mirror by default', () => {
+  const source = readFileSync(resolve(repo, 'backend/gradle/dependency-security.init.gradle'), 'utf8');
+  assert.match(source, /dc\.analyzers\.kev\.url/);
+  assert.match(source, /DEPENDENCY_SECURITY_KEV_URL/);
+  assert.match(source, /raw\.githubusercontent\.com\/cisagov\/kev-data\/refs\/heads\/develop\/known_exploited_vulnerabilities\.json/);
+  assert.doesNotMatch(source, /analyzers\.kev\.enabled\s*=\s*false/);
+});
+
 test('Jenkins can traverse and archive reports from a different container UID while data remains private', () => {
   for (const failure of ['', 'update', 'backend']) {
     const { reportParentMode, reportMode, dataMode } = exercise('all', failure);

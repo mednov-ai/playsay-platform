@@ -252,12 +252,15 @@ class MaterialImagePageService(
         val document = readMaterialDocument(material)
         val pages = materialPages(document)
         val pageId = "page-${UUID.randomUUID()}"
-        val gameMetadata = materialHtmlGameMetadataService.extract(upload.bytes, upload.originalFileName)
+        val html = upload.text ?: upload.bytes.toString(Charsets.UTF_8)
+        val gameMetadata = materialHtmlGameMetadataService.extract(html, upload.originalFileName)
         val pageTitle = gameMetadata.displayTitle
         val assetId = materialAssetUploadService.insertHtmlGameAsset(
             materialId = material.id,
             originalFileName = upload.originalFileName,
             bytes = upload.bytes,
+            html = html,
+            gameMetadata = gameMetadata,
         )
         pages.add(htmlGamePage(pageId, pageTitle, gameMetadata.titleSource, assetId))
         material.document = objectMapper.writeValueAsString(document)

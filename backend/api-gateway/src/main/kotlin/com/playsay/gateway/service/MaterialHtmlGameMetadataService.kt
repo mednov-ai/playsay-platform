@@ -15,7 +15,11 @@ data class MaterialHtmlGameMetadata(
 @Component
 class MaterialHtmlGameMetadataService {
     fun extract(bytes: ByteArray, originalFileName: String?): MaterialHtmlGameMetadata {
-        val document = Jsoup.parse(String(bytes, StandardCharsets.UTF_8))
+        return extract(String(bytes, StandardCharsets.UTF_8), originalFileName)
+    }
+
+    fun extract(html: String, originalFileName: String?): MaterialHtmlGameMetadata {
+        val document = Jsoup.parse(html.take(metadataParseMaxChars))
         val candidates = listOf(
             "HTML" to document.title(),
             "HTML" to document.selectFirst("meta[name=application-name]")?.attr("content"),
@@ -56,5 +60,9 @@ class MaterialHtmlGameMetadataService {
             normalized.length > 80 ||
             normalized.matches(Regex("(?:index|untitled|game|html game|\\u0438\\u0433\\u0440\\u0430|html)[-_. ]*\\d*")) ||
             normalized.endsWith(".html")
+    }
+
+    private companion object {
+        const val metadataParseMaxChars = 512 * 1024
     }
 }

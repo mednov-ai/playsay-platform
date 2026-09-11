@@ -93,6 +93,7 @@ class MaterialAssetUploadService(
             originalFileName = fileName,
             contentType = "text/html",
             bytes = bytes,
+            text = html,
         )
     }
 
@@ -140,11 +141,16 @@ class MaterialAssetUploadService(
         materialId: UUID,
         originalFileName: String?,
         bytes: ByteArray,
+        html: String? = null,
+        gameMetadata: MaterialHtmlGameMetadata? = null,
     ): UUID {
         val id = UUID.randomUUID()
         val storageKey = "material-assets/$materialId/$id.html"
-        val gameMetadata = materialHtmlGameMetadataService.extract(bytes, originalFileName)
-        val compatibility = classifyHtmlGameCompatibility(bytes.toString(StandardCharsets.UTF_8))
+        val htmlText = html
+            ?: decodeStrictUtf8(bytes)
+            ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_HTML_GAME_INVALID_UTF8)
+        val resolvedGameMetadata = gameMetadata ?: materialHtmlGameMetadataService.extract(htmlText, originalFileName)
+        val compatibility = classifyHtmlGameCompatibility(htmlText)
         try {
             materialObjectStorage.putObject(storageKey, bytes, "text/html")
             materialAssetRepo.saveAndFlush(
@@ -162,9 +168,9 @@ class MaterialAssetUploadService(
                             put("byteSize", bytes.size)
                             put("storageKey", storageKey)
                             put("selfContained", true)
-                            put("gameTitle", gameMetadata.displayTitle)
-                            put("gameTitleSource", gameMetadata.titleSource)
-                            put("gameTitleNeedsAi", gameMetadata.titleNeedsAi)
+                            put("gameTitle", resolvedGameMetadata.displayTitle)
+                            put("gameTitleSource", resolvedGameMetadata.titleSource)
+                            put("gameTitleNeedsAi", resolvedGameMetadata.titleNeedsAi)
                             put("enrichmentStatus", "IDLE")
                             put("syncCompatibility", compatibility)
                         },
@@ -242,6 +248,7 @@ data class ValidatedMaterialAssetFile(
     val originalFileName: String?,
     val contentType: String,
     val bytes: ByteArray,
+    val text: String? = null,
 )
 
 internal fun String.materialImageExtension(): String =

@@ -111,6 +111,7 @@ class MaterialAssetService(
             materialId = materialId,
             originalFileName = upload.originalFileName,
             bytes = upload.bytes,
+            html = upload.text,
         )
         return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
     }

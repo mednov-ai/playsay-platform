@@ -274,7 +274,7 @@ private val unsafeMaterialHtmlPatterns = listOf(
     Regex("""<\s*meta\b[^>]*http-equiv\s*=\s*["']?refresh""", RegexOption.IGNORE_CASE),
     Regex("""<\s*script\b[^>]*\bsrc\s*=""", RegexOption.IGNORE_CASE),
     Regex("""<\s*link\b[^>]*\bhref\s*=\s*["']\s*(?!data:|blob:)""", RegexOption.IGNORE_CASE),
-    Regex("""<\s*(?:img|audio|video|source)\b[^>]*\bsrc(?:set)?\s*=\s*["']\s*(?!data:|blob:)""", RegexOption.IGNORE_CASE),
+    Regex("""<\s*(?:img|audio|video|source)\b[^>]*\bsrc(?:set)?\s*=\s*["']\s*(?!data:|blob:|\$\{)""", RegexOption.IGNORE_CASE),
     Regex("""<\s*(?:script|img|audio|video|source|link)\b[^>]*(?:src|href)\s*=\s*["']\s*(?:https?:)?//""", RegexOption.IGNORE_CASE),
     Regex("""@import\s+(?:url\s*\()?\s*["']?""", RegexOption.IGNORE_CASE),
     Regex("""url\s*\(\s*["']?\s*(?:https?:)?//""", RegexOption.IGNORE_CASE),

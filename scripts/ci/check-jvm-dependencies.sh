@@ -16,6 +16,12 @@ if [ -z "${NVD_API_KEY:-}" ] && [ -f "$key_file" ]; then
   [ -n "$NVD_API_KEY" ] || { echo 'NVD API key file is empty' >&2; exit 2; }
   export NVD_API_KEY
 fi
+DEPENDENCY_SECURITY_KEV_URL=${DEPENDENCY_SECURITY_KEV_URL:-'https://raw.githubusercontent.com/cisagov/kev-data/refs/heads/develop/known_exploited_vulnerabilities.json'}
+case "$DEPENDENCY_SECURITY_KEV_URL" in
+  https://*) ;;
+  *) echo 'Invalid KEV mirror URL' >&2; exit 2 ;;
+esac
+export DEPENDENCY_SECURITY_KEV_URL
 gradle_bin=${GRADLE_BIN:-gradle}
 mkdir -p "$repo/backend/build/dependency-security-data"
 run=$(mktemp -d "$repo/backend/build/dependency-security-data/run.XXXXXXXX")
@@ -58,7 +64,8 @@ if [ -n "${DEPENDENCY_SECURITY_CACHE_SEED:-}" ]; then
   rm -f "$DEPENDENCY_SECURITY_DATA_DIR/honey-update-success"
 fi
 run_gradle() {
-  "$gradle_bin" -p "$DEPENDENCY_SECURITY_BUILD_ROOT" -I "$repo/backend/gradle/dependency-security.init.gradle" \
+  "$gradle_bin" -Dkev.url="$DEPENDENCY_SECURITY_KEV_URL" \
+    -p "$DEPENDENCY_SECURITY_BUILD_ROOT" -I "$repo/backend/gradle/dependency-security.init.gradle" \
     --no-daemon --no-configuration-cache --no-parallel --max-workers=1 \
     -Pkotlin.compiler.execution.strategy=in-process "$@"
 }

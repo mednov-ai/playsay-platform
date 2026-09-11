@@ -55,12 +55,13 @@ esac
 test('security gate refreshes data once and shares only the invocation-private database', () => {
   const { result, calls, status } = exercise('api-gateway');
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(calls.match(/dependencyCheckUpdate/g)?.length, 1);
-  assert.equal(new Set(calls.trim().split('\n').map(line => line.split('|')[2])).size, 1);
-  assert.match(calls, /\/backend\|api-gateway\|/);
-  assert.doesNotMatch(calls + result.stdout + result.stderr + status, /fixture-secret/);
-  assert.match(status, /state=passed/);
-  assert.match(status, /source_revision=0123456789abcdef0123456789abcdef01234567/);
+    assert.equal(calls.match(/dependencyCheckUpdate/g)?.length, 1);
+    assert.equal(new Set(calls.trim().split('\n').map(line => line.split('|')[2])).size, 1);
+    assert.match(calls, /\/backend\|api-gateway\|/);
+    assert.match(calls, /-Dkev\.url=https:\/\/raw\.githubusercontent\.com\/cisagov\/kev-data\/refs\/heads\/develop\/known_exploited_vulnerabilities\.json/);
+    assert.doesNotMatch(calls + result.stdout + result.stderr + status, /fixture-secret/);
+    assert.match(status, /state=passed/);
+    assert.match(status, /source_revision=0123456789abcdef0123456789abcdef01234567/);
 });
 
 test('advisory refresh failure prevents every analysis and cannot report a clean gate', () => {
@@ -121,7 +122,10 @@ test('accepted risks remain distinguishable from a clean scan in runner status',
 });
 
 test('known exploited vulnerability analyzer uses an approved CISA mirror by default', () => {
+  const runner = readFileSync(resolve(repo, 'scripts/ci/check-jvm-dependencies.sh'), 'utf8');
   const source = readFileSync(resolve(repo, 'backend/gradle/dependency-security.init.gradle'), 'utf8');
+  assert.match(runner, /-Dkev\.url="\$DEPENDENCY_SECURITY_KEV_URL"/);
+  assert.match(runner, /raw\.githubusercontent\.com\/cisagov\/kev-data\/refs\/heads\/develop\/known_exploited_vulnerabilities\.json/);
   assert.match(source, /dc\.analyzers\.kev\.url/);
   assert.match(source, /DEPENDENCY_SECURITY_KEV_URL/);
   assert.match(source, /raw\.githubusercontent\.com\/cisagov\/kev-data\/refs\/heads\/develop\/known_exploited_vulnerabilities\.json/);

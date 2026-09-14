@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppProviders } from "../../../app/AppProviders";
 import type { LessonMaterial, LessonMaterialAsset } from "../../../shared/api/playsay";
 import { i18n } from "../../../shared/i18n";
-import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
+import { LessonMaterialDocumentView, MATERIAL_ASSET_LOAD_TIMEOUT_MS } from "./LessonMaterialDocumentView";
 
 vi.hoisted(() => {
   const values = new Map<string, string>();
@@ -111,5 +111,60 @@ describe("LessonMaterialDocumentView asset failures", () => {
 
     await waitFor(() => expect(container.querySelector('img[src="blob:broken"]')).toBeInTheDocument());
     expect(screen.queryByText("Часть файлов материала не загрузилась.")).not.toBeInTheDocument();
+  });
+
+  it("settles a stalled HTML game load and lets the teacher retry", async () => {
+    vi.useFakeTimers();
+    apiMocks.fetchMaterialAssets.mockResolvedValue([{
+      id: "game-asset",
+      materialId: "material-game",
+      kind: "HTML_GAME",
+      contentUrl: "/api/materials/material-game/assets/game-asset/content",
+      provider: "s3",
+      metadata: {},
+      createdAt: now,
+    } satisfies LessonMaterialAsset]);
+    let resolveGame: ((html: string) => void) | undefined;
+    apiMocks.fetchMaterialAssetText.mockImplementation(() => new Promise<string>((resolve) => {
+      resolveGame = resolve;
+    }));
+    const gameMaterial = {
+      ...material,
+      id: "material-game",
+      title: "Game",
+      blockCount: 1,
+      document: {
+        schemaVersion: 1,
+        pages: [{
+          id: "page-game",
+          title: "Game",
+          layout: "FLOW",
+          blocks: [{ id: "game", type: "htmlGame", title: "Word race", url: "material-asset:game-asset" }],
+        }],
+      },
+    } satisfies LessonMaterial;
+    const view = render(
+      <AppProviders>
+        <LessonMaterialDocumentView material={gameMaterial} />
+      </AppProviders>,
+    );
+
+    await act(async () => Promise.resolve());
+    expect(view.getByTestId("html-game-loading-game")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(MATERIAL_ASSET_LOAD_TIMEOUT_MS);
+    });
+    expect(view.getByTestId("html-game-unavailable-game")).toBeInTheDocument();
+    expect(view.queryByTestId("html-game-launch-game")).not.toBeInTheDocument();
+    expect(screen.getByText("Не удалось загрузить файлы материала.")).toBeInTheDocument();
+
+    apiMocks.fetchMaterialAssetText.mockResolvedValue("<html><body>ready</body></html>");
+    fireEvent.click(screen.getByRole("button", { name: "Загрузить снова" }));
+    await act(async () => Promise.resolve());
+    expect(view.getByTestId("html-game-launch-game")).toBeInTheDocument();
+
+    resolveGame?.("<html><body>stale</body></html>");
+    vi.useRealTimers();
   });
 });

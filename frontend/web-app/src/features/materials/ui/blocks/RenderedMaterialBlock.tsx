@@ -1,6 +1,6 @@
 import { Button } from "../../../../components/ui/button";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
-import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Maximize2, Play, Video } from "lucide-react";
+import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Loader2, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   clampNumber,
@@ -37,6 +37,7 @@ export function RenderedMaterialBlock({
   assetTags,
   assetUrls,
   block,
+  htmlGameContentState,
   mode,
   onAnswerChange,
   exerciseParticipants = [],
@@ -56,6 +57,7 @@ export function RenderedMaterialBlock({
   assetTags: Record<string, string[]>;
   assetUrls: Record<string, string>;
   block: MaterialEditorBlock;
+  htmlGameContentState?: "loading" | "ready" | "unavailable";
   materialId?: string;
   videoSync?: MaterialVideoSync;
   mode: MaterialRenderMode;
@@ -374,7 +376,31 @@ export function RenderedMaterialBlock({
       }
     case "htmlGame":
       {
+        const hasGameAsset = Boolean(materialAssetIdFromUrl(block.url));
+        const gameContentState = hasGameAsset ? htmlGameContentState ?? "ready" : "unavailable";
         const gameIconUrl = resolveMaterialImageUrl(block.gameIconUrl, assetUrls);
+        if (gameContentState !== "ready") {
+          return blockSection(
+            <div
+              className="playsay-html-game-app"
+              data-testid={`html-game-${gameContentState}-${block.id}`}
+              role={gameContentState === "loading" ? "status" : "alert"}
+            >
+              <span className="playsay-html-game-app-icon">
+                {gameContentState === "loading"
+                  ? <Loader2 className="h-7 w-7 animate-spin" />
+                  : <CircleAlert className="h-7 w-7 text-destructive" />}
+              </span>
+              <span className="playsay-html-game-app-copy">
+                <strong>{block.title}</strong>
+                <small>{t(gameContentState === "loading"
+                  ? "materials.renderer.htmlGameLoading"
+                  : "materials.renderer.htmlGameUnavailable")}</small>
+              </span>
+            </div>,
+            "playsay-render-block playsay-render-block-html-game",
+          );
+        }
         return blockSection(
           <button
             aria-label={t("materials.renderer.launchGame", { title: block.title })}

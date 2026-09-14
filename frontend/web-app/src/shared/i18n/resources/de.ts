@@ -1357,6 +1357,7 @@ export const de = {
       videoLinkPlaceholder: "Videolink erscheint hier",
       videoPlaybackUnsupported: "Ihr Browser unterstützt die eingebettete Videowiedergabe nicht.",
       htmlGameLoading: "Spiel wird geladen…",
+      htmlGameUnavailable: "Die Spieldatei ist nicht verfügbar. Laden Sie sie erneut hoch oder versuchen Sie es noch einmal.",
       htmlGameWaiting: "Das Spiel startet, sobald die Lehrkraft diese Seite öffnet.",
       launchGame: "Spiel „{{title}}“ starten",
       gameApplication: "Interaktives Spiel",

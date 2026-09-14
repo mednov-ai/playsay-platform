@@ -713,6 +713,7 @@ describe("LessonTaskCanvas", () => {
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='annotation-tool-pen']")!);
     expect(container.querySelector("[data-testid='annotation-tool-pen']")?.getAttribute("data-active")).toBe("true");
 
+    await waitFor(() => expect(container.querySelector("[data-testid='html-game-launch-game-1']")).not.toBeNull());
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
     await waitFor(() => expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
     await waitFor(() => expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull());
@@ -730,6 +731,7 @@ describe("LessonTaskCanvas", () => {
     expect(container.querySelector(".playsay-material-focused-game")?.getAttribute("data-active")).toBe("false");
     expect(onPresentationModeChange).toHaveBeenLastCalledWith("default");
 
+    await waitFor(() => expect(container.querySelector("[data-testid='html-game-launch-game-1']")).not.toBeNull());
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
 
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
@@ -774,7 +776,7 @@ describe("LessonTaskCanvas", () => {
     expect(setPresentedBlock).toHaveBeenCalledWith(null);
   });
 
-  it("keeps a locally reopened game focused while the shared presentation echo is pending", () => {
+  it("keeps a locally reopened game focused while the shared presentation echo is pending", async () => {
     const setPresentedBlock = vi.fn();
     const baseProps = {
       lessonId: "lesson-1",
@@ -791,6 +793,7 @@ describe("LessonTaskCanvas", () => {
       htmlGameSync: htmlGameSync({ setPresentedBlock }),
     }));
 
+    await waitFor(() => expect(container.querySelector("[data-testid='html-game-launch-game-1']")).not.toBeNull());
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
     expect(container.querySelector(".playsay-task-board")?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
     expect(setPresentedBlock).toHaveBeenCalledWith("game-1");

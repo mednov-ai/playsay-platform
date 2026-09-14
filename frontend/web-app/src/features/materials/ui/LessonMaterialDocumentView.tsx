@@ -24,6 +24,24 @@ import { HtmlGameFrame } from "./blocks/HtmlGameFrame";
 import { ExternalActivityFrame } from "./blocks/ExternalActivityFrame";
 import { useAppTranslation } from "../../../shared/i18n";
 
+export const MATERIAL_ASSET_LOAD_TIMEOUT_MS = 30_000;
+
+function withMaterialAssetLoadTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => reject(new Error("material-asset-load-timeout")), MATERIAL_ASSET_LOAD_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function LessonMaterialDocumentView({
   activePageId,
   allowVideoFullscreen,
@@ -187,7 +205,7 @@ export function LessonMaterialDocumentView({
     setHtmlAssets({});
     setAssetTags({});
     setAssetLoadState("loading");
-    fetchMaterialAssets(material.id)
+    withMaterialAssetLoadTimeout(fetchMaterialAssets(material.id))
       .then(async (assets) => {
         const referencedAssetIds = new Set(assetIds);
         const referencedAssets = assets.filter((asset) => referencedAssetIds.has(asset.id));
@@ -199,7 +217,7 @@ export function LessonMaterialDocumentView({
             return {
               id: asset.id,
               kind: "html" as const,
-              value: await fetchMaterialAssetText(material.id, asset.id),
+              value: await withMaterialAssetLoadTimeout(fetchMaterialAssetText(material.id, asset.id)),
             };
           }
           const externalUrl = asset.externalUrl?.trim();
@@ -210,7 +228,7 @@ export function LessonMaterialDocumentView({
             throw new Error("missing-material-asset-content");
           }
 
-          const objectUrl = await fetchMaterialAssetObjectUrl(material.id, asset.id);
+          const objectUrl = await withMaterialAssetLoadTimeout(fetchMaterialAssetObjectUrl(material.id, asset.id));
           if (!active) {
             URL.revokeObjectURL(objectUrl);
             throw new Error("material-asset-load-cancelled");
@@ -256,6 +274,9 @@ export function LessonMaterialDocumentView({
 
   function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity", blockId: string) {
     if (kind === "htmlGame") {
+      const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "htmlGame");
+      const assetId = block?.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
+      if (!assetId || !htmlAssets[assetId]) return;
       setLaunchedGameIds((current) => new Set(current).add(blockId));
       htmlGameSync?.setPresentedBlock(blockId);
     }
@@ -372,14 +393,25 @@ export function LessonMaterialDocumentView({
       <div
         className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}
       >
-        {page.blocks.map((block) => (
-          <RenderedMaterialBlock
+        {page.blocks.map((block) => {
+          const htmlGameAssetId = block.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
+          const htmlGameContentState = block.type !== "htmlGame"
+            ? undefined
+            : !htmlGameAssetId
+              ? "unavailable" as const
+              : htmlAssets[htmlGameAssetId]
+                ? "ready" as const
+                : assetLoadState === "loading" || (assetLoadState === "idle" && material.id !== "preview")
+                  ? "loading" as const
+                  : "unavailable" as const;
+          return <RenderedMaterialBlock
             allowVideoFullscreen={videoFullscreenAllowed}
             answer={answers[block.id]}
             assetsLoading={assetLoadState === "loading"}
             assetTags={assetTags}
             assetUrls={assetUrls}
             block={block}
+            htmlGameContentState={htmlGameContentState}
             key={block.id}
             materialId={material.id}
             mode={mode}
@@ -396,8 +428,8 @@ export function LessonMaterialDocumentView({
             onBlockPatch={onBlockPatch}
             onRequestFocus={requestBlockFocus}
             pageLayout={page.layout}
-          />
-        ))}
+          />;
+        })}
       </div>
       <div
         aria-hidden={focusedBlock === null ? "true" : undefined}
@@ -424,13 +456,24 @@ export function LessonMaterialDocumentView({
         {allBlocks.filter((block) => block.type === "htmlGame" && launchedGameIds.has(block.id)).map((block) => {
           const assetId = materialAssetIdFromUrl(block.url);
           const active = focusedBlock?.kind === "htmlGame" && focusedBlock.blockId === block.id;
+          const html = assetId ? htmlAssets[assetId] : undefined;
+          const contentState = !assetId
+            ? "unavailable" as const
+            : html
+              ? "ready" as const
+              : assetLoadState === "loading" || (assetLoadState === "idle" && material.id !== "preview")
+                ? "loading" as const
+                : "unavailable" as const;
           return (
             <div className="playsay-material-focused-game" data-active={active ? "true" : "false"} key={block.id}>
               <HtmlGameFrame
                 blockId={block.id}
                 fillAvailable={active}
                 height={block.height ?? 640}
-                html={assetId ? htmlAssets[assetId] : undefined}
+                html={html}
+                contentState={contentState}
+                onClose={closeBlockFocus}
+                onRetry={() => setAssetReloadVersion((current) => current + 1)}
                 sync={htmlGameSync}
                 title={block.title}
               />

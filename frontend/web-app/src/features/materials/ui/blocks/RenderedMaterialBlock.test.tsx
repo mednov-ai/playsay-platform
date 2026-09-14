@@ -105,6 +105,22 @@ describe("RenderedMaterialBlock video playback", () => {
     expect(markup).not.toContain("<iframe");
   });
 
+  it("does not expose a launch action when the HTML game has no uploaded asset", () => {
+    const markup = renderToStaticMarkup(
+      <RenderedMaterialBlock
+        assetTags={{}}
+        assetUrls={{}}
+        block={{ id: "game-empty", title: "Word race", type: "htmlGame" }}
+        mode="classroom"
+      />,
+    );
+
+    expect(markup).toContain('data-testid="html-game-unavailable-game-empty"');
+    expect(markup).toContain('role="alert"');
+    expect(markup).not.toContain("html-game-launch-game-empty");
+    expect(markup).not.toContain("<button");
+  });
+
   it("renders a generated app icon for an enriched HTML game", () => {
     const markup = renderToStaticMarkup(
       <RenderedMaterialBlock

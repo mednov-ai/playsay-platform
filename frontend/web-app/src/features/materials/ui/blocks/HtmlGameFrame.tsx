@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Gamepad2, Loader2 } from "lucide-react";
+import { AlertCircle, Gamepad2, Loader2, RefreshCw, X } from "lucide-react";
 import {
   classifyGameHtml,
   GAME_SYNC_LIMITS,
@@ -162,25 +162,34 @@ function orderSdkAction(
 
 type HtmlGameFrameProps = {
   blockId: string;
+  contentState?: HtmlGameContentState;
   fillAvailable?: boolean;
   height: number;
   html?: string;
+  onClose?: () => void;
+  onRetry?: () => void;
   onRuntimeStatusChange?: (status: HtmlGameRuntimeStatus) => void;
   sync?: MaterialHtmlGameSync;
   title: string;
 };
 
+export type HtmlGameContentState = "loading" | "ready" | "unavailable";
+
 function HtmlGameFrameComponent({
   blockId,
+  contentState,
   fillAvailable = false,
   height,
   html,
+  onClose,
+  onRetry,
   onRuntimeStatusChange,
   sync,
   title,
 }: HtmlGameFrameProps) {
   recordGameSyncCounter("htmlGameFrameRenders");
   const { t } = useAppTranslation();
+  const resolvedContentState = contentState ?? (html ? "ready" : "loading");
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useMemo(() => crypto.randomUUID(), [blockId, html]);
   const sdkRuntime = Boolean(html && classifyGameHtml(html) === "SDK_V1");
@@ -669,11 +678,34 @@ function HtmlGameFrameComponent({
     });
   }, [blockId, channel, predictiveMirror, sync?.effects, sync?.isAuthority]);
 
-  if (!html) {
+  if (resolvedContentState === "loading") {
     return (
       <div className="playsay-html-game-placeholder" role="status">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <span>{t("materials.renderer.htmlGameLoading")}</span>
+      </div>
+    );
+  }
+
+  if (resolvedContentState === "unavailable" || !html) {
+    return (
+      <div className="playsay-html-game-placeholder" role="alert">
+        <AlertCircle className="h-5 w-5 text-destructive" />
+        <span>{t("materials.renderer.htmlGameUnavailable")}</span>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {onRetry ? (
+            <button className="inline-flex items-center gap-1.5 font-extrabold text-primary underline" onClick={onRetry} type="button">
+              <RefreshCw className="h-4 w-4" />
+              {t("materials.renderer.retryAssets")}
+            </button>
+          ) : null}
+          {onClose ? (
+            <button className="inline-flex items-center gap-1.5 font-extrabold text-primary underline" onClick={onClose} type="button">
+              <X className="h-4 w-4" />
+              {t("materials.renderer.closeGame")}
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -712,9 +744,12 @@ function sameHtmlGameFrameProps(
 ): boolean {
   if (
     previous.blockId !== next.blockId
+    || previous.contentState !== next.contentState
     || previous.fillAvailable !== next.fillAvailable
     || previous.height !== next.height
     || previous.html !== next.html
+    || previous.onClose !== next.onClose
+    || previous.onRetry !== next.onRetry
     || previous.onRuntimeStatusChange !== next.onRuntimeStatusChange
     || previous.title !== next.title
   ) {
@@ -1738,4 +1773,3 @@ function gameBridgeSource(channel: string, mirror: boolean, runId: string, predi
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
   })();`;
 }
-

@@ -2,7 +2,7 @@
 // @vitest-environment-options { "url": "http://localhost/" }
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
 import type { MaterialHtmlGameSync } from "../../model/materialDocument";
@@ -30,6 +30,28 @@ afterEach(() => {
 });
 
 describe("HTML game sandbox", () => {
+  it("shows a terminal recoverable error instead of a spinner for unavailable content", () => {
+    const onClose = vi.fn();
+    const onRetry = vi.fn();
+    const view = render(
+      <HtmlGameFrame
+        blockId="game-missing"
+        contentState="unavailable"
+        height={640}
+        onClose={onClose}
+        onRetry={onRetry}
+        title="Game"
+      />,
+    );
+
+    expect(view.getByRole("alert").textContent).toContain("materials.renderer.htmlGameUnavailable");
+    expect(view.container.querySelector(".animate-spin")).toBeNull();
+    fireEvent.click(view.getByText("materials.renderer.retryAssets"));
+    fireEvent.click(view.getByText("materials.renderer.closeGame"));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("injects an offline bridge and keeps game scripts only in the authority document", () => {
     const authority = createSandboxedGameDocument(gameHtml, "run-authority", false);
     const mirror = createSandboxedGameDocument(gameHtml, "run-mirror", true);
@@ -1103,4 +1125,3 @@ describe("HTML game sandbox", () => {
     }
   });
 });
-

@@ -1357,6 +1357,7 @@ export const en = {
       videoLinkPlaceholder: "Video link will appear here",
       videoPlaybackUnsupported: "Your browser does not support embedded video playback.",
       htmlGameLoading: "Game is loading…",
+      htmlGameUnavailable: "The game file is unavailable. Ask the teacher to upload it again or retry loading.",
       htmlGameWaiting: "The game will start when the teacher opens this page.",
       launchGame: "Launch game “{{title}}”",
       gameApplication: "Interactive game",

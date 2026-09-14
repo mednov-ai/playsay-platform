@@ -98,7 +98,7 @@ describe("MaterialPlayPreviewDialog", () => {
     expect(markup).toContain("Закрыть");
   });
 
-  it("hides answer reset for a game-only material and expands the focused game workspace", async () => {
+  it("hides answer reset and prevents launching a game whose preview asset is unavailable", () => {
     const { container } = render(createElement(MaterialPlayPreviewDialog, {
       material: gameOnlyMaterial,
       onClose: () => undefined,
@@ -109,11 +109,9 @@ describe("MaterialPlayPreviewDialog", () => {
     expect(dialog?.getAttribute("data-presentation-mode")).toBe("default");
     expect(container.querySelector("[data-testid='material-preview-reset']")).toBeNull();
 
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='html-game-launch-game-1']")!);
-    await waitFor(() => expect(dialog?.getAttribute("data-presentation-mode")).toBe("html-game-focus"));
-
-    fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
-    await waitFor(() => expect(dialog?.getAttribute("data-presentation-mode")).toBe("default"));
+    expect(container.querySelector("[data-testid='html-game-unavailable-game-1']")).not.toBeNull();
+    expect(container.querySelector("[data-testid='html-game-launch-game-1']")).toBeNull();
+    expect(dialog?.getAttribute("data-presentation-mode")).toBe("default");
   });
 
   it("keeps answer reset for exercises and clears the current answers", () => {

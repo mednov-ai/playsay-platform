@@ -1357,6 +1357,7 @@ export const fr = {
       videoLinkPlaceholder: "Le lien vidéo apparaîtra ici",
       videoPlaybackUnsupported: "Votre navigateur ne prend pas en charge la lecture vidéo intégrée.",
       htmlGameLoading: "Chargement du jeu…",
+      htmlGameUnavailable: "Le fichier du jeu est indisponible. Importez-le à nouveau ou réessayez.",
       htmlGameWaiting: "Le jeu démarrera lorsque l’enseignant ouvrira cette page.",
       launchGame: "Lancer le jeu « {{title}} »",
       gameApplication: "Jeu interactif",

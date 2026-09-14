@@ -1383,6 +1383,7 @@ export const ru = {
       videoLinkPlaceholder: "Ссылка на видео будет здесь",
       videoPlaybackUnsupported: "Ваш браузер не поддерживает встроенное воспроизведение видео.",
       htmlGameLoading: "Игра загружается…",
+      htmlGameUnavailable: "Файл игры недоступен. Загрузите его заново или повторите попытку.",
       htmlGameWaiting: "Игра запустится, когда учитель откроет эту страницу.",
       launchGame: "Запустить игру «{{title}}»",
       gameApplication: "Интерактивная игра",

@@ -762,6 +762,25 @@
   margin: 0 auto;
 }
 
+.playsay-material-reader[data-presentation-mode="html-game-focus"] {
+  min-height: min(72vh, 54rem);
+  height: min(72vh, 54rem);
+  overflow: hidden;
+  padding: 0;
+}
+
+.playsay-material-reader[data-presentation-mode="html-game-focus"] .playsay-rendered-material,
+.playsay-material-reader[data-presentation-mode="html-game-focus"] .playsay-material-focus-stack,
+.playsay-material-reader[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"],
+.playsay-material-reader[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] .playsay-html-game,
+.playsay-material-reader[data-presentation-mode="html-game-focus"] .playsay-material-focused-game[data-active="true"] iframe {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+}
+
 .playsay-material-play-backdrop {
   position: fixed;
   z-index: 70;

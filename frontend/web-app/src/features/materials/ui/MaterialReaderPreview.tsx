@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   materialPreviewFromForm,
@@ -7,6 +8,8 @@ import {
 } from "../model/materialDocument";
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
 import { MaterialImageProgress } from "./MaterialImageProgress";
+
+type MaterialReaderPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
 
 export function MaterialReaderPreview({
   form,
@@ -25,12 +28,17 @@ export function MaterialReaderPreview({
   onBlockPatchCommit: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onUpdateAssetTags: (assetId: string, tags: string[]) => Promise<LessonMaterialAsset | null>;
 }) {
+  const [presentationMode, setPresentationMode] = useState<MaterialReaderPresentationMode>("default");
+
   return (
     <>
       {imageGenerationProgress ? (
         <MaterialImageProgress value={imageGenerationProgress} />
       ) : null}
-      <div className="playsay-material-preview playsay-material-reader">
+      <div
+        className="playsay-material-preview playsay-material-reader"
+        data-presentation-mode={presentationMode}
+      >
         <LessonMaterialDocumentView
           material={materialPreviewFromForm(form)}
           mode="teacherPreview"
@@ -38,6 +46,7 @@ export function MaterialReaderPreview({
           onBlockPatchCommit={onBlockPatchCommit}
           onVideoMetadataEdit={onVideoMetadataEdit}
           onBlockPatch={onBlockPatch}
+          onPresentationModeChange={setPresentationMode}
         />
       </div>
       {message ? (

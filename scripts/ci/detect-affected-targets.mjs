@@ -227,6 +227,13 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/html-game-optimization.schema.json") {
+      deployTargets.add("api-gateway");
+      deployTargets.add("game-adapter-service");
+      addValidation(validationSuites, "ci-contracts");
+      continue;
+    }
+
     if (path === "contracts/ai-tutor-openapi.yaml") {
       deployTargets.add("ai-tutor-service");
       deployTargets.add("web-app");

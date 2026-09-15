@@ -22,6 +22,12 @@ export function htmlGameUploadErrorMessage(caught: unknown): string {
     if (caught.status === 0 || caught.errorCode === "NETWORK_ERROR") {
       return i18n.t("materials.htmlGameUpload.networkError");
     }
+    if (caught.errorCode === "MATERIAL_HTML_GAME_IMAGE_INVALID") {
+      return i18n.t("materials.htmlGameUpload.imageInvalid");
+    }
+    if (caught.errorCode === "MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE") {
+      return i18n.t("materials.htmlGameUpload.optimizationUnavailable");
+    }
     if (caught.errorCode.startsWith("MATERIAL_HTML_GAME_") && caught.message.trim()) {
       return caught.message;
     }

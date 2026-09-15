@@ -2,6 +2,7 @@ package com.playsay.gateway.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.playsay.gateway.dto.HtmlGameOptimizationMetadata
 import com.playsay.gateway.entity.MaterialAssetEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.MaterialAssetRepo
@@ -97,6 +98,24 @@ class MaterialAssetUploadService(
         )
     }
 
+    fun revalidateHtmlGameBytes(source: ValidatedMaterialAssetFile, bytes: ByteArray): ValidatedMaterialAssetFile {
+        if (bytes.isEmpty() || bytes.size > materialHtmlGameMaxBytes) {
+            throw ProjectResponseException.localized(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                MetaData.ErrorCodes.MATERIAL_HTML_GAME_IMAGE_INVALID,
+            )
+        }
+        val html = decodeStrictUtf8(bytes)
+            ?: throw ProjectResponseException.localized(
+                HttpStatus.BAD_REQUEST,
+                MetaData.ErrorCodes.MATERIAL_HTML_GAME_INVALID_UTF8,
+            )
+        if (!materialHtmlDocumentPattern.containsMatchIn(html) || unsafeMaterialHtmlPatterns.any { it.containsMatchIn(html) }) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_HTML_GAME_UNSAFE)
+        }
+        return source.copy(bytes = bytes, text = html)
+    }
+
     fun insertUploadedImageAsset(
         materialId: UUID,
         originalFileName: String?,
@@ -143,6 +162,7 @@ class MaterialAssetUploadService(
         bytes: ByteArray,
         html: String? = null,
         gameMetadata: MaterialHtmlGameMetadata? = null,
+        imageOptimization: HtmlGameOptimizationMetadata? = null,
     ): UUID {
         val id = UUID.randomUUID()
         val storageKey = "material-assets/$materialId/$id.html"
@@ -173,6 +193,15 @@ class MaterialAssetUploadService(
                             put("gameTitleNeedsAi", resolvedGameMetadata.titleNeedsAi)
                             put("enrichmentStatus", "IDLE")
                             put("syncCompatibility", compatibility)
+                            imageOptimization?.let { optimization ->
+                                put("imageOptimizationStatus", optimization.status)
+                                put("imageOptimizationPolicy", optimization.policy)
+                                put("imageOptimizationInputBytes", optimization.inputBytes)
+                                put("imageOptimizationOutputBytes", optimization.outputBytes)
+                                put("imageOptimizationEligibleCount", optimization.eligibleCount)
+                                put("imageOptimizationReplacedCount", optimization.replacedCount)
+                                put("imageOptimizationBytesSaved", optimization.bytesSaved)
+                            }
                         },
                     ),
                     createdAt = Instant.now(),

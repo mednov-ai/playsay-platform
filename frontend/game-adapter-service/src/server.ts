@@ -3,34 +3,98 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { pathToFileURL } from "node:url";
 import { adaptGameHtml } from "./adapter.js";
 import {
+  IMAGE_OPTIMIZATION_POLICY,
+  ImageOptimizationError,
+  optimizeEmbeddedImages,
+} from "./image-optimizer.js";
+import {
   closeRuntimeValidator,
   MECHANICS_VALIDATOR_VERSION,
 } from "./runtime-validator.js";
 
 const port = Number(process.env.PORT ?? 8088);
-const requestLimit = 7 * 1024 * 1024;
+const adaptationRequestLimit = 7 * 1024 * 1024;
+const optimizationRequestLimit = 24 * 1024 * 1024;
+export const optimizationDeadlineMs = 30_000;
 
-export function createGameAdapterServer(adapt: typeof adaptGameHtml = adaptGameHtml) {
+export function createGameAdapterServer(
+  adapt: typeof adaptGameHtml = adaptGameHtml,
+  optimize: typeof optimizeEmbeddedImages = optimizeEmbeddedImages,
+  deadlineMs = optimizationDeadlineMs,
+) {
   return createServer(async (request, response) => {
+    const isOptimization = request.method === "POST" && request.url === "/internal/html-game-optimizations";
     try {
       if (request.method === "GET" && request.url === "/actuator/health") {
         return json(response, 200, { status: "UP" });
       }
-      if (request.method !== "POST" || request.url !== "/internal/game-adaptations") {
+      const isAdaptation = request.method === "POST" && request.url === "/internal/game-adaptations";
+      if (!isAdaptation && !isOptimization) {
         return json(response, 404, { code: "NOT_FOUND" });
       }
       if (!authorized(request)) {
-        return json(response, 401, { code: "UNAUTHORIZED" });
+        return json(response, 401, { code: "UNAUTHORIZED", retryable: false });
       }
-      const body = JSON.parse(await readBody(request)) as { html?: unknown };
+      const body = JSON.parse(await readBody(
+        request,
+        isOptimization ? optimizationRequestLimit : adaptationRequestLimit,
+      )) as { html?: unknown; policy?: unknown };
       if (typeof body.html !== "string") {
-        return json(response, 400, { code: "HTML_REQUIRED" });
+        return json(response, 400, { code: "HTML_REQUIRED", retryable: false });
+      }
+      if (isOptimization) {
+        if (body.policy !== IMAGE_OPTIMIZATION_POLICY) {
+          return json(response, 400, { code: "OPTIMIZATION_POLICY_UNSUPPORTED", retryable: false });
+        }
+        const result = await withDeadline(optimize(body.html, body.policy), deadlineMs);
+        console.info(JSON.stringify({
+          event: "html_game_image_optimization",
+          status: result.status,
+          durationMs: result.durationMs,
+          inputBytes: result.inputBytes,
+          outputBytes: result.outputBytes,
+          eligibleCount: result.eligibleCount,
+          replacedCount: result.replacedCount,
+          bytesSaved: result.bytesSaved,
+        }));
+        return json(response, 200, result);
       }
       const result = await adapt(body.html);
+      if (result.mediaProtection) {
+        console.info(JSON.stringify({
+          event: "game_adaptation_media_protection",
+          ...result.mediaProtection,
+        }));
+      }
       return json(response, 200, result);
     } catch (error) {
+      if (error instanceof ImageOptimizationError) {
+        const code = error.code === "IMAGE_LIMIT_EXCEEDED" ? "IMAGE_LIMIT_EXCEEDED" : "IMAGE_INVALID";
+        console.warn(JSON.stringify({ event: "html_game_image_optimization_failed", code }));
+        return json(response, 422, { code, retryable: false });
+      }
+      if (error instanceof Error && error.message === "OPTIMIZATION_TIMEOUT") {
+        console.warn(JSON.stringify({ event: "html_game_image_optimization_failed", code: "OPTIMIZATION_TIMEOUT" }));
+        return json(response, 503, { code: "OPTIMIZATION_TIMEOUT", retryable: true });
+      }
       const raw = error instanceof Error ? error.message : "ADAPTATION_FAILED";
+      if (isOptimization) {
+        if (raw === "REQUEST_TOO_LARGE") {
+          return json(response, 413, { code: raw, retryable: false });
+        }
+        if (error instanceof SyntaxError) {
+          return json(response, 400, { code: "INVALID_JSON", retryable: false });
+        }
+        console.warn(JSON.stringify({ event: "html_game_image_optimization_failed", code: "OPTIMIZATION_FAILED" }));
+        return json(response, 503, { code: "OPTIMIZATION_FAILED", retryable: true });
+      }
       const failure = classifyFailure(raw);
+      if (failure.code === "ADAPTED_HTML_MEDIA_INTEGRITY_INVALID") {
+        console.warn(JSON.stringify({
+          event: "game_adaptation_media_protection_failed",
+          code: failure.code,
+        }));
+      }
       return json(response, failure.status, {
         code: failure.code,
         retryable: failure.retryable,
@@ -53,7 +117,7 @@ function authorized(request: IncomingMessage): boolean {
   return timingSafeEqual(Buffer.from(expected), Buffer.from(supplied));
 }
 
-async function readBody(request: IncomingMessage): Promise<string> {
+async function readBody(request: IncomingMessage, requestLimit: number): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -65,6 +129,21 @@ async function readBody(request: IncomingMessage): Promise<string> {
     chunks.push(buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+async function withDeadline<T>(work: Promise<T>, deadlineMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("OPTIMIZATION_TIMEOUT")), deadlineMs);
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function json(response: ServerResponse, status: number, body: unknown): void {
@@ -113,6 +192,9 @@ function classifyFailure(raw: string): {
   }
   if (raw.includes("RUNTIME_VALIDATOR_UNAVAILABLE")) {
     return { code: "RUNTIME_VALIDATOR_UNAVAILABLE", failureCode, retryable: true, status: 503 };
+  }
+  if (raw.includes("ADAPTED_HTML_MEDIA_INTEGRITY_INVALID")) {
+    return { code: "ADAPTED_HTML_MEDIA_INTEGRITY_INVALID", failureCode, retryable: false, status: 422 };
   }
   if (raw.includes("ACTION_RATE_EXCEEDED")) {
     return { code: "ADAPTED_HTML_ACTION_RATE_EXCEEDED", failureCode, retryable: false, status: 422 };

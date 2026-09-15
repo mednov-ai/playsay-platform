@@ -1217,6 +1217,7 @@ export const fr = {
       gameSyncFailedRuntime: "La version a échoué aux contrôles de démarrage et d’interaction ; l’original n’a pas été modifié",
       gameSyncFailedActionRate: "Le jeu produit trop d’événements de synchronisation ; l’original n’a pas été modifié",
       gameSyncFailedMechanics: "L’adaptation a modifié la mécanique d’origine et a été refusée",
+      gameSyncFailedMediaIntegrity: "Les médias du jeu n’ont pas pu être restaurés en toute sécurité ; l’original n’a pas été modifié",
       gameSyncFailedUnsafe: "La version a échoué au contrôle de sécurité ; l’original n’a pas été modifié",
       gameSyncFailedUnavailable: "La validation du jeu est temporairement indisponible ; veuillez réessayer",
       improveGameSync: "Améliorer la synchronisation",
@@ -1513,6 +1514,8 @@ export const fr = {
     htmlGameUpload: {
       tooLarge: "Choisissez un jeu HTML de {{max}} Mo maximum, puis réessayez.",
       networkError: "Le jeu n’a pas été importé car la connexion a été interrompue. Vérifiez la connexion et réessayez.",
+      imageInvalid: "Une image intégrée au jeu est non valide ou trop volumineuse. Vérifiez le fichier et réessayez.",
+      optimizationUnavailable: "Les images du jeu ne peuvent pas être préparées pour le moment. Le support actuel a été conservé ; réessayez l’importation plus tard.",
       failed: "Le jeu n’a pas pu être importé. Vérifiez le fichier et réessayez.",
     },
     messages: {

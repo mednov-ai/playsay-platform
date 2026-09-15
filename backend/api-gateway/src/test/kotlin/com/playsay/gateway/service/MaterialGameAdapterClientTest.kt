@@ -62,6 +62,21 @@ class MaterialGameAdapterClientTest {
     }
 
     @Test
+    fun `maps media placeholder integrity rejection to a terminal localized error`() {
+        withAdapterServer(
+            status = 422,
+            response = """{"code":"ADAPTED_HTML_MEDIA_INTEGRITY_INVALID","retryable":false}""",
+        ) { baseUrl ->
+            val failure = assertFailsWith<GameAdapterClientException> {
+                client(baseUrl).adapt("<html>source</html>")
+            }
+
+            assertEquals(MetaData.ErrorCodes.GAME_ADAPTER_MEDIA_INTEGRITY_INVALID, failure.adapterErrorCode)
+            assertEquals(false, failure.retryable)
+        }
+    }
+
+    @Test
     fun `maps unavailable runtime validator to retryable service error`() {
         withAdapterServer(
             status = 503,

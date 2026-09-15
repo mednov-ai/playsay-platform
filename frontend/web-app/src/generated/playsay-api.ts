@@ -5109,15 +5109,25 @@ export type appendScheduledLessonHtmlGamePageResponse413 = {
   status: 413
 }
 
+export type appendScheduledLessonHtmlGamePageResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
 export type appendScheduledLessonHtmlGamePageResponse502 = {
   data: void
   status: 502
 }
 
+export type appendScheduledLessonHtmlGamePageResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
 export type appendScheduledLessonHtmlGamePageResponseSuccess = (appendScheduledLessonHtmlGamePageResponse201) & {
   headers: Headers;
 };
-export type appendScheduledLessonHtmlGamePageResponseError = (appendScheduledLessonHtmlGamePageResponse400 | appendScheduledLessonHtmlGamePageResponse401 | appendScheduledLessonHtmlGamePageResponse403 | appendScheduledLessonHtmlGamePageResponse404 | appendScheduledLessonHtmlGamePageResponse413 | appendScheduledLessonHtmlGamePageResponse502) & {
+export type appendScheduledLessonHtmlGamePageResponseError = (appendScheduledLessonHtmlGamePageResponse400 | appendScheduledLessonHtmlGamePageResponse401 | appendScheduledLessonHtmlGamePageResponse403 | appendScheduledLessonHtmlGamePageResponse404 | appendScheduledLessonHtmlGamePageResponse413 | appendScheduledLessonHtmlGamePageResponse422 | appendScheduledLessonHtmlGamePageResponse502 | appendScheduledLessonHtmlGamePageResponse503) & {
   headers: Headers;
 };
 
@@ -6832,15 +6842,25 @@ export type uploadMaterialHtmlGameAssetResponse413 = {
   status: 413
 }
 
+export type uploadMaterialHtmlGameAssetResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
 export type uploadMaterialHtmlGameAssetResponse502 = {
   data: void
   status: 502
 }
 
+export type uploadMaterialHtmlGameAssetResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
 export type uploadMaterialHtmlGameAssetResponseSuccess = (uploadMaterialHtmlGameAssetResponse201) & {
   headers: Headers;
 };
-export type uploadMaterialHtmlGameAssetResponseError = (uploadMaterialHtmlGameAssetResponse400 | uploadMaterialHtmlGameAssetResponse401 | uploadMaterialHtmlGameAssetResponse403 | uploadMaterialHtmlGameAssetResponse404 | uploadMaterialHtmlGameAssetResponse413 | uploadMaterialHtmlGameAssetResponse502) & {
+export type uploadMaterialHtmlGameAssetResponseError = (uploadMaterialHtmlGameAssetResponse400 | uploadMaterialHtmlGameAssetResponse401 | uploadMaterialHtmlGameAssetResponse403 | uploadMaterialHtmlGameAssetResponse404 | uploadMaterialHtmlGameAssetResponse413 | uploadMaterialHtmlGameAssetResponse422 | uploadMaterialHtmlGameAssetResponse502 | uploadMaterialHtmlGameAssetResponse503) & {
   headers: Headers;
 };
 

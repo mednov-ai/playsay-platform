@@ -76,6 +76,16 @@ class MaterialAssetController(
                 description = "HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE",
                 content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ProjectErrorResponse::class))],
             ),
+            ApiResponse(
+                responseCode = "422",
+                description = "Embedded image is invalid or exceeds optimization bounds; errorCode MATERIAL_HTML_GAME_IMAGE_INVALID",
+                content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ProjectErrorResponse::class))],
+            ),
+            ApiResponse(
+                responseCode = "503",
+                description = "Required image optimization is temporarily unavailable; errorCode MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE",
+                content = [Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = Schema(implementation = ProjectErrorResponse::class))],
+            ),
             ApiResponse(responseCode = "502", description = "Object storage failed", content = [Content()]),
         ],
     )

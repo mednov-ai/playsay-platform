@@ -23,6 +23,8 @@ vi.mock("../../../shared/i18n", () => ({
     t: (key: string, options?: { max?: number }) => {
       if (key === "materials.htmlGameUpload.tooLarge") return `Maximum ${options?.max} MB. Try again.`;
       if (key === "materials.htmlGameUpload.networkError") return "Connection interrupted. Try again.";
+      if (key === "materials.htmlGameUpload.imageInvalid") return "Embedded image invalid. Try again.";
+      if (key === "materials.htmlGameUpload.optimizationUnavailable") return "Current material was kept. Try again later.";
       if (key === "materials.htmlGameUpload.failed") return "Upload failed. Try again.";
       return key;
     },
@@ -187,11 +189,13 @@ describe("useLessonMaterial live uploads", () => {
     expect(apiMocks.appendHtmlGame).toHaveBeenCalledTimes(1);
   });
 
-  it("settles proxy 413 and network failures without replacing the active material", async () => {
+  it("settles upload and optimizer failures without replacing the active material", async () => {
     apiMocks.fetchMaterial.mockResolvedValue(material("current", "page-current"));
     apiMocks.appendHtmlGame
       .mockRejectedValueOnce(new ApiError(413, "HTTP_ERROR", "HTTP 413"))
-      .mockRejectedValueOnce(new ApiError(0, "NETWORK_ERROR", "raw network error"));
+      .mockRejectedValueOnce(new ApiError(0, "NETWORK_ERROR", "raw network error"))
+      .mockRejectedValueOnce(new ApiError(422, "MATERIAL_HTML_GAME_IMAGE_INVALID", "internal response"))
+      .mockRejectedValueOnce(new ApiError(503, "MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE", "internal response"));
     const { result } = renderHook(() => useLessonMaterial({
       onAssignMaterial: vi.fn(),
       session: { ...session, materialId: "current" },
@@ -206,6 +210,16 @@ describe("useLessonMaterial live uploads", () => {
 
     await act(async () => { await result.current.uploadHtmlGamePage(file); });
     expect(result.current.assignmentMessage).not.toContain("raw network error");
+    expect(result.current.material?.id).toBe("current");
+    expect(result.current.uploadingHtmlGamePage).toBe(false);
+
+    await act(async () => { await result.current.uploadHtmlGamePage(file); });
+    expect(result.current.assignmentMessage).toContain("Embedded image invalid");
+    expect(result.current.material?.id).toBe("current");
+    expect(result.current.uploadingHtmlGamePage).toBe(false);
+
+    await act(async () => { await result.current.uploadHtmlGamePage(file); });
+    expect(result.current.assignmentMessage).toContain("Current material was kept");
     expect(result.current.material?.id).toBe("current");
     expect(result.current.uploadingHtmlGamePage).toBe(false);
   });

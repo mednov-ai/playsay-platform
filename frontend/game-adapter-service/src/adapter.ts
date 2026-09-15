@@ -9,6 +9,11 @@ import {
   type RuntimeValidationPlan,
   type RuntimeValidationSummary,
 } from "./runtime-validator.js";
+import {
+  protectMediaForAi,
+  restoreMediaAfterAi,
+  type MediaProtectionSummary,
+} from "./media-protector.js";
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024;
 const SDK_PLACEHOLDER = "<!-- PLAYSAY_GAME_SYNC_SDK -->";
@@ -45,6 +50,7 @@ export type AdaptationResult = {
   report: string;
   sourceHash: string;
   validation: RuntimeValidationSummary & { attempts: number };
+  mediaProtection?: MediaProtectionSummary;
 };
 
 type GeneratedAdaptation = {
@@ -110,11 +116,19 @@ export async function adaptGameHtml(
         maximumActionsPerSecond: 0,
         validatorVersion: MECHANICS_VALIDATOR_VERSION,
       },
+      mediaProtection: {
+        aiInputBytes: Buffer.byteLength(sourceHtml),
+        extractedBytes: 0,
+        inputBytes: Buffer.byteLength(sourceHtml),
+        resourceCount: 0,
+        status: "not_needed",
+      },
     };
   }
   const model = options.model?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-5.6-sol";
   const sdkSource = options.sdkSource ?? await readSdkSource();
-  const basePrompt = adaptationPrompt(sourceHtml);
+  const protectedMedia = protectMediaForAi(sourceHtml);
+  const basePrompt = adaptationPrompt(protectedMedia.html);
   const generate = options.generate ?? ((prompt: string) => generateWithOpenAi(prompt, {
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? "",
     baseUrl: options.baseUrl ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
@@ -130,9 +144,10 @@ export async function adaptGameHtml(
     previousHtml = generated.html;
     try {
       validateRuntimePlan(generated.validationPlan);
-      validateAdaptedHtml(generated.html);
-      assertStaticMechanicsPreserved(sourceHtml, generated.html);
-      const withSdk = injectSdk(generated.html, sdkSource);
+      const restoredHtml = restoreMediaAfterAi(generated.html, protectedMedia);
+      validateAdaptedHtml(restoredHtml);
+      assertStaticMechanicsPreserved(sourceHtml, restoredHtml);
+      const withSdk = injectSdk(restoredHtml, sdkSource);
       // The generated game was checked before insertion. The bundled SDK is trusted build
       // output and intentionally contains compatibility-detector names such as WebSocket.
       validateAdaptedStructure(withSdk);
@@ -146,6 +161,7 @@ export async function adaptGameHtml(
           .slice(0, 8_000),
         sourceHash: hash(sourceHtml),
         validation: { ...validation, attempts: attempt },
+        mediaProtection: protectedMedia.summary,
       };
     } catch (error) {
       previousFailure = error instanceof Error ? error.message : String(error);
@@ -323,6 +339,8 @@ Requirements:
 - Preserve every original style declaration, DOM element, visible string, control selector, timer,
   animation duration, collision condition and ordering of visible phases. Add only the manifest,
   SDK wiring and state synchronization needed by the host.
+- Preserve every playsay-media-placeholder token exactly once and byte-for-byte. Never decode,
+  remove, duplicate, rename, concatenate, inspect or move a placeholder.
 - Return validationPlan with one to twelve real interactions. Cover every visible control and every
   registered keyboard control, plus start/restart, correct/incorrect outcomes and timer-driven
   transitions when those mechanics exist. Each physical interaction must dispatch exactly one

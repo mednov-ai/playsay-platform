@@ -721,6 +721,7 @@ function gameSyncStatusLabel(
       GAME_ADAPTER_RUNTIME_INVALID: "gameSyncFailedRuntime",
       GAME_ADAPTER_ACTION_RATE_EXCEEDED: "gameSyncFailedActionRate",
       GAME_ADAPTER_MECHANICS_CHANGED: "gameSyncFailedMechanics",
+      GAME_ADAPTER_MEDIA_INTEGRITY_INVALID: "gameSyncFailedMediaIntegrity",
       GAME_ADAPTER_UNSAFE: "gameSyncFailedUnsafe",
       GAME_ADAPTER_UNAVAILABLE: "gameSyncFailedUnavailable",
     }[adaptation.errorCode];

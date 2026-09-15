@@ -33,6 +33,7 @@ class MaterialImagePageService(
     private val scheduledLessonStore: ScheduledLessonStore,
     private val materialAssetService: MaterialAssetService,
     private val materialAssetUploadService: MaterialAssetUploadService,
+    private val materialHtmlGameOptimizationService: MaterialHtmlGameOptimizationService,
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialHtmlGameMetadataService: MaterialHtmlGameMetadataService,
     private val materialAnnotationService: MaterialAnnotationService,
@@ -97,7 +98,10 @@ class MaterialImagePageService(
     ): LiveLessonHtmlGamePageResponse {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
         requireSupportedLiveLesson(lessonId, MetaData.ErrorCodes.MATERIAL_HTML_GAME_PARALLEL_UNSUPPORTED)
-        val upload = materialAssetUploadService.validateHtmlGameFile(file)
+        val optimized = materialHtmlGameOptimizationService.optimizeIfRequired(
+            materialAssetUploadService.validateHtmlGameFile(file),
+        )
+        val upload = optimized.upload
         val targetMaterial = targetLiveLessonMaterial(
             authentication = authentication,
             lessonId = lessonId,
@@ -105,7 +109,7 @@ class MaterialImagePageService(
             title = null,
             fallbackTitle = messageProvider[MetaData.Messages.MATERIAL_HTML_GAME_PAGE_TITLE],
         )
-        val appendedGame = appendHtmlGamePage(targetMaterial, upload)
+        val appendedGame = appendHtmlGamePage(targetMaterial, optimized)
         val activePageId = appendedGame.pageId
         materialHtmlGameEnrichmentService.request(
             targetMaterial.id,
@@ -248,7 +252,8 @@ class MaterialImagePageService(
         return pageId
     }
 
-    private fun appendHtmlGamePage(material: LessonMaterialEntity, upload: ValidatedMaterialAssetFile): AppendedHtmlGame {
+    private fun appendHtmlGamePage(material: LessonMaterialEntity, optimized: OptimizedHtmlGameUpload): AppendedHtmlGame {
+        val upload = optimized.upload
         val document = readMaterialDocument(material)
         val pages = materialPages(document)
         val pageId = "page-${UUID.randomUUID()}"
@@ -261,6 +266,7 @@ class MaterialImagePageService(
             bytes = upload.bytes,
             html = html,
             gameMetadata = gameMetadata,
+            imageOptimization = optimized.metadata,
         )
         pages.add(htmlGamePage(pageId, pageTitle, gameMetadata.titleSource, assetId))
         material.document = objectMapper.writeValueAsString(document)

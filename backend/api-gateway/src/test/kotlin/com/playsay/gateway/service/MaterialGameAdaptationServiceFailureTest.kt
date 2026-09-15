@@ -1,10 +1,13 @@
 package com.playsay.gateway.service
+
+import com.playsay.gateway.client.GameAdapterClientException
 import com.playsay.gateway.client.MaterialGameAdapterClient
 
 import com.playsay.gateway.entity.MaterialGameAdaptationEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.MaterialGameAdaptationRepo
+import com.playsay.gateway.utils.MetaData
 import java.time.Instant
 import java.util.Optional
 import java.util.UUID
@@ -15,6 +18,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.anyString
 import org.mockito.Mockito.`when`
 
 class MaterialGameAdaptationServiceFailureTest {
@@ -83,6 +88,37 @@ class MaterialGameAdaptationServiceFailureTest {
         assertEquals(MaterialGameMechanicsValidation.FAILED, job.mechanicsValidation)
         assertEquals("mechanics-v3", job.validatorVersion)
         assertTrue(job.validationReport.orEmpty().contains("RANGE_VALUE_INVALID"))
+    }
+
+    @Test
+    fun `media integrity failure creates no adapted asset and is terminal`() {
+        val job = job(attempts = 1)
+        val assetService = mock(MaterialAssetService::class.java)
+        val uploadService = mock(MaterialAssetUploadService::class.java)
+        val adapterClient = mock(MaterialGameAdapterClient::class.java)
+        val localService = MaterialGameAdaptationService(
+            repo = repo,
+            lessonMaterialRepo = mock(LessonMaterialRepo::class.java),
+            materialAssetService = assetService,
+            materialAssetUploadService = uploadService,
+            adapterClient = adapterClient,
+        )
+        `when`(repo.findById(job.id)).thenReturn(Optional.of(job))
+        `when`(repo.save(job)).thenReturn(job)
+        `when`(assetService.storedAssetBytes(job.materialId, job.sourceAssetId))
+            .thenReturn("<html>source</html>".toByteArray())
+        `when`(adapterClient.adapt(anyString())).thenThrow(
+            GameAdapterClientException(
+                MetaData.ErrorCodes.GAME_ADAPTER_MEDIA_INTEGRITY_INVALID,
+                retryable = false,
+            ),
+        )
+
+        localService.process(job.id)
+
+        assertEquals(MaterialGameAdaptationStatuses.FAILED, job.status)
+        assertEquals(MetaData.ErrorCodes.GAME_ADAPTER_MEDIA_INTEGRITY_INVALID, job.lastErrorCode)
+        verifyNoInteractions(uploadService)
     }
 
     @Test

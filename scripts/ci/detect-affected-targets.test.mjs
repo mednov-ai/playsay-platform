@@ -95,6 +95,12 @@ test("module Jenkinsfiles trigger only the corresponding module", () => {
 
 test("contracts trigger their producers and frontend consumers", () => {
   assertDetection(
+    ["contracts/html-game-optimization.schema.json"],
+    ["api-gateway", "game-adapter-service"],
+    ["playsay-api-gateway-develop", "playsay-game-adapter-service-develop"],
+    ["ci-contracts"],
+  );
+  assertDetection(
     ["contracts/openapi.yaml"],
     ["api-gateway", "web-app"],
     ["playsay-api-gateway-develop", "playsay-web-app-develop"],

@@ -1217,6 +1217,7 @@ export const en = {
       gameSyncFailedRuntime: "The version failed startup and interaction checks; the original was not changed",
       gameSyncFailedActionRate: "The game produces too many synchronization events; the original was not changed",
       gameSyncFailedMechanics: "The adapted game changed the original mechanics and was rejected",
+      gameSyncFailedMediaIntegrity: "The game media could not be restored safely; the original was not changed",
       gameSyncFailedUnsafe: "The version failed security validation; the original was not changed",
       gameSyncFailedUnavailable: "Game validation is temporarily unavailable; please try again",
       improveGameSync: "Improve synchronization",
@@ -1513,6 +1514,8 @@ export const en = {
     htmlGameUpload: {
       tooLarge: "Choose an HTML game no larger than {{max}} MB, then try again.",
       networkError: "The game could not be uploaded because the connection was interrupted. Check your connection and try again.",
+      imageInvalid: "An embedded game image is invalid or too large. Check the file and try again.",
+      optimizationUnavailable: "The game images could not be prepared right now. Your current material was kept; try the upload again later.",
       failed: "The game could not be uploaded. Check the file and try again.",
     },
     messages: {

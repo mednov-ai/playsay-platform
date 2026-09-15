@@ -1,4 +1,4 @@
-FROM node:22.22.0-alpine AS build
+FROM node:22.22.0-bookworm-slim AS build
 WORKDIR /workspace/frontend
 COPY package.json package-lock.json ./
 COPY web-app/package.json web-app/package.json
@@ -24,6 +24,8 @@ RUN apt-get update \
     && chown 10001:10001 /tmp/playsay
 COPY --from=build /workspace/frontend/game-adapter-service/dist /app/
 COPY --from=build /workspace/frontend/node_modules/playwright-core /app/node_modules/playwright-core
+COPY --from=build /workspace/frontend/node_modules/sharp /app/node_modules/sharp
+COPY --from=build /workspace/frontend/node_modules/@img /app/node_modules/@img
 COPY --from=build /workspace/frontend/game-sync-sdk/package.json /app/node_modules/@playsay/game-sync/package.json
 COPY --from=build /workspace/frontend/game-sync-sdk/dist /app/node_modules/@playsay/game-sync/dist
 ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \

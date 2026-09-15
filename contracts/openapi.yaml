@@ -1481,6 +1481,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image is invalid or exceeds optimization bounds; errorCode
+            MATERIAL_HTML_GAME_IMAGE_INVALID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: Required image optimization is temporarily unavailable; errorCode
+            MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
         "502":
           description: Object storage failed
       security:
@@ -2532,6 +2546,20 @@ paths:
           description: Material not found
         "413":
           description: HTML game exceeds 20 MiB; errorCode MATERIAL_HTML_GAME_TOO_LARGE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image is invalid or exceeds optimization bounds; errorCode
+            MATERIAL_HTML_GAME_IMAGE_INVALID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: Required image optimization is temporarily unavailable; errorCode
+            MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE
           content:
             application/json:
               schema:

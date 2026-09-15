@@ -31,11 +31,20 @@ describe("HTML game upload policy", () => {
     expect(htmlGameUploadErrorMessage(new Error("HTTP 500"))).not.toContain("HTTP 500");
   });
 
+  it("maps image optimization failures to stable retry guidance", () => {
+    expect(htmlGameUploadErrorMessage(new ApiError(422, "MATERIAL_HTML_GAME_IMAGE_INVALID", "internal")))
+      .toContain("image");
+    expect(htmlGameUploadErrorMessage(new ApiError(503, "MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE", "internal")))
+      .toContain("current material was kept");
+  });
+
   it("has equivalent recovery copy in every supported locale", async () => {
     for (const language of ["ru", "en", "de", "fr"]) {
       await i18n.changeLanguage(language);
       expect(i18n.t("materials.htmlGameUpload.tooLarge", { max: 20 })).toContain("20");
       expect(i18n.t("materials.htmlGameUpload.networkError")).not.toBe("materials.htmlGameUpload.networkError");
+      expect(i18n.t("materials.htmlGameUpload.imageInvalid")).not.toBe("materials.htmlGameUpload.imageInvalid");
+      expect(i18n.t("materials.htmlGameUpload.optimizationUnavailable")).not.toBe("materials.htmlGameUpload.optimizationUnavailable");
       expect(i18n.t("materials.draft.externalActivityGuidance")).not.toBe("materials.draft.externalActivityGuidance");
       expect(i18n.t("materials.blockEditor.externalActivitySaveOrValidationFailed")).not.toBe("materials.blockEditor.externalActivitySaveOrValidationFailed");
     }

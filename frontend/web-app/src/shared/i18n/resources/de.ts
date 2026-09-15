@@ -1217,6 +1217,7 @@ export const de = {
       gameSyncFailedRuntime: "Die Version hat die Start- und Interaktionsprüfung nicht bestanden; das Original wurde nicht geändert",
       gameSyncFailedActionRate: "Das Spiel erzeugt zu viele Synchronisierungsereignisse; das Original wurde nicht geändert",
       gameSyncFailedMechanics: "Die Anpassung hat die ursprüngliche Mechanik verändert und wurde abgelehnt",
+      gameSyncFailedMediaIntegrity: "Die Spielmedien konnten nicht sicher wiederhergestellt werden; das Original wurde nicht geändert",
       gameSyncFailedUnsafe: "Die Version hat die Sicherheitsprüfung nicht bestanden; das Original wurde nicht geändert",
       gameSyncFailedUnavailable: "Die Spielprüfung ist vorübergehend nicht verfügbar; bitte erneut versuchen",
       improveGameSync: "Synchronisierung verbessern",
@@ -1513,6 +1514,8 @@ export const de = {
     htmlGameUpload: {
       tooLarge: "Wählen Sie ein HTML-Spiel bis höchstens {{max}} MB und versuchen Sie es erneut.",
       networkError: "Das Spiel konnte wegen einer unterbrochenen Verbindung nicht hochgeladen werden. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
+      imageInvalid: "Ein eingebettetes Spielbild ist ungültig oder zu groß. Prüfen Sie die Datei und versuchen Sie es erneut.",
+      optimizationUnavailable: "Die Spielbilder konnten gerade nicht vorbereitet werden. Das aktuelle Material wurde beibehalten; versuchen Sie den Upload später erneut.",
       failed: "Das Spiel konnte nicht hochgeladen werden. Prüfen Sie die Datei und versuchen Sie es erneut.",
     },
     messages: {

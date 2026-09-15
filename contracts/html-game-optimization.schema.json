@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://honey.school/contracts/html-game-optimization.schema.json",
+  "title": "Honey School internal HTML game image optimization",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["html", "policy"],
+      "properties": {
+        "html": { "type": "string", "contentEncoding": "utf-8", "maxLength": 25165824 },
+        "policy": { "const": "embedded-raster-v1" }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["html", "policy", "status", "inputBytes", "outputBytes", "eligibleCount", "replacedCount", "bytesSaved", "durationMs"],
+      "properties": {
+        "html": { "type": "string", "contentEncoding": "utf-8", "maxLength": 20971520 },
+        "policy": { "const": "embedded-raster-v1" },
+        "status": { "enum": ["NOT_NEEDED", "UNCHANGED", "OPTIMIZED"] },
+        "inputBytes": { "type": "integer", "minimum": 1, "maximum": 20971520 },
+        "outputBytes": { "type": "integer", "minimum": 1, "maximum": 20971520 },
+        "eligibleCount": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "replacedCount": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "bytesSaved": { "type": "integer", "minimum": 0, "maximum": 20971520 },
+        "durationMs": { "type": "integer", "minimum": 0, "maximum": 60000 }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "retryable"],
+      "properties": {
+        "code": { "enum": ["HTML_REQUIRED", "INVALID_JSON", "IMAGE_INVALID", "IMAGE_LIMIT_EXCEEDED", "OPTIMIZATION_FAILED", "OPTIMIZATION_TIMEOUT", "OPTIMIZATION_POLICY_UNSUPPORTED", "REQUEST_TOO_LARGE", "UNAUTHORIZED"] },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    "publicFailureCode": {
+      "enum": ["MATERIAL_HTML_GAME_IMAGE_INVALID", "MATERIAL_HTML_GAME_OPTIMIZATION_UNAVAILABLE"]
+    }
+  }
+}

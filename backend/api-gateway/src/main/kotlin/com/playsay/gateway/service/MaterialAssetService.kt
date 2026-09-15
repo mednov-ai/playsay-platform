@@ -45,6 +45,7 @@ class MaterialAssetService(
     private val materialAssetRepo: MaterialAssetRepo,
     private val materialObjectStorage: MaterialObjectStorage,
     private val materialAssetUploadService: MaterialAssetUploadService,
+    private val materialHtmlGameOptimizationService: MaterialHtmlGameOptimizationService,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
     fun list(materialId: UUID): List<MaterialAssetResponse> =
@@ -106,12 +107,16 @@ class MaterialAssetService(
     }
 
     fun uploadHtmlGameAsset(materialId: UUID, file: MultipartFile): MaterialAssetResponse {
-        val upload = materialAssetUploadService.validateHtmlGameFile(file)
+        val optimized = materialHtmlGameOptimizationService.optimizeIfRequired(
+            materialAssetUploadService.validateHtmlGameFile(file),
+        )
+        val upload = optimized.upload
         val assetId = materialAssetUploadService.insertHtmlGameAsset(
             materialId = materialId,
             originalFileName = upload.originalFileName,
             bytes = upload.bytes,
             html = upload.text,
+            imageOptimization = optimized.metadata,
         )
         return requireNotNull(findAsset(assetId)).toResponse(objectMapper)
     }

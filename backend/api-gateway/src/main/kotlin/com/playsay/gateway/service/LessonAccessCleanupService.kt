@@ -18,6 +18,7 @@ class LessonAccessCleanupService(
     private val attemptRepo: LessonEntryAttemptRepo,
     private val challengeRepo: LessonEmailChallengeRepo,
     private val auditRepo: LessonAccessAuditRepo,
+    private val auditService: LessonAccessAuditService,
     private val rateLimitRepo: LessonChallengeRateLimitRepo,
     private val clock: Clock,
 ) {
@@ -25,8 +26,16 @@ class LessonAccessCleanupService(
     @Transactional
     fun cleanup() {
         val now = Instant.now(clock)
-        challengeRepo.deleteExpiredOrConsumedBefore(now.minus(Duration.ofHours(1)))
-        attemptRepo.deleteExpired(now.minus(Duration.ofHours(1)))
+        val expiredCutoff = now.minus(Duration.ofHours(1))
+        challengeRepo.deleteExpiredOrConsumedBefore(expiredCutoff)
+        val abandonedConfirmations = attemptRepo.countByStateAndExpiresAtBefore("STARTED", expiredCutoff)
+        auditService.recordAggregate(
+            LessonAccessAuditEvent.CONFIRMATION_ABANDONED,
+            LessonAccessAuditOutcome.PARTIAL,
+            LessonAccessActorKind.SYSTEM,
+            abandonedConfirmations,
+        )
+        attemptRepo.deleteExpired(expiredCutoff)
         linkRepo.deleteRevokedBefore(now.minus(Duration.ofDays(30)))
         auditRepo.deleteBefore(now.minus(Duration.ofDays(90)))
         rateLimitRepo.deleteExpired(now)

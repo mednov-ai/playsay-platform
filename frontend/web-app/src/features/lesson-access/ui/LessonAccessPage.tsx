@@ -19,6 +19,7 @@ import { ThemeToggle } from "../../../shared/theme/ThemeToggle";
 import { BrandMark } from "../../../shared/ui/BrandMark";
 import { FormField } from "../../../shared/ui/FormField";
 import { accountLabelFromIdToken, lessonTokenFromHash, stepForStatus, type LessonEntryStep } from "../model/state";
+import { isApiStatus } from "../../../shared/api/errors";
 
 type AttemptBinding = { id: string; secret: string };
 
@@ -35,6 +36,8 @@ export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showLobby, setShowLobby] = useState(false);
+  const [linkAccepted, setLinkAccepted] = useState(false);
+  const [activeAccountMismatch, setActiveAccountMismatch] = useState(false);
   const [resolutionRevision, setResolutionRevision] = useState(0);
   const [activeAccount, setActiveAccount] = useState<string | null>(() => accountLabelFromIdToken(readTokens()?.idToken));
   const compact = !lessonId;
@@ -67,6 +70,8 @@ export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
         const activeLessonId = result.lessonId ?? lessonId;
         if (!activeLessonId) throw new Error("lesson id missing");
         setResolvedLessonId(activeLessonId);
+        setLinkAccepted(true);
+        setActiveAccountMismatch(false);
         const binding = { id: result.attemptId, secret: result.attemptSecret };
         setAttempt(binding);
         if (readTokens()) {
@@ -76,8 +81,10 @@ export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
             if (remembered.status === "AUTHENTICATED_READY") window.sessionStorage.removeItem(pendingTokenKey);
             acceptResult(remembered, setStep);
             return;
-          } catch {
-            // The active account is not assigned; email or Lobby remains available.
+          } catch (caught) {
+            if (isApiStatus(caught, 404)) {
+              setActiveAccountMismatch(true);
+            }
           }
         }
         acceptResult(result, setStep);
@@ -93,6 +100,8 @@ export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
       window.sessionStorage.setItem(silentAttemptKey, "done");
       clearFragment();
       setAttempt(null);
+      setLinkAccepted(false);
+      setActiveAccountMismatch(false);
       setResolvedLessonId(lessonId ?? null);
       setStep("starting");
       setResolutionRevision((revision) => revision + 1);
@@ -190,6 +199,13 @@ export function LessonAccessPage({ lessonId }: { lessonId?: string }) {
                   {t("registration.lessonAccess.notMe")}
                 </Button>
               </div>
+            ) : null}
+
+            {step === "choose" && linkAccepted ? (
+              <Status text={t("registration.lessonAccess.linkAccepted")} />
+            ) : null}
+            {step === "choose" && activeAccountMismatch ? (
+              <Status text={t("registration.lessonAccess.accountMismatch")} />
             ) : null}
 
             {step === "starting" ? <Status icon={<Loader2 className="h-4 w-4 animate-spin" />} text={t("registration.lessonAccess.starting")} /> : null}

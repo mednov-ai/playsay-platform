@@ -34,6 +34,8 @@ interface LessonEntryAttemptRepo : JpaRepository<LessonEntryAttemptEntity, UUID>
 
     fun findByLessonIdAndStateOrderByCreatedAtAsc(lessonId: UUID, state: String): List<LessonEntryAttemptEntity>
 
+    fun countByStateAndExpiresAtBefore(state: String, expiresAt: Instant): Long
+
     @Modifying
     @Query("delete from LessonEntryAttemptEntity a where a.expiresAt < :now")
     fun deleteExpired(now: Instant): Int

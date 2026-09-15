@@ -1,7 +1,14 @@
 import { VideoPresets } from "livekit-client";
 import { describe, expect, it } from "vitest";
 import type { MediaRoutingResponse } from "../../../generated/playsay-api";
-import { lessonLiveKitRoomConnectOptions, lessonLiveKitRoomOptions, liveKitRoomInstanceKey, regionalRelayPolicyKey } from "./liveKitRoomOptions";
+import {
+  classifyMediaCredentialExpiry,
+  lessonLiveKitRoomConnectOptions,
+  lessonLiveKitRoomOptions,
+  liveKitRoomInstanceKey,
+  mediaCredentialExpirySafetyMarginMs,
+  regionalRelayPolicyKey,
+} from "./liveKitRoomOptions";
 
 const routing: MediaRoutingResponse = {
   policy: "REGIONAL_RELAY",
@@ -20,6 +27,26 @@ const routing: MediaRoutingResponse = {
 };
 
 describe("lessonLiveKitRoomOptions", () => {
+  it("classifies optional media credentials at the centralized expiry boundary", () => {
+    const nowMs = Date.parse("2026-08-31T10:00:00Z");
+
+    expect(classifyMediaCredentialExpiry(undefined, nowMs)).toBe("absent");
+    expect(classifyMediaCredentialExpiry({ ...routing, expiresAt: "not-a-date" }, nowMs)).toBe("invalid");
+    expect(classifyMediaCredentialExpiry({ ...routing, expiresAt: "2026-08-31T10:00:00Z" }, nowMs)).toBe("expired");
+    expect(classifyMediaCredentialExpiry({
+      ...routing,
+      expiresAt: new Date(nowMs + mediaCredentialExpirySafetyMarginMs).toISOString(),
+    }, nowMs)).toBe("near-expiry");
+    expect(classifyMediaCredentialExpiry({
+      ...routing,
+      expiresAt: new Date(nowMs + mediaCredentialExpirySafetyMarginMs - 1).toISOString(),
+    }, nowMs)).toBe("near-expiry");
+    expect(classifyMediaCredentialExpiry({
+      ...routing,
+      expiresAt: new Date(nowMs + mediaCredentialExpirySafetyMarginMs + 1).toISOString(),
+    }, nowMs)).toBe("safely-valid");
+  });
+
   it("pins the 100-lesson media profile and enables adaptive publishing", () => {
     expect(lessonLiveKitRoomOptions("speaker-1")).toEqual({
       adaptiveStream: true,

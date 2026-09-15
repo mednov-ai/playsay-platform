@@ -13,10 +13,16 @@ import { lessonLiveKitRoomConnectOptions, lessonLiveKitRoomOptions, liveKitRoomI
 import { ClassroomVideoStage, type ClassroomVideoMode } from "./ClassroomVideoStage";
 import { ClassroomConnectionStatus } from "./ClassroomConnectionStatus";
 import { ClassroomMediaTransportProbe } from "./ClassroomMediaTransportProbe";
+import {
+  ClassroomMediaConnectionObserver,
+  type ClassroomMediaConnectionLifecycle,
+} from "./ClassroomMediaConnectionObserver";
 import { LessonWorkspace } from "./LessonWorkspace";
 import type { LessonPresentationMode } from "./LessonTaskCanvas";
 import { useAppTranslation } from "../../../shared/i18n";
 import type { MediaTransportEvidence } from "../model/mediaTransportEvidence";
+import type { ClassroomMediaRecoveryPhase } from "../model/mediaRecovery";
+import { Button } from "../../../components/ui/button";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -49,14 +55,20 @@ export function LiveLessonExperience({
   onAssignMaterial,
   onComplete,
   onLeave,
+  onMediaLifecycleChange,
+  onRetryMedia,
   profile,
+  recoveryPhase,
   session,
 }: {
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onComplete: () => void;
   onLeave: () => void;
+  onMediaLifecycleChange: (lifecycle: ClassroomMediaConnectionLifecycle) => void;
+  onRetryMedia: () => void;
   profile: MeProfile | null;
+  recoveryPhase: ClassroomMediaRecoveryPhase;
   session: LessonRoomSession;
 }) {
   const { t } = useAppTranslation();
@@ -168,6 +180,7 @@ export function LiveLessonExperience({
   const fullscreenLabel = fullscreenActive
     ? t("classroom.actions.exitFullscreen")
     : t("classroom.actions.enterFullscreen");
+  const mediaProviderActive = recoveryPhase === "idle" || recoveryPhase === "connecting";
 
   return (
     <div
@@ -183,7 +196,27 @@ export function LiveLessonExperience({
       data-viewport-mode={viewportMode}
       ref={shellRef}
     >
-      <LiveKitRoom
+      {recoveryPhase !== "idle" ? (
+        <section
+          aria-live="polite"
+          className="playsay-classroom-media-recovery absolute inset-0 z-50 grid place-content-center gap-4 bg-background/95 p-6 text-center text-foreground backdrop-blur-sm"
+          role="status"
+        >
+          <p className="mx-auto max-w-lg text-base font-bold">{t(`classroom.recovery.${recoveryPhase}`)}</p>
+          {recoveryPhase === "failed" ? (
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button autoFocus onClick={onRetryMedia} type="button">
+                {t("classroom.recovery.retry")}
+              </Button>
+              <Button onClick={onLeave} type="button" variant="outline">
+                {t("classroom.recovery.leave")}
+              </Button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {mediaProviderActive ? <LiveKitRoom
         audio={session.mediaChoices.audioEnabled ? {
           autoGainControl: true,
           deviceId: session.mediaChoices.audioDeviceId,
@@ -200,6 +233,7 @@ export function LiveLessonExperience({
         token={session.token}
         video={session.mediaChoices.videoEnabled ? { deviceId: session.mediaChoices.videoDeviceId } : false}
       >
+        <ClassroomMediaConnectionObserver onLifecycleChange={onMediaLifecycleChange} />
         <ClassroomMediaTransportProbe onEvidence={updateMediaTransportEvidence} serverUrl={session.serverUrl} />
         <section className="playsay-video-rail">
           <div className="playsay-video-header">
@@ -248,7 +282,7 @@ export function LiveLessonExperience({
             session={session}
           />
         ) : null}
-      </LiveKitRoom>
+      </LiveKitRoom> : null}
     </div>
   );
 }

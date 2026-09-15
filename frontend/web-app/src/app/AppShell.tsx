@@ -40,6 +40,8 @@ import { WorkspaceTabs } from "../widgets/workspace-tabs/WorkspaceTabs";
 import { Button } from "../components/ui/button";
 import type { SessionStatus } from "../features/profile/ui/ProfileAccountPanel";
 import type { ClassroomMediaChoices, LessonDiceController, LessonRoomSession } from "../features/classroom";
+import type { ClassroomMediaConnectionLifecycle } from "../features/classroom/ui/ClassroomMediaConnectionObserver";
+import type { ClassroomMediaRecoveryPhase } from "../features/classroom/model/mediaRecovery";
 import { useAppTranslation } from "../shared/i18n";
 import { LanguageSwitcher } from "../shared/i18n/ui/LanguageSwitcher";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
@@ -82,6 +84,7 @@ export type AppShellProps = {
   assignMaterialToScheduledLesson: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   cancelScheduledLesson: (lesson: ScheduledLesson) => Promise<void>;
   classroomLesson: ScheduledLesson | null;
+  classroomMediaRecoveryPhase?: ClassroomMediaRecoveryPhase;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
   copyScheduledLessonLinks: (lesson: ScheduledLesson, origin?: LessonAccessOrigin) => Promise<boolean>;
@@ -156,6 +159,8 @@ export type AppShellProps = {
   closeProfile: () => void;
   openLessonPreparation?: (lessonId: string) => void;
   closeLessonPreparation?: () => void;
+  onClassroomMediaLifecycleChange?: (lifecycle: ClassroomMediaConnectionLifecycle) => void;
+  retryClassroomMediaRecovery?: () => void;
 };
 
 export function AppShell(props: AppShellProps) {
@@ -171,6 +176,7 @@ export function AppShell(props: AppShellProps) {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     classroomLesson,
+    classroomMediaRecoveryPhase = "idle",
     completeScheduledLesson,
     confirmScheduledLessonJoin,
     copyScheduledLessonLinks,
@@ -225,6 +231,8 @@ export function AppShell(props: AppShellProps) {
     roomLoadingLessonId,
     roomMessage,
     roomSession,
+    onClassroomMediaLifecycleChange = () => undefined,
+    retryClassroomMediaRecovery = () => undefined,
     saveProfile,
     scheduleLoading,
     scheduleMessage,
@@ -392,7 +400,10 @@ export function AppShell(props: AppShellProps) {
               onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}
               onComplete={() => void completeScheduledLesson(roomSession.lessonId)}
               onLeave={leaveScheduledLessonRoom}
+              onMediaLifecycleChange={onClassroomMediaLifecycleChange}
+              onRetryMedia={retryClassroomMediaRecovery}
               profile={profile}
+              recoveryPhase={classroomMediaRecoveryPhase}
               session={roomSession}
             />
           </Suspense>

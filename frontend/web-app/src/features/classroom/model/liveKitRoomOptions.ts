@@ -8,6 +8,28 @@ import type { MediaRoutingResponse } from "../../../generated/playsay-api";
 const lessonVideoMaxBitrate = 2_000_000;
 const lessonVideoMaxFramerate = 30;
 
+export const mediaCredentialExpirySafetyMarginMs = 60_000;
+
+export type MediaCredentialExpiryClass =
+  | "absent"
+  | "invalid"
+  | "expired"
+  | "near-expiry"
+  | "safely-valid";
+
+export function classifyMediaCredentialExpiry(
+  mediaRouting?: MediaRoutingResponse | null,
+  nowMs = Date.now(),
+): MediaCredentialExpiryClass {
+  if (!mediaRouting) return "absent";
+
+  const expiresAtMs = Date.parse(mediaRouting.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) return "invalid";
+  if (expiresAtMs <= nowMs) return "expired";
+  if (expiresAtMs - nowMs <= mediaCredentialExpirySafetyMarginMs) return "near-expiry";
+  return "safely-valid";
+}
+
 export function lessonLiveKitRoomOptions(
   audioOutputDeviceId: string,
 ): RoomOptions {

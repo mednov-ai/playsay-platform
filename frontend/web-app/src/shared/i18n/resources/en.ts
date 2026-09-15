@@ -118,6 +118,8 @@ export const en = {
       signingIn: "Creating a secure lesson session...",
       activeAccount: "Current account: {{account}}",
       notMe: "Not me",
+      linkAccepted: "The lesson link was accepted. Now confirm who is joining with the account email code or teacher approval.",
+      accountMismatch: "The current account is not assigned to this lesson. Switch accounts, or confirm the participant by email or through the teacher.",
     },
     form: {
       email: "Email",
@@ -1800,6 +1802,13 @@ export const en = {
       submissionsLoadFailed: "Could not load student answers",
       answerSent: "Answer sent",
       answerSendFailed: "Could not send answer",
+    },
+    recovery: {
+      refreshing: "Refreshing the secure lesson connection…",
+      connecting: "Restoring audio and video…",
+      failed: "The lesson connection could not be restored. Try again or leave the lesson.",
+      retry: "Try again",
+      leave: "Leave lesson",
     },
     collaboration: {
       workspaceAria: "Live workspace",

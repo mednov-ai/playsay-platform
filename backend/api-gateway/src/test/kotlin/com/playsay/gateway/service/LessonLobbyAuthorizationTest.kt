@@ -2,9 +2,11 @@ package com.playsay.gateway.service
 
 import com.playsay.gateway.client.RegistrationGateway
 import com.playsay.gateway.entity.LessonEntryAttemptEntity
+import com.playsay.gateway.entity.LessonAdmissionEntity
 import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonEntryAttemptRepo
+import com.playsay.gateway.repo.ScheduledLessonRow
 import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.realtime.LessonRealtimeHub
@@ -71,6 +73,94 @@ class LessonLobbyAuthorizationTest {
         )
     }
 
+    @Test
+    fun `different authenticated account records only a coarse remembered-session rejection`() {
+        val fixture = fixture()
+        val secret = "browser-secret"
+        val attempt = LessonEntryAttemptEntity(
+            id = attemptId,
+            lessonId = lessonId,
+            browserSecretHash = fixture.tokenService.hash(secret),
+            expiresAt = now.plusSeconds(600),
+            createdAt = now,
+            updatedAt = now,
+        )
+        val lesson = ScheduledLessonRow(
+            id = lessonId,
+            lessonTemplateId = null,
+            inheritTemplateMaterial = false,
+            materialId = null,
+            materialTitle = null,
+            courseId = null,
+            courseTitle = null,
+            lessonTitle = null,
+            teacherSubject = "assigned-teacher",
+            teacherName = null,
+            scheduledStart = now,
+            scheduledEnd = now.plusSeconds(3600),
+            status = "IN_PROGRESS",
+            type = "INDIVIDUAL",
+            workMode = "SHARED",
+            recurrenceSeriesId = null,
+            recurrenceIndex = null,
+            recurrenceTotal = null,
+            livekitRoomName = null,
+            createdAt = now,
+            updatedAt = now,
+        )
+        val authentication = authentication("different-student", "ROLE_STUDENT")
+        `when`(fixture.attemptRepo.lockById(attemptId)).thenReturn(attempt)
+        `when`(fixture.lessonRepo.findScheduleRowById(lessonId)).thenReturn(lesson)
+        `when`(fixture.participantRepo.existsByLessonIdAndSubject(lessonId, "different-student")).thenReturn(false)
+
+        assertFailsWith<ProjectResponseException> {
+            fixture.service.remembered(authentication, lessonId, attemptId, secret)
+        }
+
+        verify(fixture.audit).recordIndependent(
+            LessonAccessAuditEvent.REMEMBERED_SESSION_REJECTED,
+            LessonAccessAuditOutcome.REJECTED,
+            LessonAccessActorKind.STUDENT,
+        )
+        verifyNoInteractions(fixture.handoff)
+    }
+
+    @Test
+    fun `matching assigned student session enters automatically without a new proof challenge`() {
+        val fixture = fixture()
+        val secret = "browser-secret"
+        val studentSubject = "assigned-student"
+        val attempt = LessonEntryAttemptEntity(
+            id = attemptId,
+            lessonId = lessonId,
+            browserSecretHash = fixture.tokenService.hash(secret),
+            expiresAt = now.plusSeconds(600),
+            createdAt = now,
+            updatedAt = now,
+        )
+        val lesson = scheduledLesson(teacherSubject = "assigned-teacher")
+        val admission = LessonAdmissionEntity(
+            lessonId = lessonId,
+            subject = studentSubject,
+            status = LessonAdmissionStatus.ADMITTED.name,
+            createdAt = now,
+            updatedAt = now,
+        )
+        val authentication = authentication(studentSubject, "ROLE_STUDENT")
+        `when`(fixture.attemptRepo.lockById(attemptId)).thenReturn(attempt)
+        `when`(fixture.lessonRepo.findScheduleRowById(lessonId)).thenReturn(lesson)
+        `when`(fixture.participantRepo.existsByLessonIdAndSubject(lessonId, studentSubject)).thenReturn(true)
+        `when`(fixture.admission.confirmIdentity(lessonId, studentSubject, "REMEMBERED_SESSION")).thenReturn(admission)
+
+        val response = fixture.service.remembered(authentication, lessonId, attemptId, secret)
+
+        assertEquals("AUTHENTICATED_READY", response.status)
+        assertEquals("IDENTITY_CONFIRMED", attempt.state)
+        assertEquals("REMEMBERED_SESSION", attempt.confirmationMethod)
+        assertEquals(studentSubject, attempt.targetSubject)
+        verifyNoInteractions(fixture.audit, fixture.handoff)
+    }
+
     private fun fixture(): Fixture {
         val attemptRepo = mock(LessonEntryAttemptRepo::class.java)
         val participantRepo = mock(LessonParticipantRepo::class.java)
@@ -103,7 +193,7 @@ class LessonLobbyAuthorizationTest {
             tokenService,
             Clock.fixed(now, ZoneOffset.UTC),
         )
-        return Fixture(service, attemptRepo, lessonRepo, authorization, audit)
+        return Fixture(service, attemptRepo, participantRepo, lessonRepo, authorization, admission, handoff, audit, tokenService)
     }
 
     private fun authentication(subject: String, authority: String): JwtAuthenticationToken {
@@ -119,8 +209,36 @@ class LessonLobbyAuthorizationTest {
     private data class Fixture(
         val service: LessonLobbyService,
         val attemptRepo: LessonEntryAttemptRepo,
+        val participantRepo: LessonParticipantRepo,
         val lessonRepo: LessonRepo,
         val authorization: ScheduledLessonAuthorizationService,
+        val admission: LessonAdmissionService,
+        val handoff: LessonAssertionHandoffService,
         val audit: LessonAccessAuditService,
+        val tokenService: LessonAccessTokenService,
+    )
+
+    private fun scheduledLesson(teacherSubject: String) = ScheduledLessonRow(
+        id = lessonId,
+        lessonTemplateId = null,
+        inheritTemplateMaterial = false,
+        materialId = null,
+        materialTitle = null,
+        courseId = null,
+        courseTitle = null,
+        lessonTitle = null,
+        teacherSubject = teacherSubject,
+        teacherName = null,
+        scheduledStart = now,
+        scheduledEnd = now.plusSeconds(3600),
+        status = "IN_PROGRESS",
+        type = "INDIVIDUAL",
+        workMode = "SHARED",
+        recurrenceSeriesId = null,
+        recurrenceIndex = null,
+        recurrenceTotal = null,
+        livekitRoomName = null,
+        createdAt = now,
+        updatedAt = now,
     )
 }

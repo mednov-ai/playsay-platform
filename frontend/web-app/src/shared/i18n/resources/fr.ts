@@ -118,6 +118,8 @@ export const fr = {
       signingIn: "Création d’une session de cours sécurisée...",
       activeAccount: "Compte actuel : {{account}}",
       notMe: "Ce n’est pas moi",
+      linkAccepted: "Le lien du cours a été accepté. Confirmez maintenant la personne qui entre avec le code envoyé à l’adresse du compte ou l’accord du professeur.",
+      accountMismatch: "Le compte actuel n’est pas inscrit à ce cours. Changez de compte ou confirmez la personne par e-mail ou auprès du professeur.",
     },
     form: {
       email: "Email",
@@ -1799,7 +1801,14 @@ export const fr = {
       submissionLoadFailed: "Impossible de charger les réponses",
       submissionsLoadFailed: "Impossible de charger les réponses des élèves",
       answerSent: "Réponse envoyée",
-      answerSendFailed: "Impossible d'envoyer la réponse",
+      answerSendFailed: "Impossible d’envoyer la réponse",
+    },
+    recovery: {
+      refreshing: "Actualisation de la connexion sécurisée au cours…",
+      connecting: "Rétablissement du son et de la vidéo…",
+      failed: "Impossible de rétablir la connexion au cours. Réessayez ou quittez le cours.",
+      retry: "Réessayer",
+      leave: "Quitter le cours",
     },
     collaboration: {
       workspaceAria: "Espace de travail en direct",

@@ -118,6 +118,8 @@ export const de = {
       signingIn: "Eine sichere Unterrichtssitzung wird erstellt...",
       activeAccount: "Aktuelles Konto: {{account}}",
       notMe: "Das bin nicht ich",
+      linkAccepted: "Der Unterrichtslink wurde angenommen. Bestätige jetzt die teilnehmende Person per E-Mail-Code des Kontos oder durch die Lehrkraft.",
+      accountMismatch: "Das aktuelle Konto ist dieser Stunde nicht zugewiesen. Wechsle das Konto oder bestätige die Person per E-Mail oder durch die Lehrkraft.",
     },
     form: {
       email: "E-Mail",
@@ -1800,6 +1802,13 @@ export const de = {
       submissionsLoadFailed: "Schülerantworten konnten nicht geladen werden",
       answerSent: "Antwort gesendet",
       answerSendFailed: "Antwort konnte nicht gesendet werden",
+    },
+    recovery: {
+      refreshing: "Die sichere Unterrichtsverbindung wird aktualisiert…",
+      connecting: "Audio und Video werden wiederhergestellt…",
+      failed: "Die Unterrichtsverbindung konnte nicht wiederhergestellt werden. Versuche es erneut oder verlasse die Stunde.",
+      retry: "Erneut versuchen",
+      leave: "Stunde verlassen",
     },
     collaboration: {
       workspaceAria: "Live-Arbeitsbereich",

@@ -57,6 +57,7 @@ import { useLessonRealtime } from "./controller/useLessonRealtime";
 import { useMaterialActions } from "./controller/useMaterialActions";
 import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
+import { useClassroomMediaRecovery } from "./controller/useClassroomMediaRecovery";
 import { useAppShellUiStore } from "./model/useAppShellUiStore";
 import { regionalEntryUrl } from "../shared/routing/regionalEntry";
 
@@ -86,6 +87,7 @@ export function useAppController(): AppShellProps {
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const classroomMediaRecovery = useClassroomMediaRecovery({ roomSession, setRoomSession });
   const routeLessonId = classroomLessonIdFromPath(currentPath);
   const preparationLessonId = lessonPreparationIdFromPath(currentPath);
   const isProfileRoute = isProfilePath(currentPath);
@@ -295,7 +297,7 @@ export function useAppController(): AppShellProps {
     createScheduledLesson,
     deleteScheduledLesson,
     joinScheduledLesson,
-    leaveScheduledLessonRoom,
+    leaveScheduledLessonRoom: leaveScheduledLessonRoomWithoutMediaRecovery,
     refreshSchedule,
     rescheduleScheduledLesson,
     startScheduledLesson,
@@ -314,6 +316,11 @@ export function useAppController(): AppShellProps {
     setStudentUsers,
     studentUsers,
   });
+
+  function leaveScheduledLessonRoom() {
+    classroomMediaRecovery.cancel();
+    leaveScheduledLessonRoomWithoutMediaRecovery();
+  }
   const lessonRealtime = useLessonRealtime({
     applySessionError,
     classroomLessonId: classroomLesson?.id ?? null,
@@ -388,6 +395,7 @@ export function useAppController(): AppShellProps {
   }
 
   function logout() {
+    classroomMediaRecovery.cancel();
     const logoutUrl = buildLogoutUrl();
     clearTokens();
     skipSilentLoginOnce();
@@ -518,7 +526,10 @@ export function useAppController(): AppShellProps {
     openLessonPreparation,
     closeLessonPreparation,
     classroomLesson,
+    classroomMediaRecoveryPhase: classroomMediaRecovery.phase,
     confirmScheduledLessonJoin,
+    onClassroomMediaLifecycleChange: classroomMediaRecovery.onLifecycleChange,
+    retryClassroomMediaRecovery: classroomMediaRecovery.retry,
     lessonDice: lessonRealtime.dice,
   };
 }

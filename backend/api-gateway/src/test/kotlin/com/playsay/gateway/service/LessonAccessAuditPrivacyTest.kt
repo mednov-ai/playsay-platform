@@ -24,6 +24,7 @@ class LessonAccessAuditPrivacyTest {
                 "CHALLENGE_REQUESTED", "CHALLENGE_VERIFIED",
                 "LOBBY_REQUESTED", "LOBBY_APPROVED", "LOBBY_DENIED",
                 "STUDENT_KICKED", "STUDENT_READMITTED", "ASSERTION_ISSUED", "SESSION_REVOKED",
+                "REMEMBERED_SESSION_REJECTED", "CONFIRMATION_ABANDONED",
             ),
             LessonAccessAuditEvent.entries.map(Enum<*>::name).toSet(),
         )

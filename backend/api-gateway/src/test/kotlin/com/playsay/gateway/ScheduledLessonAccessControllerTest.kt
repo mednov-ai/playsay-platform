@@ -186,6 +186,34 @@ class ScheduledLessonAccessControllerTest : ScheduledLessonControllerTestFixture
     }
 
     @Test
+    fun `possession of only the shared link creates an unconfirmed attempt without an assertion`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "assigned-student", username = "student.one", role = "ROLE_STUDENT")
+        userProfileStore.currentUserId(student)
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(
+                scheduledStart = futureStart(5),
+                scheduledEnd = futureEnd(5),
+                participantSubjects = listOf("assigned-student"),
+            ),
+        ).body!!
+        val link = lessonAccessController.getOrCreate(teacher, lesson.id)
+
+        val response = lessonAccessController.startCompact(
+            "https://online.honeyschool.ru",
+            LessonCompactAccessStartRequest(link.alias),
+        )
+
+        assertEquals("CONFIRMATION_REQUIRED", response.status)
+        val attempt = lessonEntryAttemptRepo.findById(response.attemptId).orElseThrow()
+        assertEquals("STARTED", attempt.state)
+        assertNull(attempt.targetSubject)
+        assertNull(attempt.confirmationMethod)
+        assertNull(attempt.assertionIssuedAt)
+    }
+
+    @Test
     fun `student sees only own scheduled lessons`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")

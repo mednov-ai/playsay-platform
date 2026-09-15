@@ -217,7 +217,14 @@ class LessonLobbyService(
         val assigned = (lesson.teacherSubject == subject && authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER }) ||
             (participantRepo.existsByLessonIdAndSubject(lessonId, subject) &&
                 authentication.authorities.any { it.authority == MetaData.Authorities.STUDENT })
-        if (!assigned) throw invalidDecision()
+        if (!assigned) {
+            auditService.recordIndependent(
+                LessonAccessAuditEvent.REMEMBERED_SESSION_REJECTED,
+                LessonAccessAuditOutcome.REJECTED,
+                authentication.auditActorKind(),
+            )
+            throw invalidDecision()
+        }
         attempt.targetSubject = subject
         attempt.confirmationMethod = "REMEMBERED_SESSION"
         attempt.rememberMe = true
@@ -282,7 +289,12 @@ class LessonLobbyService(
 }
 
 private fun JwtAuthenticationToken.auditActorKind(): LessonAccessActorKind =
-    if (authorities.any { it.authority == MetaData.Authorities.ADMIN }) LessonAccessActorKind.ADMIN else LessonAccessActorKind.TEACHER
+    when {
+        authorities.any { it.authority == MetaData.Authorities.ADMIN } -> LessonAccessActorKind.ADMIN
+        authorities.any { it.authority == MetaData.Authorities.TEACHER } -> LessonAccessActorKind.TEACHER
+        authorities.any { it.authority == MetaData.Authorities.STUDENT } -> LessonAccessActorKind.STUDENT
+        else -> LessonAccessActorKind.ANONYMOUS
+    }
 
 internal object LessonLobbyMappingPolicy {
     fun canMap(identity: InternalUserIdentityResponse?, requestedSubject: String, rostered: Boolean): Boolean =

@@ -1,17 +1,16 @@
 import { applyCaptureHardening } from "./capture-hardening";
-import { parsePageCommand, sessionsToReplace, type PageCommand } from "./protocol";
-import { pointerButtonMask, trustedInputCommand } from "./trusted-input";
+import { createInputDispatcher, type DispatchSession, type DispatchViewport } from "./input-dispatch";
+import { parsePageCommand, sessionsToReplace, type InputResult, type PageCommand } from "./protocol";
+import { debuggerEventRefreshesViewport } from "./viewport-lifecycle";
 
-type HostSession = {
+type HostSession = DispatchSession & {
   sessionId: string;
   nonce: string;
   consumerTabId: number;
   targetTabId: number;
   expectedUrl: string;
   inputEnabled: boolean;
-  pressedButtons?: number;
-  viewportHeight?: number;
-  viewportWidth?: number;
+  viewport?: DispatchViewport;
 };
 
 const sessions = new Map<string, HostSession>();
@@ -21,6 +20,14 @@ const hydration = chrome.storage.session.get("hostSessions").then(({ hostSession
       if (session && typeof session.sessionId === "string") sessions.set(session.sessionId, session as HostSession);
     });
   }
+});
+
+const dispatchInput = createInputDispatcher({
+  refreshViewport,
+  sendCommand: async (targetTabId, method, params) => {
+    await chrome.debugger.sendCommand({ tabId: targetTabId }, method, params);
+  },
+  targetAvailable: async (targetTabId) => chrome.tabs.get(targetTabId).then(() => true).catch(() => false),
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -80,7 +87,22 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   });
 });
 
-async function handleCommand(command: PageCommand, consumerTabId: number): Promise<{ ok: boolean }> {
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (source.tabId === undefined || !debuggerEventRefreshesViewport(method, params)) return;
+  void refreshTargetViewport(source.tabId);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading" || changeInfo.status === "complete") {
+    void refreshTargetViewport(tabId);
+  }
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  void refreshTargetViewport(tabId);
+});
+
+async function handleCommand(command: PageCommand, consumerTabId: number): Promise<{ ok: boolean } | InputResult> {
   await hydration;
   if (command.type === "PREPARE") {
     const previousSessions = sessionsToReplace(sessions.values(), consumerTabId, command.sessionId);
@@ -100,8 +122,16 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
     return { ok: true };
   }
 
-  const session = sessions.get(command.sessionId);
-  if (!session || session.nonce !== command.nonce || session.consumerTabId !== consumerTabId) return { ok: false };
+  const candidate = sessions.get(command.sessionId);
+  const session = candidate?.nonce === command.nonce && candidate.consumerTabId === consumerTabId
+    ? candidate
+    : null;
+  if (command.type === "INPUT") {
+    const result = await dispatchInput(command, session);
+    if (session) await persistSessions();
+    return result;
+  }
+  if (!session) return { ok: false };
   if (command.type === "STOP") {
     await stopSession(session, true);
   } else if (command.type === "RELOAD") {
@@ -110,16 +140,6 @@ async function handleCommand(command: PageCommand, consumerTabId: number): Promi
   } else if (command.type === "BACK") {
     await chrome.tabs.goBack(session.targetTabId);
     await refreshViewport(session).catch(() => undefined);
-  } else if (command.type === "INPUT" && command.input && session.inputEnabled) {
-    if (command.input.type === "pointer") {
-      const nextMask = pointerButtonMask(command.input);
-      if (nextMask >= 0) session.pressedButtons = nextMask;
-    }
-    const trusted = trustedInputCommand(command.input, {
-      height: session.viewportHeight ?? 720,
-      width: session.viewportWidth ?? 1280,
-    }, session.pressedButtons ?? 0);
-    await chrome.debugger.sendCommand({ tabId: session.targetTabId }, trusted.method, trusted.params);
   }
   return { ok: true };
 }
@@ -128,6 +148,7 @@ async function activateCapture(session: HostSession) {
   try {
     const debuggee = { tabId: session.targetTabId };
     await chrome.debugger.attach(debuggee, "1.3");
+    await chrome.debugger.sendCommand(debuggee, "Page.enable");
     await applyCaptureHardening((method, params) => chrome.debugger.sendCommand(debuggee, method, params));
     await refreshViewport(session);
     const streamId = await chrome.tabCapture.getMediaStreamId({
@@ -154,15 +175,31 @@ async function stopSession(session: HostSession, closeTarget: boolean) {
   sendStatus(session.consumerTabId, session.sessionId, "STOPPED");
 }
 
-async function refreshViewport(session: HostSession) {
+async function refreshTargetViewport(targetTabId: number) {
+  await hydration;
+  const session = [...sessions.values()].find((candidate) => (
+    candidate.targetTabId === targetTabId && candidate.inputEnabled
+  ));
+  if (!session) return;
+  await refreshViewport(session).then(persistSessions).catch(() => undefined);
+}
+
+async function refreshViewport(session: DispatchSession) {
   const result = await chrome.debugger.sendCommand({ tabId: session.targetTabId }, "Runtime.evaluate", {
     expression: "({width: window.innerWidth, height: window.innerHeight})",
     returnByValue: true,
   }) as { result?: { value?: { height?: number; width?: number } } };
   const height = result.result?.value?.height;
   const width = result.result?.value?.width;
-  if (typeof height === "number" && height > 0) session.viewportHeight = height;
-  if (typeof width === "number" && width > 0) session.viewportWidth = width;
+  if (typeof height !== "number" || height <= 0 || typeof width !== "number" || width <= 0) {
+    throw new Error("viewport unavailable");
+  }
+  session.viewport = {
+    height,
+    refreshedAt: Date.now(),
+    revision: (session.viewport?.revision ?? 0) + 1,
+    width,
+  };
 }
 
 async function persistSessions() {

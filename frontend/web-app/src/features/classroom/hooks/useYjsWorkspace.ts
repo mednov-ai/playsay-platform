@@ -38,6 +38,7 @@ import type {
 } from "../model/materialViewport";
 import { realtimeReconnectDelayMs } from "../model/realtimeLifecycle";
 import { createGameRealtimeClient } from "../model/gameRealtimeClient";
+import { createExternalActivityRealtimeClient } from "../model/externalActivityRealtimeClient";
 import { createGameSyncSessionController } from "../model/gameSyncSessionController";
 
 export type { CollaborationCursor, CollaborationParticipant };
@@ -76,6 +77,14 @@ export function useYjsWorkspace({
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const gameSyncControllerRef = useRef<ReturnType<typeof createGameSyncSessionController> | null>(null);
+  const externalActivityRealtime = useMemo(() => {
+    if (!enabled || !document) return null;
+    return createExternalActivityRealtimeClient({
+      getUrl: async () => collaborationWebSocketUrl(
+        await createCollaborationDocumentToken(document.lessonId, document.id),
+      ),
+    });
+  }, [document?.id, document?.lessonId, enabled]);
 
   useEffect(() => {
     if (!enabled || !document) {
@@ -273,6 +282,7 @@ export function useYjsWorkspace({
       runtime.destroy();
       gameSyncController.close();
       gameRealtime.close();
+      externalActivityRealtime?.close();
       gameSyncControllerRef.current = null;
       runtimeRef.current = null;
       setAnnotationElementsState([]);
@@ -289,7 +299,7 @@ export function useYjsWorkspace({
       setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
     };
-  }, [color, document?.id, enabled, onDocumentInvalid, participantName]);
+  }, [color, document?.id, enabled, externalActivityRealtime, onDocumentInvalid, participantName]);
 
   const updateText = useCallback((nextText: string) => {
     const runtime = runtimeRef.current;
@@ -443,6 +453,7 @@ export function useYjsWorkspace({
     participants,
     reconnectCount,
     htmlGameSync,
+    externalActivityRealtime,
     exerciseSync,
     videoSync,
     materialViewport,

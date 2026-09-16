@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  inputResult,
   isTrustedPlaySayOrigin,
+  parseInputResult,
   parsePageCommand,
   sessionsToReplace,
 } from "./protocol";
@@ -38,6 +40,7 @@ describe("extension protocol", () => {
       type: "INPUT",
       sessionId: "s-1",
       nonce: "n-1",
+      eventId: "e-1",
       input: {
         type: "pointer",
         action: "down",
@@ -58,6 +61,7 @@ describe("extension protocol", () => {
       type: "INPUT",
       sessionId: "s-1",
       nonce: "n-1",
+      eventId: "e-1",
       input: { type: "pointer", action: "move", x: 10, y: 20, normalizedX: 1.1, normalizedY: 0.5 },
     })).toBeNull();
     expect(parsePageCommand({
@@ -65,8 +69,38 @@ describe("extension protocol", () => {
       type: "INPUT",
       sessionId: "s-1",
       nonce: "n-1",
+      eventId: "e-1",
       input: { type: "clipboard", value: "secret" },
     })).toBeNull();
+  });
+
+  it("requires opaque event ids and rejects oversized or content-bearing command fields", () => {
+    const valid = {
+      version: 1,
+      type: "INPUT",
+      sessionId: "s-1",
+      nonce: "n-1",
+      eventId: "e-1",
+      input: { type: "key", action: "down", key: "a" },
+    };
+    expect(parsePageCommand({ ...valid, eventId: undefined })).toBeNull();
+    expect(parsePageCommand({ ...valid, providerContent: "private" })).toBeNull();
+    expect(parsePageCommand({ ...valid, input: { ...valid.input, providerContent: "private" } })).toBeNull();
+    expect(parsePageCommand({ ...valid, padding: "x".repeat(20_000) })).toBeNull();
+  });
+
+  it("accepts only stable content-free input results for the expected event", () => {
+    const command = { sessionId: "s-1", eventId: "e-1" };
+    expect(parseInputResult(inputResult(command, "DISPATCHED", 2), command)).toEqual({
+      version: 1,
+      type: "INPUT_RESULT",
+      sessionId: "s-1",
+      eventId: "e-1",
+      result: "DISPATCHED",
+      viewportRevision: 2,
+    });
+    expect(parseInputResult({ ...inputResult(command, "DEBUGGER_FAILED"), error: "raw browser error" }, command)).toBeNull();
+    expect(parseInputResult(inputResult({ sessionId: "s-1", eventId: "old" }, "DISPATCHED"), command)).toBeNull();
   });
 
   it("replaces the previous tab whenever the same classroom launches a new capture session", () => {

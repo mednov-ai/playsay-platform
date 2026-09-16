@@ -3,11 +3,10 @@ import type {
   ExternalActivityRealtimeMessage,
 } from "./externalActivityProtocol";
 import {
-  decodeGameRealtimeFrame,
-  encodeExternalActivityRealtimeMessage,
-  gameRealtimeSubprotocol,
-  type GameRealtimeMode,
-} from "./gameRealtimeProtocol";
+  decodeExternalActivityRealtimeFrame,
+  encodeExternalActivityRealtimeFrame,
+  externalActivityRealtimeSubprotocol,
+} from "./externalActivityRealtimeProtocol";
 
 const maximumBufferedBytes = 512 * 1024;
 
@@ -18,7 +17,6 @@ export function createExternalActivityRealtimeClient({
 }): ExternalActivityRealtime {
   const subscribers = new Set<(message: ExternalActivityRealtimeMessage) => void>();
   let socket: WebSocket | null = null;
-  let mode: GameRealtimeMode | null = null;
   let disposed = false;
   let reconnectAttempt = 0;
   let reconnectTimer: number | null = null;
@@ -41,39 +39,28 @@ export function createExternalActivityRealtimeClient({
       || socket?.readyState === WebSocket.CONNECTING
     ) return;
     try {
-      const next = new WebSocket(await getUrl(), gameRealtimeSubprotocol);
+      const next = new WebSocket(await getUrl(), externalActivityRealtimeSubprotocol);
       next.binaryType = "arraybuffer";
       socket = next;
       next.onmessage = (event) => {
         if (socket !== next || !(event.data instanceof ArrayBuffer)) return;
         try {
-          const frame = decodeGameRealtimeFrame(event.data);
-          if (frame.kind === "welcome") {
-            mode = frame.mode;
-            reconnectAttempt = 0;
-            return;
-          }
-          if (
-            frame.message.kind === "external-input"
-            || frame.message.kind === "external-cursor"
-          ) {
-            subscribers.forEach((subscriber) => subscriber(frame.message as ExternalActivityRealtimeMessage));
-          }
+          const message = decodeExternalActivityRealtimeFrame(event.data);
+          subscribers.forEach((subscriber) => subscriber(message));
         } catch {
           next.close(1003, "invalid realtime frame");
         }
       };
+      next.onopen = () => { reconnectAttempt = 0; };
       next.onclose = () => {
         if (socket === next) {
           socket = null;
-          mode = null;
         }
         scheduleReconnect();
       };
       next.onerror = () => next.close();
     } catch {
       socket = null;
-      mode = null;
       scheduleReconnect();
     }
   };
@@ -89,7 +76,6 @@ export function createExternalActivityRealtimeClient({
           reconnectTimer = null;
           socket?.close(1000, "external activity inactive");
           socket = null;
-          mode = null;
         }
       };
     },
@@ -100,18 +86,13 @@ export function createExternalActivityRealtimeClient({
       subscribers.clear();
       socket?.close(1000, "workspace disposed");
       socket = null;
-      mode = null;
     },
     publish(message) {
       if (
         socket?.readyState !== WebSocket.OPEN
-        || mode === null
         || socket.bufferedAmount >= maximumBufferedBytes
       ) return false;
-      socket.send(encodeExternalActivityRealtimeMessage(message));
-      // External activity input does not need the game protocol's shadow
-      // comparison duplicate. The dedicated socket is already relayed in both
-      // shadow and primary modes; LiveKit remains the fallback when it is down.
+      socket.send(encodeExternalActivityRealtimeFrame(message));
       return true;
     },
   };

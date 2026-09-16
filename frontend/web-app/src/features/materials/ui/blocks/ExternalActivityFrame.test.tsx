@@ -288,7 +288,7 @@ describe("ExternalActivityFrame", () => {
 
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("EXTENSION_UPDATE_REQUIRED");
-    expect(alert).toHaveTextContent("0.1.7");
+    expect(alert).toHaveTextContent("0.1.8");
   });
 
   it("keeps teacher-only diagnostics out of the student failure state", () => {
@@ -333,6 +333,31 @@ describe("ExternalActivityFrame", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(copy.error);
     expect(screen.getByRole("alert")).toHaveTextContent(copy.errors.captureNotSupported);
     expect(screen.getByRole("button", { name: copy.retry })).toBeEnabled();
+  });
+
+  it.each(["ru", "en", "de", "fr"] as const)("renders a recoverable localized input status in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    render(<ExternalActivityFrame block={block} sync={sync({
+      active: {
+        blockId: block.id,
+        sessionId: "s-1",
+        hostIdentity: "teacher",
+        phase: "ACTIVE",
+        studentsLocked: false,
+        visible: true,
+      },
+      inputStatus: {
+        code: "VIEWPORT_STALE",
+        correlationId: "event-1",
+        transport: "local",
+      },
+    })} />);
+
+    const copy = resources[language].translation.materials.externalActivity;
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.inputDegraded);
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.inputErrors.viewport);
+    expect(screen.getByRole("button", { name: copy.retry })).toBeEnabled();
+    expect(screen.getByRole("button", { name: copy.returnToLesson })).toBeEnabled();
   });
 
   it("mutes the local teacher preview but plays captured page audio for students", () => {

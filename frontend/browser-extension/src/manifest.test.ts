@@ -30,7 +30,7 @@ const expectedIcons = {
 describe("extension manifest contract", () => {
   it("keeps package and manifest versions aligned", () => {
     expect(manifest.name).toBe("Honey.school");
-    expect(manifest.version).toBe("0.1.7");
+    expect(manifest.version).toBe("0.1.8");
     expect(extensionPackage.version).toBe(manifest.version);
     expect(frontendLock.packages["browser-extension"]?.version).toBe(manifest.version);
   });

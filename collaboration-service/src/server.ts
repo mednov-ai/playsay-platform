@@ -24,6 +24,8 @@ import { SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
 import { disconnectLessonSubject } from "./disconnect.js";
+import { externalActivityRealtimeSubprotocol } from "./externalActivityProtocol.js";
+import { relayExternalActivityFrame } from "./externalActivityRelay.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -50,12 +52,19 @@ async function main(): Promise<void> {
     hardLimitBytes: config.websocketHardLimitBytes,
     softLimitBytes: config.websocketSoftLimitBytes,
   };
+  const externalActivityBackpressurePolicy = {
+    hardLimitBytes: config.externalActivityWebsocketHardLimitBytes,
+    softLimitBytes: config.externalActivityWebsocketSoftLimitBytes,
+  };
   const wss = new WebSocketServer({
-    handleProtocols: (protocols) => (
-      config.gameRealtimeMode !== "off" && protocols.has(gameRealtimeSubprotocol)
+    handleProtocols: (protocols) => {
+      if (config.externalActivityRealtimeEnabled && protocols.has(externalActivityRealtimeSubprotocol)) {
+        return externalActivityRealtimeSubprotocol;
+      }
+      return config.gameRealtimeMode !== "off" && protocols.has(gameRealtimeSubprotocol)
         ? gameRealtimeSubprotocol
-        : false
-    ),
+        : false;
+    },
     maxPayload: config.websocketMaxPayloadBytes,
     noServer: true,
     perMessageDeflate: false,
@@ -71,10 +80,14 @@ async function main(): Promise<void> {
       void metrics.render({
         activeConnections: wss.clients.size,
         activeGameConnections: [...wss.clients].filter(isGameSocket).length,
+        activeExternalActivityConnections: [...wss.clients].filter(isExternalActivitySocket).length,
         activeRooms: rooms.size,
         bufferedBytes,
         gameBufferedBytes: [...wss.clients]
           .filter(isGameSocket)
+          .reduce((total, client) => total + client.bufferedAmount, 0),
+        externalActivityBufferedBytes: [...wss.clients]
+          .filter(isExternalActivitySocket)
           .reduce((total, client) => total + client.bufferedAmount, 0),
       }).then((body) => {
         response.writeHead(200, { "content-type": metrics.contentType });
@@ -126,7 +139,14 @@ async function main(): Promise<void> {
     const roomName = requestUrl.searchParams.get("room")?.trim();
     const requestsGameRealtime = requestedSubprotocols(request)
       .includes(gameRealtimeSubprotocol);
+    const requestsExternalActivityRealtime = requestedSubprotocols(request)
+      .includes(externalActivityRealtimeSubprotocol);
     if (requestsGameRealtime && config.gameRealtimeMode === "off") {
+      socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    if (requestsExternalActivityRealtime && !config.externalActivityRealtimeEnabled) {
       socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
       socket.destroy();
       return;
@@ -153,14 +173,15 @@ async function main(): Promise<void> {
   });
 
   wss.on("connection", (ws: WebSocket, request: http.IncomingMessage, claims: CollaborationClaims) => {
-    heartbeat.track(ws, isGameSocket(ws) ? "game" : "yjs");
+    heartbeat.track(ws, socketChannel(ws));
     connectionClaims.set(ws, claims);
     ws.once("close", () => connectionClaims.delete(ws));
     request.socket.setNoDelay(true);
     request.socket.setKeepAlive(true, 30_000);
     const pendingMessages: RawData[] = [];
     const queuePendingMessage = (message: RawData) => {
-      if (pendingMessages.length >= 100) {
+      const pendingLimit = isExternalActivitySocket(ws) ? config.externalActivityMaxPendingMessages : 100;
+      if (pendingMessages.length >= pendingLimit) {
         ws.close(1009, "too many messages while restoring room");
         return;
       }
@@ -176,6 +197,7 @@ async function main(): Promise<void> {
           ws,
           snapshots,
           backpressurePolicy,
+          externalActivityBackpressurePolicy,
           metrics,
           config.gameRealtimeMode,
           pendingMessages,
@@ -256,7 +278,7 @@ async function createRoom(
     room.connections.forEach((_controlledIds, connection) => {
       if (
         connection !== originSocket
-        && !isGameSocket(connection)
+        && isYjsSocket(connection)
         && connection.readyState === connection.OPEN
       ) {
         sendSyncUpdate(connection, update, backpressurePolicy, metrics);
@@ -306,6 +328,7 @@ function bindWebSocket(
   ws: WebSocket,
   snapshots: SnapshotQueue,
   backpressurePolicy: CollaborationBackpressurePolicy,
+  externalActivityBackpressurePolicy: CollaborationBackpressurePolicy,
   metrics: CollaborationMetrics,
   gameRealtimeMode: GameRealtimeMode,
   pendingMessages: RawData[] = [],
@@ -317,7 +340,7 @@ function bindWebSocket(
   room.connections.set(ws, new Set());
 
   ws.on("message", (message) => {
-    processMessage(room, ws, message, backpressurePolicy, metrics);
+    processMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
   });
 
   ws.on("close", () => {
@@ -352,12 +375,12 @@ function bindWebSocket(
       backpressurePolicy,
       metrics,
     );
-  } else {
+  } else if (!isExternalActivitySocket(ws)) {
     sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
     sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
   }
   pendingMessages.forEach((message) => {
-    processMessage(room, ws, message, backpressurePolicy, metrics);
+    processMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
   });
 }
 
@@ -366,17 +389,31 @@ function processMessage(
   ws: WebSocket,
   message: RawData,
   backpressurePolicy: CollaborationBackpressurePolicy,
+  externalActivityBackpressurePolicy: CollaborationBackpressurePolicy,
   metrics: CollaborationMetrics,
 ): void {
   try {
     if (isGameSocket(ws)) {
       handleGameMessage(room, ws, message, backpressurePolicy, metrics);
+    } else if (isExternalActivitySocket(ws)) {
+      handleExternalActivityMessage(room, ws, message, externalActivityBackpressurePolicy, metrics);
     } else {
       handleMessage(room, ws, message, backpressurePolicy, metrics);
     }
   } catch {
     ws.close(1003, "invalid collaboration message");
   }
+}
+
+function handleExternalActivityMessage(
+  room: CollaborationRoom,
+  ws: WebSocket,
+  message: RawData,
+  backpressurePolicy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
+  const bytes = rawDataToUint8Array(message);
+  relayExternalActivityFrame(room.connections.keys(), ws, bytes, backpressurePolicy, metrics);
 }
 
 function handleMessage(
@@ -424,7 +461,7 @@ function handleMessage(
     room.connections.forEach((_controlledIds, connection) => {
       if (
         connection !== ws
-        && !isGameSocket(connection)
+        && isYjsSocket(connection)
         && connection.readyState === connection.OPEN
       ) {
         sendWithBackpressure(connection, encoded, "ephemeral", backpressurePolicy, metrics);
@@ -529,7 +566,7 @@ function broadcastAwareness(
   room.connections.forEach((_controlledIds, connection) => {
     if (
       connection !== origin
-      && !isGameSocket(connection)
+      && isYjsSocket(connection)
       && connection.readyState === connection.OPEN
     ) {
       sendWithBackpressure(connection, payload, "awareness", backpressurePolicy, metrics);
@@ -539,6 +576,20 @@ function broadcastAwareness(
 
 function isGameSocket(ws: WebSocket): boolean {
   return ws.protocol === gameRealtimeSubprotocol;
+}
+
+function isExternalActivitySocket(ws: WebSocket): boolean {
+  return ws.protocol === externalActivityRealtimeSubprotocol;
+}
+
+function isYjsSocket(ws: WebSocket): boolean {
+  return !isGameSocket(ws) && !isExternalActivitySocket(ws);
+}
+
+function socketChannel(ws: WebSocket): "yjs" | "game" | "external-activity" {
+  if (isGameSocket(ws)) return "game";
+  if (isExternalActivitySocket(ws)) return "external-activity";
+  return "yjs";
 }
 
 function requestedSubprotocols(request: http.IncomingMessage): string[] {

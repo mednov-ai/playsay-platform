@@ -13,6 +13,10 @@ export interface CollaborationServiceConfig {
   websocketHeartbeatIntervalMs: number;
   websocketHeartbeatMissedPongs: number;
   gameRealtimeMode: GameRealtimeMode;
+  externalActivityRealtimeEnabled: boolean;
+  externalActivityWebsocketHardLimitBytes: number;
+  externalActivityWebsocketSoftLimitBytes: number;
+  externalActivityMaxPendingMessages: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationServiceConfig {
@@ -29,9 +33,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationS
     websocketHeartbeatIntervalMs: numberEnv(env.WEBSOCKET_HEARTBEAT_INTERVAL_MS, 20_000),
     websocketHeartbeatMissedPongs: integerEnv(env.WEBSOCKET_HEARTBEAT_MISSED_PONGS, 2),
     gameRealtimeMode: gameRealtimeModeEnv(env.GAME_REALTIME_MODE),
+    externalActivityRealtimeEnabled: booleanEnv(env.EXTERNAL_ACTIVITY_REALTIME_ENABLED, false),
+    externalActivityWebsocketHardLimitBytes: numberEnv(env.EXTERNAL_ACTIVITY_WEBSOCKET_HARD_LIMIT_BYTES, 512 * 1024),
+    externalActivityWebsocketSoftLimitBytes: numberEnv(env.EXTERNAL_ACTIVITY_WEBSOCKET_SOFT_LIMIT_BYTES, 128 * 1024),
+    externalActivityMaxPendingMessages: integerEnv(env.EXTERNAL_ACTIVITY_MAX_PENDING_MESSAGES, 64),
   };
   if (config.websocketHardLimitBytes <= config.websocketSoftLimitBytes) {
     throw new Error("websocket hard limit must exceed the soft limit");
+  }
+  if (config.externalActivityWebsocketHardLimitBytes <= config.externalActivityWebsocketSoftLimitBytes) {
+    throw new Error("external activity websocket hard limit must exceed the soft limit");
   }
   if (config.websocketHeartbeatIntervalMs * (config.websocketHeartbeatMissedPongs + 1) > 60_000) {
     throw new Error("websocket heartbeat must terminate stale connections within 60 seconds");
@@ -40,6 +51,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationS
     throw new Error("websocket heartbeat requires more than one missed pong");
   }
   return config;
+}
+
+function booleanEnv(value: string | undefined, fallback: boolean): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  throw new Error(`invalid boolean env value: ${value}`);
 }
 
 function integerEnv(value: string | undefined, fallback: number): number {

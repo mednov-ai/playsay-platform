@@ -23,10 +23,12 @@ import {
   participantCanHostExternalActivity,
   type ExternalActivityBlock,
   type ExternalActivityInput,
+  type ExternalActivityInputResultCode,
   type ExternalActivityMessage,
   type ExternalActivityRealtime,
   type ExternalActivityState,
 } from "../model/externalActivityProtocol";
+import { createExternalActivityDiagnostics } from "../model/externalActivityDiagnostics";
 
 export const externalActivityVideoPublishOptions = {
   degradationPreference: "maintain-framerate",
@@ -59,12 +61,26 @@ export function useExternalActivitySession({
   const [active, setActive] = useState<ExternalActivityState | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [cursorsByIdentity, setCursorsByIdentity] = useState<Record<string, { identity: string; name: string; color: string; x: number; y: number }>>({});
+  const [inputStatus, setInputStatus] = useState<{
+    code: ExternalActivityInputResultCode;
+    correlationId: string;
+    transport: "local" | "fast-lane" | "livekit";
+  } | null>(null);
+  const diagnosticsRef = useRef(createExternalActivityDiagnostics());
+  const [diagnosticFailures, setDiagnosticFailures] = useState(diagnosticsRef.current.failures);
   const activeRef = useRef<ExternalActivityState | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const extensionNonceRef = useRef<string | null>(null);
   const extensionTimerRef = useRef<number | null>(null);
   const blocksRef = useRef(blocks);
   const handledInputEventsRef = useRef(new Set<string>());
+  const inputResultsRef = useRef(new Map<string, ExternalActivityInputResultCode>());
+  const pendingInputsRef = useRef(new Map<string, {
+    ackTimer: number;
+    fallbackTimer?: number;
+    origin: "local" | "participant";
+    transport: "local" | "fast-lane" | "livekit";
+  }>());
   const stateResponseReceivedRef = useRef(false);
   const sessionGenerationRef = useRef(0);
   const remoteTrackLossTimerRef = useRef<number | null>(null);
@@ -78,6 +94,10 @@ export function useExternalActivitySession({
     const bytes = new TextEncoder().encode(JSON.stringify(message));
     await room.localParticipant.publishData(bytes, { reliable, topic }).catch(() => undefined);
   }, [enabled, room.localParticipant]);
+
+  const postExtensionCommand = useCallback((command: Record<string, unknown>) => {
+    window.postMessage({ channel: externalActivityPageChannel, command }, window.location.origin);
+  }, []);
 
   const broadcastState = useCallback((state: ExternalActivityState) => {
     activeRef.current = state;
@@ -98,6 +118,101 @@ export function useExternalActivitySession({
     extensionTimerRef.current = null;
   }, []);
 
+  const clearInputTimers = useCallback(() => {
+    pendingInputsRef.current.forEach(({ ackTimer, fallbackTimer }) => {
+      window.clearTimeout(ackTimer);
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+    });
+    pendingInputsRef.current.clear();
+  }, []);
+
+  const settleInput = useCallback((
+    eventId: string,
+    result: ExternalActivityInputResultCode,
+    transport?: "local" | "fast-lane" | "livekit",
+  ) => {
+    const pending = pendingInputsRef.current.get(eventId);
+    if (pending) {
+      window.clearTimeout(pending.ackTimer);
+      if (pending.fallbackTimer !== undefined) window.clearTimeout(pending.fallbackTimer);
+      pendingInputsRef.current.delete(eventId);
+    }
+    if (result === "DISPATCHED") {
+      diagnosticsRef.current.recordSuccess("dispatch", transport ?? pending?.transport ?? "local");
+      setInputStatus(null);
+    } else {
+      diagnosticsRef.current.recordFailure({
+        correlationId: eventId,
+        result,
+        stage: result === "ACK_TIMEOUT" ? "acknowledgement" : "extension",
+        timestamp: new Date().toISOString(),
+        transport: transport ?? pending?.transport ?? "local",
+      });
+      setDiagnosticFailures(diagnosticsRef.current.failures());
+      setInputStatus({
+        code: result,
+        correlationId: eventId,
+        transport: transport ?? pending?.transport ?? "local",
+      });
+    }
+  }, []);
+
+  const broadcastInputResult = useCallback((
+    blockId: string,
+    sessionId: string,
+    eventId: string,
+    result: ExternalActivityInputResultCode,
+  ) => {
+    realtime?.publish({ blockId, sessionId, eventId, result, kind: "external-result" });
+    void publish({
+      version: 1,
+      type: "INPUT_RESULT",
+      blockId,
+      sessionId,
+      eventId,
+      result,
+    }, externalActivityInputTopic, true);
+  }, [publish, realtime]);
+
+  const dispatchParticipantInput = useCallback((message: {
+    blockId: string;
+    eventId: string;
+    input: ExternalActivityInput;
+    sessionId: string;
+  }) => {
+    const remembered = inputResultsRef.current.get(message.eventId);
+    if (remembered) {
+      broadcastInputResult(message.blockId, message.sessionId, message.eventId, remembered);
+      return;
+    }
+    if (handledInputEventsRef.current.has(message.eventId)) return;
+    handledInputEventsRef.current.add(message.eventId);
+    if (handledInputEventsRef.current.size > 500) {
+      const oldest = handledInputEventsRef.current.values().next().value;
+      if (oldest) handledInputEventsRef.current.delete(oldest);
+    }
+    const nonce = extensionNonceRef.current;
+    if (!nonce) {
+      inputResultsRef.current.set(message.eventId, "STALE_SESSION");
+      broadcastInputResult(message.blockId, message.sessionId, message.eventId, "STALE_SESSION");
+      return;
+    }
+    const ackTimer = window.setTimeout(() => {
+      inputResultsRef.current.set(message.eventId, "ACK_TIMEOUT");
+      settleInput(message.eventId, "ACK_TIMEOUT", "local");
+      broadcastInputResult(message.blockId, message.sessionId, message.eventId, "ACK_TIMEOUT");
+    }, 2_500);
+    pendingInputsRef.current.set(message.eventId, { ackTimer, origin: "participant", transport: "local" });
+    postExtensionCommand({
+      version: 1,
+      type: "INPUT",
+      sessionId: message.sessionId,
+      nonce,
+      eventId: message.eventId,
+      input: message.input,
+    });
+  }, [broadcastInputResult, postExtensionCommand, settleInput]);
+
   const clearRemoteTrackLossTimer = useCallback(() => {
     if (remoteTrackLossTimerRef.current !== null) window.clearTimeout(remoteTrackLossTimerRef.current);
     remoteTrackLossTimerRef.current = null;
@@ -111,7 +226,9 @@ export function useExternalActivitySession({
     setActive(null);
     setMediaStream(null);
     setCursorsByIdentity({});
-  }, [clearRemoteTrackLossTimer]);
+    clearInputTimers();
+    setInputStatus(null);
+  }, [clearInputTimers, clearRemoteTrackLossTimer]);
 
   const unpublishLocalStream = useCallback(async () => {
     const stream = localStreamRef.current;
@@ -124,15 +241,13 @@ export function useExternalActivitySession({
     }
   }, [room.localParticipant]);
 
-  const postExtensionCommand = useCallback((command: Record<string, unknown>) => {
-    window.postMessage({ channel: externalActivityPageChannel, command }, window.location.origin);
-  }, []);
-
   const stopHostSession = useCallback(async (notify = true) => {
     const current = activeRef.current;
     if (!current || !isHost) return;
     sessionGenerationRef.current += 1;
     clearTimers();
+    clearInputTimers();
+    setInputStatus(null);
     const nonce = extensionNonceRef.current;
     if (nonce) postExtensionCommand({ version: 1, type: "STOP", sessionId: current.sessionId, nonce });
     extensionNonceRef.current = null;
@@ -142,7 +257,7 @@ export function useExternalActivitySession({
     setActive(null);
     setCursorsByIdentity({});
     if (notify) await publish({ version: 1, type: "HOST_IDLE", sessionId: current.sessionId, blockId: current.blockId }, externalActivityHostTopic, true);
-  }, [clearTimers, isHost, postExtensionCommand, publish, unpublishLocalStream]);
+  }, [clearInputTimers, clearTimers, isHost, postExtensionCommand, publish, unpublishLocalStream]);
 
   const startHostSession = useCallback(async (blockId: string, sessionId: string) => {
     if (!isHost) return;
@@ -203,14 +318,16 @@ export function useExternalActivitySession({
         return;
       }
       if (message.type === "INPUT" && isHost && message.input && activeRef.current?.sessionId === message.sessionId) {
-        if (!message.eventId || handledInputEventsRef.current.has(message.eventId)) return;
-        handledInputEventsRef.current.add(message.eventId);
-        if (handledInputEventsRef.current.size > 500) {
-          const oldest = handledInputEventsRef.current.values().next().value;
-          if (oldest) handledInputEventsRef.current.delete(oldest);
-        }
-        const nonce = extensionNonceRef.current;
-        if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: message.sessionId, nonce, input: message.input });
+        dispatchParticipantInput({
+          blockId: message.blockId,
+          eventId: message.eventId!,
+          input: message.input,
+          sessionId: message.sessionId,
+        });
+        return;
+      }
+      if (message.type === "INPUT_RESULT" && !isHost && message.result && activeRef.current?.sessionId === message.sessionId) {
+        settleInput(message.eventId!, message.result, "livekit");
         return;
       }
       if (message.type === "CURSOR" && message.cursor && activeRef.current?.sessionId === message.sessionId) {
@@ -271,7 +388,7 @@ export function useExternalActivitySession({
     };
     room.on(RoomEvent.DataReceived, handleData);
     return () => { room.off(RoomEvent.DataReceived, handleData); };
-  }, [clearRemoteSession, enabled, isHost, postExtensionCommand, room, startHostSession, stopHostSession, trustedHostIdentity]);
+  }, [clearRemoteSession, dispatchParticipantInput, enabled, isHost, room, settleInput, startHostSession, stopHostSession, trustedHostIdentity]);
 
   useEffect(() => {
     if (!enabled || !realtime) return undefined;
@@ -279,20 +396,12 @@ export function useExternalActivitySession({
       const current = activeRef.current;
       if (!current || current.sessionId !== message.sessionId || current.blockId !== message.blockId) return;
       if (message.kind === "external-input") {
-        if (!isHost || handledInputEventsRef.current.has(message.eventId)) return;
-        handledInputEventsRef.current.add(message.eventId);
-        if (handledInputEventsRef.current.size > 500) {
-          const oldest = handledInputEventsRef.current.values().next().value;
-          if (oldest) handledInputEventsRef.current.delete(oldest);
-        }
-        const nonce = extensionNonceRef.current;
-        if (nonce) postExtensionCommand({
-          version: 1,
-          type: "INPUT",
-          sessionId: message.sessionId,
-          nonce,
-          input: message.input,
-        });
+        if (!isHost) return;
+        dispatchParticipantInput(message);
+        return;
+      }
+      if (message.kind === "external-result") {
+        if (!isHost) settleInput(message.eventId, message.result, "fast-lane");
         return;
       }
       if (
@@ -315,7 +424,7 @@ export function useExternalActivitySession({
         }));
       }
     });
-  }, [enabled, isHost, postExtensionCommand, realtime]);
+  }, [dispatchParticipantInput, enabled, isHost, realtime, settleInput]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -480,6 +589,15 @@ export function useExternalActivitySession({
               broadcastState({ ...next, phase: "ERROR", errorCode: externalActivityCaptureErrorCode(error) });
             }
           });
+      } else if (extensionEvent.type === "INPUT_RESULT") {
+        const eventId = String(extensionEvent.eventId);
+        const result = extensionEvent.result as ExternalActivityInputResultCode;
+        const pending = pendingInputsRef.current.get(eventId);
+        inputResultsRef.current.set(eventId, result);
+        settleInput(eventId, result, pending?.transport);
+        if (pending?.origin === "participant") {
+          broadcastInputResult(current.blockId, current.sessionId, eventId, result);
+        }
       } else if (["TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR"].includes(String(extensionEvent.type))) {
         clearTimers();
         broadcastState({
@@ -491,7 +609,7 @@ export function useExternalActivitySession({
     };
     window.addEventListener("message", handleExtensionEvent);
     return () => window.removeEventListener("message", handleExtensionEvent);
-  }, [broadcastState, enabled, isHost, room.localParticipant, unpublishLocalStream]);
+  }, [broadcastInputResult, broadcastState, enabled, isHost, room.localParticipant, settleInput, unpublishLocalStream]);
 
   useEffect(() => {
     if (!enabled || isHost || !active) return undefined;
@@ -567,9 +685,10 @@ export function useExternalActivitySession({
 
   useEffect(() => () => {
     clearTimers();
+    clearInputTimers();
     clearRemoteTrackLossTimer();
     if (isHost) void stopHostSession();
-  }, [clearRemoteTrackLossTimer, clearTimers, isHost, stopHostSession]);
+  }, [clearInputTimers, clearRemoteTrackLossTimer, clearTimers, isHost, stopHostSession]);
 
   const open = useCallback((block: MaterialEditorBlock) => {
     if (block.type !== "externalActivity" || !block.url) return;
@@ -615,25 +734,52 @@ export function useExternalActivitySession({
   const sendInput = useCallback((input: ExternalActivityInput) => {
     const current = activeRef.current;
     if (!current || current.phase !== "ACTIVE") return;
+    const eventId = crypto.randomUUID();
+    const ackTimer = window.setTimeout(() => {
+      const pending = pendingInputsRef.current.get(eventId);
+      settleInput(eventId, "ACK_TIMEOUT", pending?.transport);
+    }, 2_500);
     if (isHost) {
       const nonce = extensionNonceRef.current;
-      if (nonce) postExtensionCommand({ version: 1, type: "INPUT", sessionId: current.sessionId, nonce, input });
+      pendingInputsRef.current.set(eventId, { ackTimer, origin: "local", transport: "local" });
+      if (nonce) {
+        postExtensionCommand({ version: 1, type: "INPUT", sessionId: current.sessionId, nonce, eventId, input });
+      } else {
+        settleInput(eventId, "STALE_SESSION", "local");
+      }
     } else {
-      const eventId = crypto.randomUUID();
-      if (realtime?.publish({
+      const message = {
         blockId: current.blockId,
         eventId,
         input,
         kind: "external-input",
         sessionId: current.sessionId,
-      })) return;
-      void publish(
-        { version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId, input },
-        externalActivityInputTopic,
-        externalActivityInputReliable(input),
-      );
+      } as const;
+      const fastLaneSent = realtime?.publish(message) === true;
+      const pending = {
+        ackTimer,
+        origin: "participant" as const,
+        transport: fastLaneSent ? "fast-lane" as const : "livekit" as const,
+        fallbackTimer: undefined as number | undefined,
+      };
+      pendingInputsRef.current.set(eventId, pending);
+      const sendLiveKitFallback = () => {
+        const currentPending = pendingInputsRef.current.get(eventId);
+        if (!currentPending) return;
+        currentPending.transport = "livekit";
+        void publish(
+          { version: 1, type: "INPUT", sessionId: current.sessionId, blockId: current.blockId, eventId, input },
+          externalActivityInputTopic,
+          externalActivityInputReliable(input),
+        );
+      };
+      if (fastLaneSent) {
+        pending.fallbackTimer = window.setTimeout(sendLiveKitFallback, 700);
+      } else {
+        sendLiveKitFallback();
+      }
     }
-  }, [isHost, postExtensionCommand, publish, realtime]);
+  }, [isHost, postExtensionCommand, publish, realtime, settleInput]);
 
   const sendCursor = useCallback((x: number, y: number) => {
     const current = activeRef.current;
@@ -666,7 +812,10 @@ export function useExternalActivitySession({
   return useMemo(() => ({
     active,
     cursors: Object.values(cursorsByIdentity),
+    diagnostics: diagnosticFailures,
+    exportDiagnostics: diagnosticsRef.current.exportJson,
     isHost,
+    inputStatus,
     mediaStream,
     open,
     reload,
@@ -674,7 +823,7 @@ export function useExternalActivitySession({
     returnToLesson,
     sendCursor,
     sendInput: sendInput as MaterialExternalActivitySync["sendInput"],
-  }), [active, cursorsByIdentity, isHost, mediaStream, open, reload, retry, returnToLesson, sendCursor, sendInput]);
+  }), [active, cursorsByIdentity, diagnosticFailures, inputStatus, isHost, mediaStream, open, reload, retry, returnToLesson, sendCursor, sendInput]);
 }
 
 async function consumeCapture(streamId: string, sessionId: string): Promise<MediaStream> {

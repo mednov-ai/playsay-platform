@@ -199,10 +199,21 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
     });
   }
 
+  function exportDiagnostics() {
+    if (!sync.exportDiagnostics) return;
+    const url = URL.createObjectURL(new Blob([sync.exportDiagnostics()], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "honey-school-external-activity-diagnostics.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   const connectingStudentStream = !sync.isHost && active?.phase === "ACTIVE" && !sync.mediaStream;
   const waiting = !active || connectingStudentStream || ["REQUESTED", "OPENING_PROVIDER", "AWAITING_EXTENSION", "AWAITING_ACTION", "STARTING"].includes(active.phase);
   const waitingCopy = externalActivityWaitingCopy(t, active?.phase, sync.isHost, connectingStudentStream);
   const errorMessage = externalActivityErrorMessage(t, active?.errorCode);
+  const inputStatusMessage = externalActivityInputStatusMessage(t, sync.inputStatus?.code);
 
   return (
     <section className="playsay-external-activity-frame" data-phase={active?.phase ?? "IDLE"}>
@@ -216,7 +227,7 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
             {active?.phase === "ACTIVE" ? (
               <Button onClick={sync.reload} type="button" variant="outline"><RefreshCw className="h-4 w-4" />{t("materials.externalActivity.reload")}</Button>
             ) : null}
-            {active?.phase !== "ERROR" ? (
+            {active?.phase !== "ERROR" && !sync.inputStatus ? (
               <Button onClick={sync.returnToLesson} type="button"><ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}</Button>
             ) : null}
           </div>
@@ -295,6 +306,38 @@ export function ExternalActivityFrame({ block, sync }: { block: MaterialEditorBl
             <span>{waitingCopy.hint}</span>
           </div>
         ) : null}
+        {active?.phase === "ACTIVE" && sync.inputStatus ? (
+          <div
+            className="playsay-external-activity-state"
+            data-input-result={sync.inputStatus.code}
+            data-input-transport={sync.inputStatus.transport}
+            role="alert"
+          >
+            <Unplug className="h-8 w-8 text-destructive" />
+            <strong>{t("materials.externalActivity.inputDegraded")}</strong>
+            <span>{inputStatusMessage}</span>
+            <code aria-label={t("materials.externalActivity.diagnosticCode", { code: sync.inputStatus.code })}>{sync.inputStatus.code}</code>
+            <details>
+              <summary>{t("materials.externalActivity.diagnosticsTitle")}</summary>
+              {(sync.diagnostics ?? []).slice(-5).map((record) => (
+                <code key={`${record.timestamp}:${record.correlationId}`}>
+                  {record.timestamp} · {record.stage} · {record.transport} · {record.result} · {record.correlationId}
+                </code>
+              ))}
+              <Button disabled={!sync.exportDiagnostics} onClick={exportDiagnostics} type="button" variant="outline">
+                {t("materials.externalActivity.exportDiagnostics")}
+              </Button>
+            </details>
+            <div className="playsay-external-activity-state-actions">
+              {sync.isHost ? (
+                <Button onClick={sync.retry} type="button"><RotateCcw className="h-4 w-4" />{t("materials.externalActivity.retry")}</Button>
+              ) : null}
+              <Button onClick={sync.returnToLesson} type="button" variant="outline">
+                <ArrowLeft className="h-4 w-4" />{t("materials.externalActivity.returnToLesson")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {active?.phase === "ERROR" ? (
           <div className="playsay-external-activity-state" data-error-code={sync.isHost ? active.errorCode : undefined} role="alert">
             <Unplug className="h-8 w-8 text-destructive" />
@@ -367,4 +410,16 @@ function externalActivityErrorMessage(t: TFunction, errorCode?: string): string 
     case "CAPTURE_START_FAILED": return t("materials.externalActivity.errors.captureStartFailed");
     default: return t("materials.externalActivity.errors.extensionUnknown");
   }
+}
+
+function externalActivityInputStatusMessage(t: TFunction, code?: string): string {
+  if (code === "ACK_TIMEOUT") return t("materials.externalActivity.inputErrors.transport");
+  if (code === "BRIDGE_UNAVAILABLE" || code === "STALE_SESSION" || code === "INPUT_DISABLED") {
+    return t("materials.externalActivity.inputErrors.bridge");
+  }
+  if (code === "VIEWPORT_STALE") return t("materials.externalActivity.inputErrors.viewport");
+  if (code === "DEBUGGER_FAILED" || code === "TARGET_UNAVAILABLE") {
+    return t("materials.externalActivity.inputErrors.debugger");
+  }
+  return t("materials.externalActivity.inputErrors.unknown");
 }

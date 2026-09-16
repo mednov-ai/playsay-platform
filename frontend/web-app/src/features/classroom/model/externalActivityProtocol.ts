@@ -22,6 +22,15 @@ export type ExternalActivityInput =
   | { type: "pointer"; action: "move" | "down" | "up"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; button?: "left" | "middle" | "right"; clickCount?: number }
   | { type: "scroll"; x: number; y: number; normalizedX?: number; normalizedY?: number; sourceWidth?: number; sourceHeight?: number; deltaX: number; deltaY: number }
   | { type: "key"; action: "down" | "up"; key: string; code?: string; text?: string; modifiers?: number };
+export type ExternalActivityInputResultCode =
+  | "DISPATCHED"
+  | "BRIDGE_UNAVAILABLE"
+  | "STALE_SESSION"
+  | "INPUT_DISABLED"
+  | "TARGET_UNAVAILABLE"
+  | "VIEWPORT_STALE"
+  | "DEBUGGER_FAILED"
+  | "ACK_TIMEOUT";
 
 export type ExternalActivityRealtimeMessage =
   | {
@@ -29,6 +38,13 @@ export type ExternalActivityRealtimeMessage =
       eventId: string;
       input: ExternalActivityInput;
       kind: "external-input";
+      sessionId: string;
+    }
+  | {
+      blockId: string;
+      eventId: string;
+      kind: "external-result";
+      result: ExternalActivityInputResultCode;
       sessionId: string;
     }
   | {
@@ -54,11 +70,12 @@ export function externalActivityInputReliable(input: ExternalActivityInput): boo
 
 export type ExternalActivityMessage = {
   version: 1;
-  type: "REQUEST_OPEN" | "REQUEST_CLOSE" | "REQUEST_STATE" | "INPUT" | "CURSOR" | "HOST_STATE" | "HOST_IDLE" | "STOPPED" | "SET_LOCK" | "RELOAD" | "BACK";
+  type: "REQUEST_OPEN" | "REQUEST_CLOSE" | "REQUEST_STATE" | "INPUT" | "INPUT_RESULT" | "CURSOR" | "HOST_STATE" | "HOST_IDLE" | "STOPPED" | "SET_LOCK" | "RELOAD" | "BACK";
   sessionId: string;
   blockId: string;
   eventId?: string;
   input?: ExternalActivityInput;
+  result?: ExternalActivityInputResultCode;
   cursor?: { x: number; y: number; name?: string; color?: string };
   phase?: ExternalActivityWirePhase;
   studentsLocked?: boolean;
@@ -81,10 +98,11 @@ export type ExternalActivityBlock = MaterialEditorBlock & { type: "externalActiv
 export function parseExternalActivityMessage(value: unknown): ExternalActivityMessage | null {
   if (!value || typeof value !== "object") return null;
   const message = value as Partial<ExternalActivityMessage>;
-  const types = ["REQUEST_OPEN", "REQUEST_CLOSE", "REQUEST_STATE", "INPUT", "CURSOR", "HOST_STATE", "HOST_IDLE", "STOPPED", "SET_LOCK", "RELOAD", "BACK"];
+  const types = ["REQUEST_OPEN", "REQUEST_CLOSE", "REQUEST_STATE", "INPUT", "INPUT_RESULT", "CURSOR", "HOST_STATE", "HOST_IDLE", "STOPPED", "SET_LOCK", "RELOAD", "BACK"];
   if (message.version !== 1 || !types.includes(message.type ?? "") || !safeToken(message.sessionId) || !safeToken(message.blockId)) return null;
   if (message.type === "INPUT" && !validInput(message.input)) return null;
   if (message.type === "INPUT" && !safeToken(message.eventId)) return null;
+  if (message.type === "INPUT_RESULT" && (!safeToken(message.eventId) || !validInputResult(message.result))) return null;
   if (message.type === "CURSOR" && !validCursor(message.cursor)) return null;
   if (message.type === "HOST_STATE" && !["REQUESTED", "AWAITING_EXTENSION", "STARTING", "ACTIVE", "ERROR"].includes(message.phase ?? "")) return null;
   return message as ExternalActivityMessage;
@@ -97,13 +115,14 @@ export function parseExtensionEvent(value: unknown, sessionId: string): Record<s
     event.version !== 1
     || event.sessionId !== sessionId
     || typeof event.type !== "string"
-    || !["AWAITING_ACTION", "CAPTURE_READY", "TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR", "STOPPED"].includes(event.type)
+    || !["AWAITING_ACTION", "CAPTURE_READY", "INPUT_RESULT", "TAB_CLOSED", "DEBUGGER_DETACHED", "ERROR", "STOPPED"].includes(event.type)
   ) return null;
   if (event.type === "CAPTURE_READY" && (typeof event.streamId !== "string" || !event.streamId)) return null;
+  if (event.type === "INPUT_RESULT" && (!safeToken(event.eventId) || !validInputResult(event.result))) return null;
   return event;
 }
 
-export const minimumTrustedInputExtensionVersion = "0.1.7";
+export const minimumTrustedInputExtensionVersion = "0.1.8";
 
 export function extensionSupportsTrustedInput(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -204,6 +223,19 @@ function validInput(input: ExternalActivityInput | undefined): input is External
 
 function validCursor(cursor: ExternalActivityMessage["cursor"]): boolean {
   return Boolean(cursor && coordinate(cursor.x) && coordinate(cursor.y) && cursor.x <= 1 && cursor.y <= 1);
+}
+
+function validInputResult(value: unknown): value is ExternalActivityInputResultCode {
+  return [
+    "DISPATCHED",
+    "BRIDGE_UNAVAILABLE",
+    "STALE_SESSION",
+    "INPUT_DISABLED",
+    "TARGET_UNAVAILABLE",
+    "VIEWPORT_STALE",
+    "DEBUGGER_FAILED",
+    "ACK_TIMEOUT",
+  ].includes(String(value));
 }
 
 function safeToken(value: unknown): value is string {

@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 // @vitest-environment-options { "url": "http://localhost/" }
-import * as encoding from "lib0/encoding";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createExternalActivityRealtimeClient } from "./externalActivityRealtimeClient";
 
@@ -16,6 +15,7 @@ class FakeWebSocket {
   readyState = FakeWebSocket.CONNECTING;
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  onopen: (() => void) | null = null;
   onmessage: ((event: { data: ArrayBuffer }) => void) | null = null;
 
   constructor() {
@@ -27,17 +27,9 @@ class FakeWebSocket {
     this.onclose?.();
   }
 
-  open(mode: "shadow" | "primary") {
+  open() {
     this.readyState = FakeWebSocket.OPEN;
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, 3);
-    encoding.writeVarUint(encoder, 1);
-    encoding.writeVarUint(encoder, 0);
-    encoding.writeVarUint8Array(encoder, new TextEncoder().encode(JSON.stringify({ mode })));
-    const frame = encoding.toUint8Array(encoder);
-    this.onmessage?.({
-      data: frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength) as ArrayBuffer,
-    });
+    this.onopen?.();
   }
 
   send(payload: Uint8Array) {
@@ -63,21 +55,37 @@ describe("createExternalActivityRealtimeClient", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the fast lane in both server modes without a LiveKit duplicate", async () => {
+  it("uses the dedicated fast lane without a LiveKit duplicate", async () => {
     const client = createExternalActivityRealtimeClient({
       getUrl: async () => "ws://localhost/collab/ws",
     });
     const release = client.acquire(vi.fn());
     await Promise.resolve();
-    sockets[0]?.open("shadow");
+    sockets[0]?.open();
 
     expect(client.publish(inputMessage)).toBe(true);
     expect(sockets[0]?.sent).toHaveLength(1);
 
-    sockets[0]?.open("primary");
     expect(client.publish(inputMessage)).toBe(true);
     expect(sockets[0]?.sent).toHaveLength(2);
 
+    release();
+    client.close();
+  });
+
+  it("requests the external activity subprotocol independently from game mode", async () => {
+    const protocols: string[] = [];
+    class ProtocolSocket extends FakeWebSocket {
+      constructor(_url: string, protocol: string) {
+        super();
+        protocols.push(protocol);
+      }
+    }
+    vi.stubGlobal("WebSocket", ProtocolSocket);
+    const client = createExternalActivityRealtimeClient({ getUrl: async () => "ws://localhost/collab/ws" });
+    const release = client.acquire(vi.fn());
+    await Promise.resolve();
+    expect(protocols).toEqual(["playsay-external-activity-v1"]);
     release();
     client.close();
   });
@@ -89,5 +97,21 @@ describe("createExternalActivityRealtimeClient", () => {
 
     expect(client.publish(inputMessage)).toBe(false);
     client.close();
+  });
+
+  it("reconnects after transport close while subscribers remain", async () => {
+    vi.useFakeTimers();
+    const client = createExternalActivityRealtimeClient({ getUrl: async () => "ws://localhost/collab/ws" });
+    const release = client.acquire(vi.fn());
+    await Promise.resolve();
+    sockets[0]?.open();
+    sockets[0]?.close();
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(sockets).toHaveLength(2);
+
+    release();
+    client.close();
+    vi.useRealTimers();
   });
 });

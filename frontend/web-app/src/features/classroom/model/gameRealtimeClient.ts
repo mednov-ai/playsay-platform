@@ -265,11 +265,6 @@ export function createGameRealtimeClient({
             reconnectAttempt = 0;
             pendingRequests.forEach((message) => sendFast(message));
             registrations.forEach(sendResume);
-          } else if (
-            frame.message.kind === "external-input"
-            || frame.message.kind === "external-cursor"
-          ) {
-            return;
           } else {
             dispatch(frame.message);
           }

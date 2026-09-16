@@ -1,10 +1,23 @@
-import { EXTENSION_CHANNEL, PAGE_CHANNEL, isTrustedPlaySayOrigin, parsePageCommand } from "./protocol";
+import {
+  EXTENSION_CHANNEL,
+  PAGE_CHANNEL,
+  isTrustedPlaySayOrigin,
+  parsePageCommand,
+} from "./protocol";
+import { forwardPageCommand } from "./content-bridge";
 
 if (isTrustedPlaySayOrigin(window.location.origin)) {
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== window.location.origin || event.data?.channel !== PAGE_CHANNEL) return;
     const command = parsePageCommand(event.data.command);
-    if (command) void chrome.runtime.sendMessage(command);
+    if (command) void forwardPageCommand(
+      command,
+      (message) => chrome.runtime.sendMessage(message),
+      (extensionEvent) => window.postMessage(
+        { channel: EXTENSION_CHANNEL, event: extensionEvent },
+        window.location.origin,
+      ),
+    );
   });
 
   chrome.runtime.onMessage.addListener((message) => {

@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { RoomEvent } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useExternalActivitySession } from "./useExternalActivitySession";
+import type { ExternalActivityRealtimeMessage } from "../model/externalActivityProtocol";
 
 type RoomHandler = (...args: unknown[]) => void;
 const handlers = new Map<string, Set<RoomHandler>>();
@@ -95,7 +96,7 @@ describe("useExternalActivitySession", () => {
     postMessage.mockRestore();
   });
 
-  it("uses the 0.1.7 acknowledgement to distinguish extension readiness from detection timeout", async () => {
+  it("uses the 0.1.8 acknowledgement to distinguish extension readiness from detection timeout", async () => {
     vi.useFakeTimers();
     const { result, unmount } = renderHook(() => useExternalActivitySession({
       blocks: [block],
@@ -108,7 +109,7 @@ describe("useExternalActivitySession", () => {
     act(() => result.current.open(block));
     expect(result.current.active?.phase).toBe("OPENING_PROVIDER");
     const sessionId = result.current.active!.sessionId;
-    act(() => dispatchExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId, extensionVersion: "0.1.7" }));
+    act(() => dispatchExtensionEvent({ version: 1, type: "AWAITING_ACTION", sessionId, extensionVersion: "0.1.8" }));
     expect(result.current.active?.phase).toBe("AWAITING_ACTION");
 
     await act(async () => {
@@ -156,6 +157,213 @@ describe("useExternalActivitySession", () => {
       errorCode: "EXTENSION_NOT_DETECTED",
       phase: "ERROR",
     });
+    unmount();
+  });
+
+  it("sends teacher input only through the local extension bridge", async () => {
+    const videoTrack = { stop: vi.fn() } as unknown as MediaStreamTrack;
+    const stream = {
+      getAudioTracks: () => [],
+      getTracks: () => [videoTrack],
+      getVideoTracks: () => [videoTrack],
+    } as unknown as MediaStream;
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      mediaDevices: { getUserMedia: vi.fn(async () => stream) },
+    });
+    const postMessage = vi.spyOn(window, "postMessage");
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: true,
+      participantColor: "#ff5c00",
+      participantName: "Teacher",
+    }));
+
+    act(() => result.current.open(block));
+    const sessionId = result.current.active!.sessionId;
+    act(() => dispatchExtensionEvent({
+      version: 1,
+      type: "AWAITING_ACTION",
+      sessionId,
+      extensionVersion: "0.1.8",
+    }));
+    act(() => dispatchExtensionEvent({
+      version: 1,
+      type: "CAPTURE_READY",
+      sessionId,
+      streamId: "stream-1",
+    }));
+    await waitFor(() => expect(result.current.active?.phase).toBe("ACTIVE"));
+    postMessage.mockClear();
+    publishData.mockClear();
+
+    act(() => result.current.sendInput({ type: "pointer", action: "down", x: 10, y: 20 }));
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "playsay.external-activity.page.v1",
+      command: expect.objectContaining({ type: "INPUT", sessionId, eventId: expect.any(String) }),
+    }), window.location.origin);
+    expect(publishData).not.toHaveBeenCalled();
+
+    postMessage.mockClear();
+    const participantInput = {
+      version: 1,
+      type: "INPUT",
+      sessionId,
+      blockId: block.id,
+      eventId: "participant-event-1",
+      input: { type: "key", action: "down", key: "b" },
+    };
+    const student = { identity: "student", metadata: JSON.stringify({ playsayRole: "STUDENT" }), name: "Student" };
+    act(() => {
+      const payload = new TextEncoder().encode(JSON.stringify(participantInput));
+      emit(RoomEvent.DataReceived, payload, student, undefined, "playsay.external-activity.input.v1");
+      emit(RoomEvent.DataReceived, payload, student, undefined, "playsay.external-activity.input.v1");
+    });
+    expect(postMessage.mock.calls.filter(([message]) => (
+      (message as { command?: { eventId?: string } }).command?.eventId === "participant-event-1"
+    ))).toHaveLength(1);
+    postMessage.mockRestore();
+  });
+
+  it("falls back to LiveKit data for participant input when no realtime client is wired", async () => {
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map(),
+    };
+    const { result } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      trustedHostIdentity: "teacher",
+    }));
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type: "HOST_STATE",
+      sessionId: "session-1",
+      blockId: block.id,
+      phase: "ACTIVE",
+      studentsLocked: false,
+      visible: true,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+    publishData.mockClear();
+
+    act(() => result.current.sendInput({ type: "key", action: "down", key: "a" }));
+    await waitFor(() => expect(publishData).toHaveBeenCalledTimes(1));
+
+    expect(publishData.mock.calls[0]?.[1]).toEqual({
+      reliable: true,
+      topic: "playsay.external-activity.input.v1",
+    });
+    expect(decodedMessages()[0]).toMatchObject({
+      blockId: block.id,
+      type: "INPUT",
+      sessionId: "session-1",
+    });
+  });
+
+  it("reuses the same event id when uncertain fast-lane delivery falls back to LiveKit", async () => {
+    vi.useFakeTimers();
+    let realtimeSubscriber: ((message: ExternalActivityRealtimeMessage) => void) | undefined;
+    const realtime = {
+      acquire: vi.fn((subscriber) => {
+        realtimeSubscriber = subscriber;
+        return () => undefined;
+      }),
+      close: vi.fn(),
+      publish: vi.fn((_message: ExternalActivityRealtimeMessage) => true),
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map(),
+    };
+    const { result, unmount } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      realtime,
+      trustedHostIdentity: "teacher",
+    }));
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type: "HOST_STATE",
+      sessionId: "session-1",
+      blockId: block.id,
+      phase: "ACTIVE",
+      studentsLocked: false,
+      visible: true,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+    publishData.mockClear();
+
+    act(() => result.current.sendInput({ type: "key", action: "down", key: "a" }));
+    const fastMessage = realtime.publish.mock.calls[0]?.[0];
+    expect(fastMessage).toMatchObject({ kind: "external-input", sessionId: "session-1" });
+    if (fastMessage?.kind !== "external-input") throw new Error("expected external input");
+    expect(publishData).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(700); });
+    expect(decodedMessages().at(-1)).toMatchObject({
+      type: "INPUT",
+      eventId: fastMessage?.eventId,
+      sessionId: "session-1",
+    });
+
+    act(() => realtimeSubscriber?.({
+      blockId: block.id,
+      eventId: fastMessage!.eventId,
+      kind: "external-result",
+      result: "DISPATCHED",
+      sessionId: "session-1",
+    }));
+    expect(result.current.inputStatus).toBeNull();
+    unmount();
+  });
+
+  it("reports acknowledgement timeout after fallback without claiming provider success", async () => {
+    vi.useFakeTimers();
+    const realtime = {
+      acquire: (_subscriber: (message: ExternalActivityRealtimeMessage) => void) => () => undefined,
+      close: vi.fn(),
+      publish: vi.fn((_message: ExternalActivityRealtimeMessage) => true),
+    };
+    const teacher = {
+      identity: "teacher",
+      metadata: JSON.stringify({ playsayRole: "TEACHER" }),
+      name: "Teacher",
+      trackPublications: new Map(),
+    };
+    const { result, unmount } = renderHook(() => useExternalActivitySession({
+      blocks: [block],
+      enabled: true,
+      isHost: false,
+      participantColor: "#ff5c00",
+      participantName: "Student",
+      realtime,
+      trustedHostIdentity: "teacher",
+    }));
+    act(() => emit(RoomEvent.DataReceived, new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      type: "HOST_STATE",
+      sessionId: "session-1",
+      blockId: block.id,
+      phase: "ACTIVE",
+      studentsLocked: false,
+      visible: true,
+    })), teacher, undefined, "playsay.external-activity.host.v1"));
+
+    act(() => result.current.sendInput({ type: "key", action: "down", key: "a" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_500); });
+
+    expect(result.current.inputStatus).toMatchObject({ code: "ACK_TIMEOUT", transport: "livekit" });
     unmount();
   });
 

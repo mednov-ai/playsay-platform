@@ -54,6 +54,15 @@ describe("sendWithBackpressure", () => {
     expect(metrics.recordDropped).toHaveBeenCalledWith("awareness");
   });
 
+  it("drops only external cursors at the external soft limit", () => {
+    const ws = socket(1024);
+    const metrics = observer();
+
+    expect(sendWithBackpressure(ws, new Uint8Array([1]), "external-cursor", policy, metrics)).toBe(false);
+    expect(sendWithBackpressure(ws, new Uint8Array([1]), "external-input", policy, metrics)).toBe(true);
+    expect(metrics.recordDropped).toHaveBeenCalledWith("external-cursor");
+  });
+
   it("closes a slow client at the hard limit so it can reconnect and resync", () => {
     const ws = socket(4096);
     const metrics = observer();

@@ -97,7 +97,8 @@ describe("external activity classroom protocol", () => {
   it("requires the trusted-input extension patch while accepting later versions", () => {
     expect(extensionSupportsTrustedInput(undefined)).toBe(false);
     expect(extensionSupportsTrustedInput("0.1.6")).toBe(false);
-    expect(extensionSupportsTrustedInput("0.1.7")).toBe(true);
+    expect(extensionSupportsTrustedInput("0.1.7")).toBe(false);
+    expect(extensionSupportsTrustedInput("0.1.8")).toBe(true);
     expect(extensionSupportsTrustedInput("0.2.0")).toBe(true);
     expect(extensionSupportsTrustedInput("invalid")).toBe(false);
   });

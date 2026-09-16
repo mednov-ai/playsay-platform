@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CollaborationMetrics } from "./metrics.js";
 
 describe("CollaborationMetrics", () => {
@@ -12,9 +12,11 @@ describe("CollaborationMetrics", () => {
     const rendered = await metrics.render({
       activeConnections: 2,
       activeGameConnections: 0,
+      activeExternalActivityConnections: 0,
       activeRooms: 1,
       bufferedBytes: 0,
       gameBufferedBytes: 0,
+      externalActivityBufferedBytes: 0,
     });
 
     expect(rendered).toContain("playsay_collaboration_ephemeral_messages_total 1");
@@ -33,14 +35,56 @@ describe("CollaborationMetrics", () => {
     const rendered = await metrics.render({
       activeConnections: 2,
       activeGameConnections: 1,
+      activeExternalActivityConnections: 0,
       activeRooms: 1,
       bufferedBytes: 0,
       gameBufferedBytes: 64,
+      externalActivityBufferedBytes: 0,
     });
 
     expect(rendered).toContain("playsay_collaboration_game_active_connections 1");
     expect(rendered).toContain('playsay_collaboration_game_messages_total{message_type="2"} 1');
     expect(rendered).toContain("playsay_collaboration_game_bytes_total 256");
     expect(rendered).toContain("playsay_collaboration_game_websocket_buffered_bytes 64");
+  });
+
+  it("records fixed-cardinality external activity relay stages without identifiers", async () => {
+    const metrics = new CollaborationMetrics();
+    metrics.recordExternalActivityRelay("external-input", "accepted", 192, 0.0004);
+
+    const rendered = await metrics.render({
+      activeConnections: 2,
+      activeGameConnections: 0,
+      activeExternalActivityConnections: 2,
+      activeRooms: 1,
+      bufferedBytes: 96,
+      gameBufferedBytes: 0,
+      externalActivityBufferedBytes: 96,
+    });
+
+    expect(rendered).toContain("playsay_collaboration_external_activity_active_connections 2");
+    expect(rendered).toContain('playsay_collaboration_external_activity_stage_total{stage="external-input",transport="fast-lane",result="accepted"} 1');
+    expect(rendered).toContain("playsay_collaboration_external_activity_bytes_total 192");
+    expect(rendered).not.toContain("eventId");
+    expect(rendered).not.toContain("session-1");
+  });
+
+  it("writes failure-only records with an explicit privacy-safe schema", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const metrics = new CollaborationMetrics();
+    metrics.recordExternalActivityFailure({
+      correlationId: "opaque-event",
+      result: "ACK_TIMEOUT",
+      stage: "acknowledgement",
+      timestamp: "2026-09-16T12:00:00.000Z",
+      transport: "fast-lane",
+    });
+    const record = String(warn.mock.calls[0]?.[0]);
+    expect(record).toContain("opaque-event");
+    expect(record).toContain("ACK_TIMEOUT");
+    expect(record).not.toContain("lessonId");
+    expect(record).not.toContain("coordinates");
+    expect(record).not.toContain("token");
+    warn.mockRestore();
   });
 });

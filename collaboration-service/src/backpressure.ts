@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 
-export type CollaborationDeliveryClass = "sync" | "awareness" | "ephemeral" | "game";
+export type CollaborationDeliveryClass = "sync" | "awareness" | "ephemeral" | "game" | "external-input" | "external-result" | "external-cursor";
 
 export interface CollaborationBackpressurePolicy {
   softLimitBytes: number;
@@ -8,7 +8,7 @@ export interface CollaborationBackpressurePolicy {
 }
 
 export interface CollaborationBackpressureObserver {
-  recordDropped(deliveryClass: "awareness" | "ephemeral"): void;
+  recordDropped(deliveryClass: "awareness" | "ephemeral" | "external-cursor"): void;
   recordForcedClose(): void;
 }
 
@@ -30,7 +30,7 @@ export function sendWithBackpressure(
   }
 
   if (
-    (deliveryClass === "awareness" || deliveryClass === "ephemeral")
+    (deliveryClass === "awareness" || deliveryClass === "ephemeral" || deliveryClass === "external-cursor")
     && ws.bufferedAmount >= policy.softLimitBytes
   ) {
     observer.recordDropped(deliveryClass);

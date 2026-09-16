@@ -1,6 +1,6 @@
 import type { WebSocket, WebSocketServer } from "ws";
 
-export type CollaborationChannel = "game" | "yjs";
+export type CollaborationChannel = "external-activity" | "game" | "yjs";
 export type CollaborationCloseClass = "heartbeat" | "normal" | "transport";
 
 export interface CollaborationConnectionObserver {

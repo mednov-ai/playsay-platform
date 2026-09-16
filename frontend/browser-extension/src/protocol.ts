@@ -21,9 +21,33 @@ export type PageCommand = {
   type: "PREPARE" | "INPUT" | "STOP" | "RELOAD" | "BACK";
   sessionId: string;
   nonce: string;
+  eventId?: string;
   url?: string;
   input?: ExternalInput;
 };
+
+export const INPUT_RESULT_CODES = [
+  "DISPATCHED",
+  "BRIDGE_UNAVAILABLE",
+  "STALE_SESSION",
+  "INPUT_DISABLED",
+  "TARGET_UNAVAILABLE",
+  "VIEWPORT_STALE",
+  "DEBUGGER_FAILED",
+] as const;
+
+export type InputResultCode = typeof INPUT_RESULT_CODES[number];
+
+export type InputResult = {
+  version: 1;
+  type: "INPUT_RESULT";
+  sessionId: string;
+  eventId: string;
+  result: InputResultCode;
+  viewportRevision?: number;
+};
+
+export const maximumPageCommandBytes = 16 * 1024;
 
 export function isTrustedPlaySayOrigin(origin: string): boolean {
   try {
@@ -38,8 +62,10 @@ export function isTrustedPlaySayOrigin(origin: string): boolean {
 export function parsePageCommand(value: unknown): PageCommand | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<PageCommand>;
+  if (!boundedJson(value, maximumPageCommandBytes)) return null;
   if (candidate.version !== 1 || !["PREPARE", "INPUT", "STOP", "RELOAD", "BACK"].includes(candidate.type ?? "")) return null;
   if (!safeToken(candidate.sessionId) || !safeToken(candidate.nonce)) return null;
+  if (!hasOnlyKeys(candidate, commandKeys(candidate.type))) return null;
   if (candidate.type === "PREPARE") {
     if (typeof candidate.url !== "string" || candidate.url.length > 2048) return null;
     try {
@@ -48,8 +74,41 @@ export function parsePageCommand(value: unknown): PageCommand | null {
       return null;
     }
   }
-  if (candidate.type === "INPUT" && !validInput(candidate.input)) return null;
+  if (candidate.type === "INPUT" && (!safeToken(candidate.eventId) || !validInput(candidate.input))) return null;
   return candidate as PageCommand;
+}
+
+export function inputResult(
+  command: Pick<PageCommand, "eventId" | "sessionId">,
+  result: InputResultCode,
+  viewportRevision?: number,
+): InputResult {
+  return {
+    version: 1,
+    type: "INPUT_RESULT",
+    sessionId: command.sessionId,
+    eventId: command.eventId!,
+    result,
+    ...(viewportRevision === undefined ? {} : { viewportRevision }),
+  };
+}
+
+export function parseInputResult(
+  value: unknown,
+  expected: Pick<PageCommand, "eventId" | "sessionId">,
+): InputResult | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<InputResult>;
+  if (
+    candidate.version !== 1
+    || candidate.type !== "INPUT_RESULT"
+    || candidate.sessionId !== expected.sessionId
+    || candidate.eventId !== expected.eventId
+    || !INPUT_RESULT_CODES.includes(candidate.result as InputResultCode)
+    || !hasOnlyKeys(candidate, ["version", "type", "sessionId", "eventId", "result", "viewportRevision"])
+    || (candidate.viewportRevision !== undefined && (!Number.isInteger(candidate.viewportRevision) || candidate.viewportRevision < 1))
+  ) return null;
+  return candidate as InputResult;
 }
 
 export function sessionsToReplace<T extends { consumerTabId: number; sessionId: string }>(
@@ -68,6 +127,7 @@ function safeToken(value: unknown): value is string {
 
 function validInput(input: ExternalInput | undefined): input is ExternalInput {
   if (!input || typeof input !== "object") return false;
+  if (!hasOnlyKeys(input, inputKeys(input.type))) return false;
   if (input.type === "pointer" || input.type === "scroll") {
     if (!coordinate(input.x) || !coordinate(input.y)) return false;
     if (input.normalizedX !== undefined && !normalizedCoordinate(input.normalizedX)) return false;
@@ -83,6 +143,32 @@ function validInput(input: ExternalInput | undefined): input is ExternalInput {
     && ["down", "up"].includes(input.action)
     && typeof input.key === "string"
     && input.key.length <= 64;
+}
+
+function commandKeys(type: PageCommand["type"] | undefined): readonly string[] {
+  if (type === "PREPARE") return ["version", "type", "sessionId", "nonce", "url"];
+  if (type === "INPUT") return ["version", "type", "sessionId", "nonce", "eventId", "input"];
+  return ["version", "type", "sessionId", "nonce"];
+}
+
+function inputKeys(type: ExternalInput["type"] | undefined): readonly string[] {
+  if (type === "pointer") return ["type", "action", "x", "y", "normalizedX", "normalizedY", "button", "clickCount"];
+  if (type === "scroll") return ["type", "x", "y", "normalizedX", "normalizedY", "deltaX", "deltaY"];
+  if (type === "key") return ["type", "action", "key", "code", "text", "modifiers"];
+  return [];
+}
+
+function hasOnlyKeys(value: object, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed);
+  return Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function boundedJson(value: unknown, limit: number): boolean {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength <= limit;
+  } catch {
+    return false;
+  }
 }
 
 function finite(value: unknown): value is number {

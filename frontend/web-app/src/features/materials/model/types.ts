@@ -283,8 +283,15 @@ export type MaterialExternalActivitySync = {
     visible: boolean;
   } | null;
   cursors: Array<{ identity: string; name: string; color: string; x: number; y: number }>;
+  diagnostics?: Array<{ timestamp: string; correlationId: string; stage: string; transport: string; result: string }>;
+  exportDiagnostics?: () => string;
   isHost: boolean;
   mediaStream: MediaStream | null;
+  inputStatus?: {
+    code: string;
+    correlationId: string;
+    transport: "local" | "fast-lane" | "livekit";
+  } | null;
   open: (block: MaterialEditorBlock) => void;
   retry: () => void;
   sendInput: (input: {

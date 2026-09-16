@@ -114,6 +114,7 @@ export function StudentLiveWorkspace({
     isHost: false,
     participantColor,
     participantName: displayName,
+    realtime: groupAnnotationWorkspace.externalActivityRealtime,
     trustedHostIdentity: teacherSubject,
   });
 

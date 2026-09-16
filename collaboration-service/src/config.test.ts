@@ -28,6 +28,24 @@ describe("loadConfig", () => {
       .toThrow(/GAME_REALTIME_MODE/);
   });
 
+  it("enables external activity realtime independently from game realtime", () => {
+    const config = loadConfig({
+      ...requiredEnv,
+      GAME_REALTIME_MODE: "off",
+      EXTERNAL_ACTIVITY_REALTIME_ENABLED: "true",
+    });
+    expect(config.gameRealtimeMode).toBe("off");
+    expect(config.externalActivityRealtimeEnabled).toBe(true);
+  });
+
+  it("validates independent external activity buffer limits", () => {
+    expect(() => loadConfig({
+      ...requiredEnv,
+      EXTERNAL_ACTIVITY_WEBSOCKET_SOFT_LIMIT_BYTES: "1024",
+      EXTERNAL_ACTIVITY_WEBSOCKET_HARD_LIMIT_BYTES: "1024",
+    })).toThrow(/external activity websocket hard limit/);
+  });
+
   it("rejects a hard limit that does not exceed the soft limit", () => {
     expect(() => loadConfig({
       ...requiredEnv,

@@ -25,6 +25,7 @@ class MaterialHtmlGameOptimizationService(
     private val uploadService: MaterialAssetUploadService,
     private val meterRegistry: MeterRegistry,
 ) {
+    @Suppress("LongMethod")
     fun optimizeIfRequired(upload: ValidatedMaterialAssetFile): OptimizedHtmlGameUpload {
         val html = requireNotNull(upload.text)
         val inputBytes = upload.bytes.size

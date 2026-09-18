@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
 
 @Component
+@Suppress("LongParameterList")
 class MaterialImagePageService(
     private val lessonRepo: LessonRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,

@@ -25,6 +25,7 @@ RUN apt-get update \
 COPY --from=build /workspace/frontend/game-adapter-service/dist /app/
 COPY --from=build /workspace/frontend/node_modules/playwright-core /app/node_modules/playwright-core
 COPY --from=build /workspace/frontend/node_modules/sharp /app/node_modules/sharp
+COPY --from=build /workspace/frontend/node_modules/detect-libc /app/node_modules/detect-libc
 COPY --from=build /workspace/frontend/node_modules/@img /app/node_modules/@img
 COPY --from=build /workspace/frontend/game-sync-sdk/package.json /app/node_modules/@playsay/game-sync/package.json
 COPY --from=build /workspace/frontend/game-sync-sdk/dist /app/node_modules/@playsay/game-sync/dist

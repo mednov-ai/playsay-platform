@@ -1,66 +1,82 @@
-# Vocabulary practice recovery — local and dev evidence
+# Vocabulary practice recovery — DEV delivery and acceptance
 
-Change: `restore-vocabulary-practice-reliability`. Owner authorized implementation, develop integration, dev deployment and authenticated dev browser acceptance on 2026-09-19. Production is outside this authorization.
+OpenSpec: `restore-vocabulary-practice-reliability`. The owner authorized implementation, develop integration, DEV GitOps deployment and browser acceptance with DEV accounts. Production was not operated or promoted.
 
-## Baseline and isolation
+## Result and remaining scope
 
-Platform worktree `vocabulary-recovery-platform`, branch `codex/restore-vocabulary-practice-reliability`, starts at develop `2d140f6f`. Infra worktree `vocabulary-recovery-infra` starts at develop `25fb5af`. Original dirty platform/infra checkouts are preserved; their changes were not imported. Relevant overlaps include vocabulary repositories and shared locale files.
+The player, frozen publication settings, last-answer retry, category selection, Key authentication, media refresh, and live discovery/control synchronization fixes are in develop and deployed to DEV. Authenticated acceptance used a teacher and two students through external Playwright, with real gateway/vocabulary/Key APIs. Technical health is recorded separately from product acceptance.
 
-## Local reproduction and verification
+Two contract decisions remain open:
 
-- Before fixes, three added player regressions failed: parent state update erased corrective feedback, repeated form submit sent two requests, same-item hint reset typed input.
-- Fixed player plus composer initially passed 10/10 selected tests; full web suite passed 785/785 before additional coverage.
-- Backend characterization/plan/selection tests passed; full vocabulary suite passed after adding terminal replay, denied actor/new terminal attempt and all four frozen homework policy tests.
-- Hook stale-context/recoverable-error and media pending-to-terminal coverage passed (12 selected tests).
-- Web production build passed after building its game-sync workspace dependency. Public wire shapes are unchanged; generated clients require no edit.
-- New tests use synthetic content; no credentials or learner payloads are retained here.
+- **Teacher RETURN/rework:** the gateway returns the assignment to IN_PROGRESS while its immutable vocabulary session remains COMPLETED. No learner rework path exists. ACCEPT after the completion callback settles works. Rework must be defined as mistakes-only (with an all-correct fallback) or the whole frozen set before a new snapshot lifecycle is implemented.
+- **Delete an already-used recipe:** DELETE returns 500 because `fk_vocabulary_plan_recipe` retains the immutable plan reference. DEV service logs confirmed the constraint at 02:11:01 UTC. The owner was asked to choose archival preserving history, or an explicit user-facing prohibition. No database bypass or historical-plan mutation was performed.
 
-## Remaining acceptance
+The change remains open; these defects and full acceptance/cleanup closure are not marked complete.
 
-Final counts, source commit, Jenkins/security reports, immutable image identities, browser results and cleanup are appended after execution. This initial evidence does not claim delivery or end-to-end acceptance.
+## Source, builds and immutable images
 
-## Final local gate before dev integration
+Isolated platform work started at develop `2d140f6f`; infra at `25fb5af`. Original dirty checkouts were preserved. Platform commits `a4a31eb4`, `5a3c59e1`, `a93c03a9`, `36d95e9d`, `6da05075`, `f9cff14b`, `dba43986` are integrated into develop. Infra functional commit `004bbdf` is also in develop.
 
-- Web: `npm --workspace web-app run lint`, full `test` (148 files / 790 tests), production `build`: PASS.
-- Vocabulary: pipeline-equivalent `gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar`: PASS; 87 tests, zero failures/errors/skips. Concurrent terminal replay returns one attempt and one evidence record. All four custom completion policies preserve their frozen settings.
-- Initial generic `detekt` invocation reported existing untyped-baseline complexity findings. The repository's Jenkins command uses `detektMain` and its checked-in typed baseline; that required gate passed without baseline changes.
-- No OpenAPI shape or dependency versions changed. Existing gateway sourcePracticeId deduplication supports continuation retry; browser confirmation remains pending.
+| Component | Successful build | Source | Runtime image digest |
+| --- | --- | --- | --- |
+| Web | 338 / dispatcher 213 | `dba43986b100080bafe536ce0c4c36d89ee0e001` | `sha256:ac89823995dd80db7de344031c6a32e992705da18ead669ec7a4964b22e1e0fd` |
+| Vocabulary | 66 / dispatcher 210 | `36d95e9d94e603b0ae184ec3ed81e4a13d8eefc8` | `sha256:0a7ed3f9bf59964ad0b0064655aff48f515675b15fe80d185b0a2df440a664dd` |
+| Key frontend | 99 / dispatcher 209 | `a93c03a9cd6d4a5c016f8d69be0e178d8a8e1684` | `sha256:219f7d051bb81b5b651de25398949abb9a75e0b1c5206d4efa5c77fe12ed4110` |
 
-## Findings during authenticated DEV acceptance
+Web build 337 and dispatcher 212 were deliberately stopped before publication when the additional hint-ordering defect was found. Build 338 contains both follow-ups. Final image-pointer commit: infra `0489904`. Web, vocabulary and Key applications were Synced/Healthy, their pods had zero restarts, and all 13 DEV product deployments were ready.
 
-- Real self-practice completed MATCHING, FLASHCARD and MEANING_CHOICE, with wrong-answer feedback and explicit Continue before the final summary. The browser exposed an additional existing presentation defect: matching feedback rendered internal pair IDs. A focused follow-up maps the accepted answer through the retained attempted-item labels, including lost final-response retry. A regression test covers that exact boundary.
-- A late failed live refresh could overwrite recovery from a newer successful refresh. Both success and failure now use the same request generation; regression passes.
-- At 00:44:14 UTC, the DEV vocabulary container was OOMKilled (exit 137) at its 512 MiB limit and nginx returned 502 for key-set. This establishes the failed request boundary, not a proven memory leak. DEV node working set was 74%; GitOps raises only the DEV container limit to 768 MiB, retaining the 256 MiB heap. Repeat authenticated acceptance is required after rollout.
-- Initial localStorage-only locale screenshots did not exercise the intended translated dictionary after profile hydration; they are discarded as acceptance evidence. The corrected run updates/restores the demo profile locale and asserts document language and the actual dictionary view.
+Backend composer/adaptive-policy/delivery-policies/key-ngrams/generated-media flags were true. Web CI confirmed the corresponding VITE flags plus practice/homework/live/key and personal-practice-v2, with `https://dev.key.honey.school` as Key origin. No public wire shape, generated client contract, dependency version or schema changed.
 
-- Fresh Key login reproduced a silent fallback to the default letter-pair set: App discarded the launch query after OIDC. The follow-up retains a same-origin return path in the validated login flow and completed-flow record; external paths and credential-bearing callback paths are rejected. Key lint/build and all 193 tests pass (including one real code-exchange helper test with a duplicate callback). Real post-rollout acceptance remains pending.
-- API gateway AssignmentControllerTest: 13 tests pass, including versioned/idempotent review progress and recipient authorization. Live two-owner privacy/help/hint/pause/resume/stop and sourcePracticeId continuation deduplication pass against DEV.
-- Actual media generation produced a candidate; the teacher inspected and approved only the task's synthetic sense. Learner candidate access was denied, approved delivery succeeded only for the owner, regeneration retained the approved asset, and hide/default restored it. Provider/storage outage behavior is verified locally through injected integration failures, not by disrupting DEV infrastructure.
-- Teacher RETURN is an unresolved contract gap: gateway changes the recipient to IN_PROGRESS while the immutable vocabulary session remains COMPLETED. Immediate ACCEPT is correctly rejected (409), but no rework path exists. The owner was asked whether rework should contain mistakes only or the whole frozen set. This task is not marked complete pending that decision.
+## Reproduced defects and verified fixes
 
-- Teacher UI custom COMPLETE_SESSION + 2 prompts/1 entry publication passed. Learner UI completed 14 attempts across MATCHING, FORM_INPUT and PHRASE_BUILDER, preserving wrong/final feedback. Separate authenticated API reports confirmed meaningful/complete completion, mastery remaining IN_PROGRESS at 33.33% despite 100% diagnostic accuracy, and teacher-review AWAITING_REVIEW.
+- Parent session updates erased wrong/final feedback; duplicate form events sent two requests; same-item hints cleared input. Regressions first failed, then passed. Feedback now persists through explicit Continue, and retry retains its original attempt identity and payload.
+- An accepted final attempt could not be replayed after completion. Owner/association checks remain before deduplication; accepted replay now precedes terminal checks. New terminal attempts and foreign actors are still rejected.
+- Matching feedback exposed internal pair IDs. The retained attempted item now maps the accepted answer to readable word/translation pairs, including lost-final-response recovery.
+- Preview/publish settings could disagree; recipient refetch could undo exclusions. The complete frozen policy/threshold settings identify the preview, and explicit recipient choices survive equivalent refetches.
+- DUE list and preview differed (0 versus 6). Dashboard and planner now share the earliest due date among available skills, including SPELLING. FORGOTTEN includes LAPSED or lastRating=AGAIN in indexed and in-memory paths.
+- A fresh Key sign-in discarded the vocabulary launch query and silently opened the bundled set. The validated login flow now preserves the safe same-origin relative return path. External and credential-bearing callback paths are rejected.
+- A learner without an assigned lesson material never mounted the live workspace. The lesson shell now owns the subscription and opens the workspace when a practice appears.
+- The teacher rail had an uncaught hint rejection and leaked transport text. Errors now remain localized and recoverable; a command captured in an earlier lesson cannot update the new context.
+- A teacher hint was persisted at learner revision 4 but invisible in the browser: a local session timestamp had advanced practice metadata, causing the whole server snapshot to be discarded. Practice metadata and learner revisions are now merged independently; local session replacement does not manufacture a practice timestamp.
+- At 00:44:14 UTC the old DEV vocabulary pod was OOMKilled/137 at 512 MiB while key-set returned 502. DEV-only limit is now 768 MiB, heap remains 256 MiB and request 384 MiB. This is measured native-memory headroom remediation, not a claim of proving or curing a memory leak.
 
-- Cross-category acceptance found DUE list=0 and preview=6 for the same six task-owned entries. Preview/indexed lookup used all available skills; dashboard/planner dates omitted SPELLING. A shared earliest-available-skill date now feeds both dashboard and planner. Deterministic tests include available SPELLING/unavailable CONTEXT and indexed FORGOTTEN with AGAIN but non-LAPSED reason. Pipeline-equivalent vocabulary checks pass (89 tests). Runtime cross-category retest is pending this follow-up rollout.
-- Real browser lost-final-response injection passed: the last HTTP response was discarded after the server accepted it; Retry recovered the confirmed result on the completed session. A separate second-learner run verified matching feedback uses word/translation labels instead of pair IDs on the deployed web.
+## Verification
 
-## Further real-browser findings and corrections
+| Gate | Result |
+| --- | --- |
+| Web `lint`, full `test`, `build` | PASS: 148 files / 797 tests |
+| Key `lint`, full `test`, `build` | PASS: 35 files / 193 tests |
+| `gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar` | PASS: 89 tests |
+| Gateway `AssignmentControllerTest` | PASS: 13 tests |
+| DEV Helm lint, scoped diff checks, strict OpenSpec validation | PASS |
 
-- Key frontend build 99: WHOLE_WORDS, CHARACTER_NGRAMS and MIXED all passed fresh authentication, custom n-gram settings, actual keyboard typing, full server acknowledgement, duplicate result submission (201, same result ID), and return to Honey School. The local backend regression separately proves n-grams do not earn SPELLING schedule credit.
-- Dictionary browser edit/search/favorite/pause/archive and undo after archiving the last visible search result passed. Existing partial group-save regression retries only failed recipients; this failure is injected locally, not by altering other learners.
-- Real live acceptance found the learner workspace was never mounted without a lesson material, so vocabulary could not be discovered. The lesson shell now owns the one vocabulary subscription and passes it into the workspace; incoming practice opens the workspace even without a material. Regression covers discovery and paused visibility. Full web suite: 148 files / 793 tests, lint and build PASS. Post-rollout three-browser retest remains pending.
+The initial untyped generic Detekt command reported existing baseline findings; the Jenkins-equivalent typed `detektMain` gate passed without changing baselines. Vocabulary 66 retained 19 security artifacts; backend and build-logic gates were `passed-with-accepted-risks` under policy SHA256 `05a67abe7f8dbe24fc2a47985919fe8333b7209aba4a9590e3fa65368cf95a96`. The existing exact Kotlin CVE-2026-53914 exception expires 2026-10-08; it was neither extended nor broadened.
 
-## Post-backend-rollout retest
+## Authenticated acceptance matrix
 
-Vocabulary build 66 (`36d95e9d94e603b0ae184ec3ed81e4a13d8eefc8`) passed CI and deployed as digest `sha256:0a7ed3f9bf59964ad0b0064655aff48f515675b15fe80d185b0a2df440a664dd`; ArgoCD Synced/Healthy, one ready pod, zero restarts. The same six owned entries matched list/indexed preview across RECENT=6, DUE=4, FORGOTTEN=1, DIFFICULT=0, NEW=0, FAVORITE=1 and FULL_DICTIONARY=6. A paused pinned word was excluded. No clock override was required.
+| Scenario | Result and evidence boundary |
+| --- | --- |
+| Dictionary add/edit/search/favorite/pause/archive/last-visible-word undo | PASS through real UI/API; keyboard search clear restores focus on mobile |
+| Group partial save | PASS: one real insert, one injected 503, retry only the failed owner; exactly two entries |
+| Seven selection sources | PASS on the same six owned entries: RECENT=6, DUE=4, FORGOTTEN=1, DIFFICULT=0, NEW=0, FAVORITE=1, FULL_DICTIONARY=6; paused pinned word excluded |
+| Recipes create/update/select and frozen self launch | PASS; later changes do not rematerialize an existing session; delete-used-recipe is separately BLOCKED above |
+| Self/homework exercises | PASS: MATCHING, FLASHCARD, MEANING_CHOICE, FORM_INPUT, PHRASE_BUILDER; wrong/final feedback remains until Continue |
+| Lost final response | PASS: real accepted response discarded in the browser, explicit Retry recovered the same result on the completed session without extra attempts |
+| Homework policies | PASS: all four custom policy/threshold combinations preserved through publication; meaningful/complete finished; mastery remained IN_PROGRESS at 33.33% below 70%, then a separate 20% target completed at actual 66.67%; teacher review reached AWAITING_REVIEW and ACCEPT completed it |
+| Teacher RETURN/rework | BLOCKED: no agreed rework-snapshot lifecycle; not counted as accepted |
+| Live teacher + two students | PASS on deployed web 338: no-material discovery, pause/resume, help/hint, preserved drafts, independent progress, stopped-versus-complete UI, desktop/mobile |
+| Live failure and reconnect | PASS on deployed web 338: injected Pause/Hint 503 stays recoverable without raw errors or unhandled rejection; explicit retry succeeds; bounded transport interruption and new WebSocket restore subscription without losing the draft |
+| Stop/continue at home | PASS against real API: remaining snapshot preserved and repeated continuation returns one assignment |
+| Key three modes | PASS: WHOLE_WORDS/CHARACTER_NGRAMS/MIXED, custom settings, fresh auth, actual typing, acknowledgement, duplicate callback (same result ID), return to Honey School; real n-gram callback/replay leaves SPELLING state unchanged |
+| Media | PASS real generation/candidate inspection/teacher approval/reuse/regeneration/owner delivery; candidate and foreign-owner delivery denied; approved asset survives regeneration and hide/default changes |
+| Provider/storage failure | PASS locally with injected integration failures; no real infrastructure outage was induced |
+| Privacy | PASS: foreign session and media access denied; authorized final replay succeeds; new paused/stopped attempt rejected |
+| Locales/layout | PASS: actual profile locale set/restored for ru/en/de/fr at 1440 and 390 pixels; screenshots inspected; no horizontal overflow; mobile keyboard navigation verified |
 
-Teacher ACCEPT passed against the real gateway after its completion callback settled. RETURN/rework remains unresolved, rather than being hidden by the later successful ACCEPT.
+The local-bundle/real-API precheck was followed by the same live scenario on deployed web 338; only the latter closes deployment acceptance. Initial localStorage-only locale screenshots and harness selector/expired-fixture failures were not treated as product acceptance.
 
-- Additional real Key test compared the complete SPELLING state before and after a CHARACTER_NGRAMS run and its replay; it remained identical for both owned entries. This supplements the local no-credit regression.
+## Cleanup and handoff
 
-- Final teacher-rail inspection reproduced two regression failures: a rejected hint escaped as an unhandled rejection, and command errors exposed transport text. The current personal-practice rail had separate handlers from the legacy live stage. It now catches hint failures, uses localized recoverable errors, and clears them on explicit retry. The legacy lesson-menu start handler receives the same catch/retry boundary. Before-fix test: 2 failures plus 1 unhandled error; after-fix gate is recorded below.
+Cleanup was restricted to recorded task-owned IDs. Twelve synthetic words were archived, ten recorded unfinished practices ended in CANCELLED, and five created lessons were deleted. Eight assignment/audit histories remain because no public deletion endpoint exists. One used recipe remains due to the confirmed FK deletion defect. No pre-existing learner records were selected for mutation or deletion. Credential files are temporary and are removed at handoff.
 
-- Follow-up command-context regression failed before the guard and passed afterward. Full web verification after rail/start/context fixes: 148 files / 796 tests, lint and build PASS. No new strings or wire fields were introduced.
-
-- Three-browser acceptance localized a second live defect: teacher hint was persisted (learner revision 4) but absent from the learner UI. Local help had advanced the practice timestamp using a session timestamp; the hook discarded the subsequent server snapshot before comparing session revisions. Local session replacement now leaves practice metadata intact, and the hook independently merges newer learner revisions while retaining newer practice metadata. A regression reproduces the old discard.
-
-- Hint-ordering fix: full web suite 148 files / 797 tests, lint and build PASS. The intermediate web build 337 is superseded before publication by the combined rail and hint-ordering correction; its interruption is intentional, not a product gate failure.
+Cross-domain `spec.md` §5.7, `keyboard.md`, focused vocabulary contract, manual matrix and the infra runbook/evidence were synchronized. Root cross-domain files and OpenSpec artifacts are outside these two repository worktrees. No OpenAPI regeneration was needed for behavior-only changes; CI still ran the standard generation step.

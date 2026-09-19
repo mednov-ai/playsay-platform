@@ -572,3 +572,8 @@ Complete the existing dictionary CRUD/group-partial-failure, recipes, all exerci
 - Teacher RETURN currently lacks an agreed rework-snapshot lifecycle; record it as unresolved rather than treating a gateway status change as learner acceptance.
 
 - Live without a material: join a lesson with no material, then start vocabulary. Learners must discover the practice without reload; pausing keeps the workspace and draft visible.
+
+- Reconnect while typing: restore the vocabulary subscription on a new WebSocket and retain the current draft; verify a subsequent teacher hint is visible despite newer learner revisions.
+- Deleting a recipe referenced by an immutable plan currently returns 500; keep this BLOCKED pending archival versus explicit-prohibition semantics.
+
+Final delivered build identities, acceptance results and cleanup: [DEV recovery evidence](evidence/2026-09-19-vocabulary-practice-recovery.md).

@@ -243,7 +243,7 @@ function StudentVocabularyPanel() {
       if (wordFilter === "ALL") return true;
       if (wordFilter === "RECENT") return Date.parse(item.entry.updatedAt) >= recentThreshold;
       if (wordFilter === "DUE") return item.overdue;
-      if (wordFilter === "FORGOTTEN") return item.skills.some((skill) => skill.reviewReason === "LAPSED");
+      if (wordFilter === "FORGOTTEN") return item.skills.some((skill) => (skill.reviewReason === "LAPSED" || skill.lastRating === "AGAIN"));
       if (wordFilter === "DIFFICULT") return item.skills.some((skill) => skill.reviewReason === "DIFFICULT" || (skill.difficultyScore ?? 0) >= 0.55);
       if (wordFilter === "NEW") return item.stage === "NEW";
       return item.entry.favorite === true;

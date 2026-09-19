@@ -53,6 +53,7 @@ export function PersonalPracticeComposer({
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => (
     owners.filter((owner) => owner.presence !== "ABSENT").map((owner) => owner.subject)
   ));
+  const recipientsInitialized = useRef(owners.length > 0);
   const [activeOwner, setActiveOwner] = useState(
     owners.find((owner) => owner.presence !== "ABSENT")?.subject ?? owners[0]?.subject ?? "",
   );
@@ -67,13 +68,12 @@ export function PersonalPracticeComposer({
 
   useEffect(() => {
     const available = new Set(owners.map((owner) => owner.subject));
-    setSelectedSubjects((current) => {
-      const retained = current.filter((subject) => available.has(subject));
-      const additions = owners
-        .filter((owner) => owner.presence !== "ABSENT" && !retained.includes(owner.subject))
-        .map((owner) => owner.subject);
-      return [...retained, ...additions];
-    });
+    if (!recipientsInitialized.current && owners.length > 0) {
+      recipientsInitialized.current = true;
+      setSelectedSubjects(owners.filter((owner) => owner.presence !== "ABSENT").map((owner) => owner.subject));
+    } else {
+      setSelectedSubjects((current) => current.filter((subject) => available.has(subject)));
+    }
     if (!available.has(activeOwner)) setActiveOwner(owners[0]?.subject ?? "");
   }, [activeOwner, owners]);
   useEffect(() => {
@@ -93,7 +93,11 @@ export function PersonalPracticeComposer({
     sources,
     targetMinutes,
   }), [lessonId, sources, targetMinutes]);
-  const settingsKey = JSON.stringify({ delivery, lessonId, mode, ownerOverrides, recipeId, selectedSubjects, selection, wordLimit });
+  const completionSettings = delivery === "HOMEWORK" ? {
+    completionPolicy,
+    completionThresholds: { distinctEntries, distinctGradedPrompts, masteryPercent, policyVersion: "vocabulary-homework-v1" },
+  } : {};
+  const settingsKey = JSON.stringify({ delivery, lessonId, mode, ownerOverrides, recipeId, selectedSubjects, selection, wordLimit, ...completionSettings });
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSettings(settingsKey), 300);
     return () => window.clearTimeout(timer);
@@ -105,6 +109,7 @@ export function PersonalPracticeComposer({
     queryFn: async ({ signal }) => {
       const currentPlan = planRef.current;
       const input = {
+        ...completionSettings,
         delivery,
         lessonId,
         mode,
@@ -206,7 +211,7 @@ export function PersonalPracticeComposer({
   }
 
   async function publish() {
-    if (!preview || preview.owners.every((owner) => owner.selectedCount === 0)) return;
+    if (publishing || debouncedSettings !== settingsKey || previewQuery.isFetching || !preview || preview.owners.every((owner) => owner.selectedCount === 0)) return;
     setPublishing(true);
     setMessage(null);
     try {
@@ -497,7 +502,7 @@ export function PersonalPracticeComposer({
       ) : null}
       <Button
         className="w-full"
-        disabled={disabled || publishing || previewQuery.isFetching || !preview || preview.owners.every((owner) => owner.selectedCount === 0)}
+        disabled={disabled || publishing || debouncedSettings !== settingsKey || previewQuery.isFetching || !preview || preview.owners.every((owner) => owner.selectedCount === 0)}
         onClick={() => void publish()}
         type="button"
       >

@@ -374,6 +374,9 @@ export function LessonWorkspace({
           </div>
         )}
 
+        {vocabularyFeatures.live && liveVocabulary.error ? (
+          <div role="alert"><p>{t("vocabulary.practice.errors.save")}</p><Button onClick={() => void liveVocabulary.refresh()}>{t("vocabulary.practice.actions.retry")}</Button></div>
+        ) : null}
         {vocabularyFeatures.live && liveVocabulary.practice ? (
           <VocabularyLiveStage
             activeStudentSubject={activeParticipant?.subject}

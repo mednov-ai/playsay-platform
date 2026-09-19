@@ -498,10 +498,12 @@ export const en = {
     practice: {
       create: "Create practice", homeworkTitle: "Words · {{name}}", progress: "{{current}} of {{total}}", answerLabel: "Your answer", answerPlaceholder: "Type your answer", teacherHint: "Teacher hint: {{hint}}",
       exercise: { FLASHCARD: "Recall the meaning", MATCHING: "Match the pair", MEANING_CHOICE: "Choose the meaning", PHRASE_BUILDER: "Build the phrase", FORM_INPUT: "Write it in English", CONTEXT_GAP: "Fill the gap", KEYBOARD: "Keyboard practice" },
-      actions: { reveal: "Show answer", check: "Check", continue: "Continue", back: "Back to vocabulary", openKey: "Open in Key" },
+      actions: {
+        retry: "Retry", reveal: "Show answer", check: "Check", continue: "Continue", back: "Back to vocabulary", openKey: "Open in Key" },
       rating: { AGAIN: "Could not recall", HARD: "With difficulty", GOOD: "Recalled" },
       feedback: { correct: "Correct", again: "We will revisit this word", answer: "Correct answer:" },
-      complete: { title: "Practice complete", result: "{{correct}} correct out of {{total}}", diagnostic: "{{items}} items · {{attempts}} attempts · {{accuracy}}% accuracy" },
+      complete: {
+        stopped: "Practice stopped", title: "Practice complete", result: "{{correct}} correct out of {{total}}", diagnostic: "{{items}} items · {{attempts}} attempts · {{accuracy}}% accuracy" },
       phrase: { placeholder: "Tap the words in order", reset: "Start again", remove: "Remove {{word}}" },
       matching: { label: "Match words and translations", connect: "Connect selected cards", remove: "Remove pair {{left}} — {{right}}" },
       keyHint: "Key opens separately while the lesson stays connected.",

@@ -498,10 +498,12 @@ export const fr = {
     practice: {
       create: "Créer un exercice", homeworkTitle: "Mots · {{name}}", progress: "{{current}} sur {{total}}", answerLabel: "Votre réponse", answerPlaceholder: "Saisissez la réponse", teacherHint: "Indice du professeur : {{hint}}",
       exercise: { FLASHCARD: "Retrouvez le sens", MATCHING: "Associez les éléments", MEANING_CHOICE: "Choisissez le sens", PHRASE_BUILDER: "Composez l’expression", FORM_INPUT: "Écrivez en anglais", CONTEXT_GAP: "Complétez le blanc", KEYBOARD: "Entraînement clavier" },
-      actions: { reveal: "Afficher la réponse", check: "Vérifier", continue: "Continuer", back: "Retour au vocabulaire", openKey: "Ouvrir dans Key" },
+      actions: {
+        retry: "Réessayer", reveal: "Afficher la réponse", check: "Vérifier", continue: "Continuer", back: "Retour au vocabulaire", openKey: "Ouvrir dans Key" },
       rating: { AGAIN: "Pas retrouvé", HARD: "Avec difficulté", GOOD: "Retrouvé" },
       feedback: { correct: "Correct", again: "Ce mot reviendra plus tard", answer: "Bonne réponse :" },
-      complete: { title: "Exercice terminé", result: "{{correct}} bonnes réponses sur {{total}}", diagnostic: "{{items}} exercices · {{attempts}} tentatives · {{accuracy}} % de précision" },
+      complete: {
+        stopped: "Entraînement arrêté", title: "Exercice terminé", result: "{{correct}} bonnes réponses sur {{total}}", diagnostic: "{{items}} exercices · {{attempts}} tentatives · {{accuracy}} % de précision" },
       phrase: { placeholder: "Touchez les mots dans l’ordre", reset: "Recommencer", remove: "Retirer {{word}}" },
       matching: { label: "Associer mots et traductions", connect: "Relier la sélection", remove: "Retirer la paire {{left}} — {{right}}" },
       keyHint: "Key s’ouvre séparément ; le cours reste connecté.",

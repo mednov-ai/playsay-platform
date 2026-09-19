@@ -498,10 +498,12 @@ export const de = {
     practice: {
       create: "Übung erstellen", homeworkTitle: "Wörter · {{name}}", progress: "{{current}} von {{total}}", answerLabel: "Deine Antwort", answerPlaceholder: "Antwort eingeben", teacherHint: "Hinweis der Lehrkraft: {{hint}}",
       exercise: { FLASHCARD: "Bedeutung erinnern", MATCHING: "Paare zuordnen", MEANING_CHOICE: "Bedeutung wählen", PHRASE_BUILDER: "Ausdruck bauen", FORM_INPUT: "Auf Englisch schreiben", CONTEXT_GAP: "Lücke ergänzen", KEYBOARD: "Tastaturtraining" },
-      actions: { reveal: "Antwort zeigen", check: "Prüfen", continue: "Weiter", back: "Zum Wörterbuch", openKey: "In Key öffnen" },
+      actions: {
+        retry: "Erneut versuchen", reveal: "Antwort zeigen", check: "Prüfen", continue: "Weiter", back: "Zum Wörterbuch", openKey: "In Key öffnen" },
       rating: { AGAIN: "Nicht gewusst", HARD: "Mit Mühe", GOOD: "Gewusst" },
       feedback: { correct: "Richtig", again: "Dieses Wort kommt noch einmal", answer: "Richtige Antwort:" },
-      complete: { title: "Übung beendet", result: "{{correct}} von {{total}} richtig", diagnostic: "{{items}} Aufgaben · {{attempts}} Versuche · {{accuracy}} % Genauigkeit" },
+      complete: {
+        stopped: "Übung gestoppt", title: "Übung beendet", result: "{{correct}} von {{total}} richtig", diagnostic: "{{items}} Aufgaben · {{attempts}} Versuche · {{accuracy}} % Genauigkeit" },
       phrase: { placeholder: "Wörter der Reihe nach antippen", reset: "Neu beginnen", remove: "{{word}} entfernen" },
       matching: { label: "Wörter und Übersetzungen zuordnen", connect: "Auswahl verbinden", remove: "Paar {{left}} — {{right}} entfernen" },
       keyHint: "Key öffnet separat; der Unterricht bleibt verbunden.",

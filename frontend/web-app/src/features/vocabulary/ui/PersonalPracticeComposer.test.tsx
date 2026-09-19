@@ -105,6 +105,10 @@ describe("PersonalPracticeComposer", () => {
     );
 
     await waitFor(() => expect(screen.getByText("steady")).toBeInTheDocument());
+    expect(previewVocabularyPractice).toHaveBeenLastCalledWith(expect.objectContaining({
+      completionPolicy: "MEANINGFUL_ACTIVITY",
+      completionThresholds: expect.objectContaining({ distinctEntries: 4, distinctGradedPrompts: 8 }),
+    }), expect.any(AbortSignal));
     fireEvent.click(screen.getByRole("button", { name: "assign" }));
 
     await waitFor(() => expect(onPublish).toHaveBeenCalledWith(
@@ -117,6 +121,19 @@ describe("PersonalPracticeComposer", () => {
       }),
     ));
   });
+  it("retains excluded recipients across active-owner changes and list refresh", async () => {
+    const owners = [{ subject: "a", name: "Anna" }, { subject: "b", name: "Bob" }];
+    previewVocabularyPractice.mockResolvedValue({ owners: [], planId: "plan", revision: 1 });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (values: typeof owners) => <QueryClientProvider client={client}><PersonalPracticeComposer owners={values} delivery="HOMEWORK" actionLabel="assign" onPublish={vi.fn()} /></QueryClientProvider>;
+    const { rerender } = render(tree(owners));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Anna" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Anna" })).not.toBeChecked());
+    rerender(tree(owners.map((owner) => ({ ...owner }))));
+    expect(screen.getByRole("checkbox", { name: "Anna" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Bob" })).toBeChecked();
+  });
+
 });
 
 const entry = {

@@ -498,10 +498,12 @@ export const ru = {
     practice: {
       create: "Создать тренировку", homeworkTitle: "Слова · {{name}}", progress: "{{current}} из {{total}}", answerLabel: "Ваш ответ", answerPlaceholder: "Введите ответ", teacherHint: "Подсказка учителя: {{hint}}",
       exercise: { FLASHCARD: "Вспомните значение", MATCHING: "Сопоставьте", MEANING_CHOICE: "Выберите значение", PHRASE_BUILDER: "Соберите фразу", FORM_INPUT: "Напишите по-английски", CONTEXT_GAP: "Заполните пропуск", KEYBOARD: "Клавиатурная практика" },
-      actions: { reveal: "Показать ответ", check: "Проверить", continue: "Продолжить", back: "Вернуться в словарик", openKey: "Открыть в Key" },
+      actions: {
+        retry: "Повторить", reveal: "Показать ответ", check: "Проверить", continue: "Продолжить", back: "Вернуться в словарик", openKey: "Открыть в Key" },
       rating: { AGAIN: "Не вспомнил", HARD: "С трудом", GOOD: "Вспомнил" },
       feedback: { correct: "Верно", again: "Попробуем это слово ещё раз", answer: "Правильный ответ:" },
-      complete: { title: "Практика завершена", result: "Верных ответов: {{correct}} из {{total}}", diagnostic: "{{items}} заданий · {{attempts}} попыток · точность {{accuracy}}%" },
+      complete: {
+        stopped: "Тренировка остановлена", title: "Практика завершена", result: "Верных ответов: {{correct}} из {{total}}", diagnostic: "{{items}} заданий · {{attempts}} попыток · точность {{accuracy}}%" },
       phrase: { placeholder: "Нажимайте на слова по порядку", reset: "Собрать заново", remove: "Убрать {{word}}" },
       matching: { label: "Сопоставление слов и переводов", connect: "Соединить выбранные", remove: "Убрать пару {{left}} — {{right}}" },
       keyHint: "Key откроется отдельно; урок останется подключённым.",

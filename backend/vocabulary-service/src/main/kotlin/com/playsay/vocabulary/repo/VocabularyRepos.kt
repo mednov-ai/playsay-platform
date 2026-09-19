@@ -255,6 +255,8 @@ interface VocabularySkillStateRepo : JpaRepository<VocabularySkillStateEntity, U
     fun findDueEntryIds(ownerSubject: String, now: Instant): List<UUID>
     @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.reviewReason = :reason")
     fun findEntryIdsByReviewReason(ownerSubject: String, reason: String): List<UUID>
+    @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.lastRating = :rating")
+    fun findEntryIdsByLastRating(ownerSubject: String, rating: com.playsay.vocabulary.dto.PracticeRating): List<UUID>
     @Query("select distinct state.entryId from VocabularySkillStateEntity state where state.ownerSubject = :ownerSubject and state.difficultyScore >= :threshold")
     fun findDifficultEntryIds(ownerSubject: String, threshold: java.math.BigDecimal): List<UUID>
 }

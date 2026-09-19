@@ -37,8 +37,9 @@ class VocabularyPracticeAttemptService(
 ) {
     fun attempt(actorSubject: String, sessionId: UUID, request: VocabularyAttemptRequest): VocabularyAttemptResponse {
         val session = sessionEntityForUpdate(sessionId)
-        requireOpenSession(actorSubject, session)
+        if (actorSubject != session.ownerSubject) throw ResponseStatusException(HttpStatus.FORBIDDEN)
         existingAttemptResponse(session, request)?.let { return it }
+        requireOpenSession(actorSubject, session)
         val item = requireCurrentItem(session, request)
         val now = Instant.now()
         val result = recordAttempt(session, item, request, now)

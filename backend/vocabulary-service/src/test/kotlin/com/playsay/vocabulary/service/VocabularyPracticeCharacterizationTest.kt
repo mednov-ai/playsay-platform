@@ -483,6 +483,58 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
     }
 
     @Test
+    fun `homework preview freezes every completion policy with custom thresholds`() {
+        com.playsay.vocabulary.dto.VocabularyHomeworkCompletionPolicy.entries.forEach { policy ->
+            val owner = seedOwner("policy-${policy.name}")
+            seedEntry(owner, "steady", "устойчивый")
+            val settings = VocabularyPracticeSettingsRequest(
+                ownerSubjects = listOf(owner), delivery = PracticeDelivery.HOMEWORK,
+                completionPolicy = policy,
+                completionThresholds = com.playsay.vocabulary.dto.VocabularyCompletionThresholdsRequest(
+                    distinctEntries = 1, distinctGradedPrompts = 2, masteryPercent = 70,
+                ),
+            )
+            val preview = practice.preview(owner, settings)
+            val created = practice.create(owner, settings.copy(planId = preview.planId, planRevision = preview.revision))
+            val stored = practices.findById(created.id).orElseThrow()
+            assertEquals(policy, stored.completionPolicy)
+            assertTrue(stored.completionThresholdsJson.contains("70"))
+            val conflict = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+                practice.create(owner, settings.copy(planId = preview.planId, planRevision = preview.revision,
+                    completionThresholds = settings.completionThresholds.copy(masteryPercent = 60)))
+            }
+            assertEquals(409, conflict.statusCode.value())
+        }
+    }
+
+    @Test
+    fun `final accepted attempt can be replayed without evidence duplication or foreign access`() {
+        val owner = seedOwner("final-retry")
+        val seeded = seedPractice(creator = owner, owner = owner, delivery = PracticeDelivery.SELF, exerciseType = PracticeExerciseType.FLASHCARD)
+        val request = VocabularyAttemptRequest(clientAttemptId = "final-${UUID.randomUUID()}", itemId = seeded.item.id, sessionRevision = 0, rating = PracticeRating.GOOD)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val outcomes = try {
+            executor.invokeAll(List(2) { java.util.concurrent.Callable { practice.attempt(owner, seeded.session.id, request) } })
+                .map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) }
+        } finally { executor.shutdownNow() }
+        val first = outcomes.first()
+        assertEquals(first.attemptId, outcomes.last().attemptId)
+        assertEquals(SessionStatus.COMPLETED, first.session.status)
+        val repeated = practice.attempt(owner, seeded.session.id, request)
+        assertEquals(first.attemptId, repeated.attemptId)
+        assertEquals(1, attempts.findAllBySessionIdOrderByCreatedAtAsc(seeded.session.id).size)
+        assertEquals(1, learningEvidence.findAllBySessionIdOrderByOccurredAtAsc(seeded.session.id).size)
+        val denied = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+            practice.attempt("foreign", seeded.session.id, request)
+        }
+        assertEquals(403, denied.statusCode.value())
+        val closed = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+            practice.attempt(owner, seeded.session.id, request.copy(clientAttemptId = "new-${UUID.randomUUID()}"))
+        }
+        assertEquals(409, closed.statusCode.value())
+    }
+
+    @Test
     fun `live help and teacher hint publish session updates without exposing the answer`() {
         val teacher = seedOwner("teacher-hint")
         val learner = seedOwner("learner-help")

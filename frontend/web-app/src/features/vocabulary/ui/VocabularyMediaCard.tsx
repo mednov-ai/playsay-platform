@@ -17,7 +17,9 @@ export function VocabularyMediaCard({ entry }: { entry: VocabularyEntry }) {
   const { t, i18n } = useAppTranslation();
   const queryClient = useQueryClient();
   const queryKey = ["vocabulary-media", entry.id] as const;
-  const mediaQuery = useQuery({ queryKey, queryFn: ({ signal }) => fetchVocabularyEntryMedia(entry.id, signal), staleTime: 30_000, retry: 1 });
+  const mediaQuery = useQuery({ queryKey, queryFn: ({ signal }) => fetchVocabularyEntryMedia(entry.id, signal), staleTime: 30_000, retry: 1,
+    refetchInterval: (query) => query.state.status !== "error" && (query.state.data?.generationPending || query.state.data?.state === "GENERATING") ? 5_000 : false,
+    refetchIntervalInBackground: false });
   const media = mediaQuery.data;
   const mutation = useMutation({
     mutationFn: (action: "hide" | "show" | "report" | "regenerate" | { alternative: string }) => {
@@ -57,6 +59,7 @@ export function VocabularyMediaCard({ entry }: { entry: VocabularyEntry }) {
         )}
       </div>
       <div className="vocabulary-media-card__actions">
+        {mediaQuery.isError || blobQuery.isError ? <Button disabled={mediaQuery.isFetching || blobQuery.isFetching} onClick={() => { void mediaQuery.refetch(); if (media?.asset?.contentUrl) void blobQuery.refetch(); }} type="button" variant="outline">{t("vocabulary.practice.actions.retry")}</Button> : null}
         {media?.asset ? (
           <>
             <Button aria-label={t("vocabulary.media.wrongAria", { word: entry.sourceText })} disabled={mutation.isPending} onClick={() => mutation.mutate("report")} type="button" variant="outline"><TriangleAlert className="h-4 w-4" />{t("vocabulary.media.wrong")}</Button>

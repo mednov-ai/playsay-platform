@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VocabularyEntry, VocabularyMediaView } from "../../../shared/api/playsay";
 import { VocabularyMediaCard } from "./VocabularyMediaCard";
@@ -30,9 +30,22 @@ beforeEach(() => {
   vi.stubGlobal("URL", { ...URL, createObjectURL: vi.fn(() => "blob:approved"), revokeObjectURL: vi.fn() });
 });
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("VocabularyMediaCard", () => {
+  it("refreshes pending generation and stops polling on terminal state", async () => {
+    vi.useFakeTimers();
+    fetchMedia.mockResolvedValueOnce(view("GENERATING")).mockResolvedValue(view("FAILED"));
+    renderCard();
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(fetchMedia).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(fetchMedia).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(fetchMedia).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("vocabulary.media.state.FAILED")).toBeInTheDocument();
+  });
+
   it.each(["UNRESOLVED_PRIVATE", "GENERATING", "FAILED", "TEXT_ONLY", "NO_IMAGE", "HIDDEN"] as const)("keeps a stable text fallback for %s", async (state) => {
     fetchMedia.mockResolvedValue(view(state));
     renderCard();

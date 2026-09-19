@@ -1180,6 +1180,19 @@ page?: number;
 size?: number;
 };
 
+export type PostInternalVocabularyAssignmentsReworkBody = {
+  assignmentId: string;
+  sourceSessionId: string;
+  /** @minLength 1 */
+  ownerSubject: string;
+  /** @minLength 1 */
+  actorSubject: string;
+};
+
+export type PostInternalVocabularyAssignmentsRework200 = {
+  sessionId: string;
+};
+
 export type postApiVocabularyTranslationSuggestionsResponse200 = {
   data: TranslationSuggestion
   status: 200
@@ -2927,6 +2940,66 @@ export const postInternalVocabularyAssignments = async (homeworkPreparation: Hom
 
   const data: postInternalVocabularyAssignmentsResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as postInternalVocabularyAssignmentsResponse
+}
+
+
+
+export type postInternalVocabularyAssignmentsReworkResponse200 = {
+  data: PostInternalVocabularyAssignmentsRework200
+  status: 200
+}
+
+export type postInternalVocabularyAssignmentsReworkResponse403 = {
+  data: void
+  status: 403
+}
+
+export type postInternalVocabularyAssignmentsReworkResponse404 = {
+  data: void
+  status: 404
+}
+
+export type postInternalVocabularyAssignmentsReworkResponse409 = {
+  data: void
+  status: 409
+}
+
+export type postInternalVocabularyAssignmentsReworkResponseSuccess = (postInternalVocabularyAssignmentsReworkResponse200) & {
+  headers: Headers;
+};
+export type postInternalVocabularyAssignmentsReworkResponseError = (postInternalVocabularyAssignmentsReworkResponse403 | postInternalVocabularyAssignmentsReworkResponse404 | postInternalVocabularyAssignmentsReworkResponse409) & {
+  headers: Headers;
+};
+
+export type postInternalVocabularyAssignmentsReworkResponse = (postInternalVocabularyAssignmentsReworkResponseSuccess | postInternalVocabularyAssignmentsReworkResponseError)
+
+export const getPostInternalVocabularyAssignmentsReworkUrl = () => {
+
+
+
+
+  return `/internal/vocabulary/assignments/rework`
+}
+
+/**
+ * @summary Create or recover immutable mistakes-only rework for a completed teacher-review session
+ */
+export const postInternalVocabularyAssignmentsRework = async (postInternalVocabularyAssignmentsReworkBody: PostInternalVocabularyAssignmentsReworkBody, options?: RequestInit): Promise<postInternalVocabularyAssignmentsReworkResponse> => {
+
+  const res = await fetch(getPostInternalVocabularyAssignmentsReworkUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(postInternalVocabularyAssignmentsReworkBody)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postInternalVocabularyAssignmentsReworkResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postInternalVocabularyAssignmentsReworkResponse
 }
 
 

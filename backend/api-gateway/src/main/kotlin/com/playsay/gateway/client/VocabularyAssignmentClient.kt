@@ -3,6 +3,8 @@ package com.playsay.gateway.client
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationRequest
+import com.playsay.gateway.dto.VocabularyHomeworkReworkRequest
+import com.playsay.gateway.dto.VocabularyHomeworkReworkResponse
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
 import java.net.URI
 import java.net.http.HttpClient
@@ -23,6 +25,19 @@ class VocabularyAssignmentClient(
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(8))
         .build()
+
+    fun rework(request: VocabularyHomeworkReworkRequest): VocabularyHomeworkReworkResponse {
+        check(serviceToken.isNotBlank()) { "Vocabulary integration token is not configured" }
+        val httpRequest = HttpRequest.newBuilder(URI.create(baseUrl.trimEnd('/') + "/internal/vocabulary/assignments/rework"))
+            .timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/json")
+            .header("X-PlaySay-Service-Token", serviceToken)
+            .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
+            .build()
+        val response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString())
+        check(response.statusCode() in 200..299) { "Vocabulary rework failed with HTTP ${response.statusCode()}" }
+        return objectMapper.readValue(response.body(), VocabularyHomeworkReworkResponse::class.java)
+    }
 
     fun prepare(
         actorSubject: String,

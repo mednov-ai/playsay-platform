@@ -1,5 +1,7 @@
 package com.playsay.vocabulary.controller
 
+import com.playsay.vocabulary.dto.VocabularyHomeworkReworkRequest
+import com.playsay.vocabulary.service.VocabularyHomeworkReworkService
 import com.playsay.vocabulary.dto.VocabularyHomeworkPreparationRequest
 import com.playsay.vocabulary.dto.VocabularyHomeworkPreparationResponse
 import com.playsay.vocabulary.dto.VocabularyKeyResultRequest
@@ -21,6 +23,7 @@ import jakarta.validation.Valid
 @RestController
 class VocabularyInternalController(
     private val practices: VocabularyPracticeService,
+    private val rework: VocabularyHomeworkReworkService,
     private val diagnostics: VocabularyDiagnosticsService,
     @param:Value("\${playsay.user-data.service-token:}") private val serviceToken: String,
 ) {
@@ -31,6 +34,15 @@ class VocabularyInternalController(
     ): VocabularyHomeworkPreparationResponse {
         requireServiceToken(presentedToken)
         return practices.prepareHomework(request)
+    }
+
+    @PostMapping("/internal/vocabulary/assignments/rework")
+    fun reworkAssignment(
+        @RequestHeader("X-PlaySay-Service-Token", required = false) presentedToken: String?,
+        @Valid @RequestBody request: VocabularyHomeworkReworkRequest,
+    ) = run {
+        requireServiceToken(presentedToken)
+        rework.rework(request)
     }
 
     @PostMapping("/internal/vocabulary/practice-sessions/{sessionId}/key-results")

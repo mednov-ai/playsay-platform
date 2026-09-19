@@ -233,7 +233,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SelectionRecipe' }
-        '404': { description: Recipe absent or not owned by the caller }
+        '404': { description: "Recipe absent, archived or not owned by the caller" }
     put:
       requestBody:
         required: true
@@ -248,7 +248,7 @@ paths:
               schema: { $ref: '#/components/schemas/SelectionRecipe' }
     delete:
       responses:
-        '204': { description: Recipe deleted without mutating launched plans }
+        '204': { description: Recipe archived idempotently; historical plans preserved }
   /api/vocabulary/practices:
     post:
       summary: Publish a frozen live vocabulary plan
@@ -433,6 +433,36 @@ paths:
       responses:
         '200': { description: Idempotently prepared sessions for an assignment }
         '403': { description: Invalid service token }
+  /internal/vocabulary/assignments/rework:
+    post:
+      summary: Create or recover immutable mistakes-only rework for a completed teacher-review session
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignmentId, sourceSessionId, ownerSubject, actorSubject]
+              properties:
+                assignmentId: { type: string, format: uuid }
+                sourceSessionId: { type: string, format: uuid }
+                ownerSubject: { type: string, minLength: 1 }
+                actorSubject: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: One child per source session; whole frozen set when no mistakes exist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionId]
+                properties:
+                  sessionId: { type: string, format: uuid }
+        '403': { description: Invalid service token or actor access }
+        '404': { description: "Assignment, owner or source session mismatch" }
+        '409': { description: Source session not completed or empty }
   /internal/vocabulary/practice-sessions/{sessionId}/key-results:
     post:
       security:

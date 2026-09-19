@@ -87,7 +87,7 @@ interface VocabularyProjectionQueueRepo : JpaRepository<VocabularyProjectionQueu
 }
 
 interface VocabularySelectionRecipeRepo : JpaRepository<VocabularySelectionRecipeEntity, UUID> {
-    fun findAllByOwnerSubjectOrderByUpdatedAtDesc(ownerSubject: String): List<VocabularySelectionRecipeEntity>
+    fun findAllByOwnerSubjectAndArchivedAtIsNullOrderByUpdatedAtDesc(ownerSubject: String): List<VocabularySelectionRecipeEntity>
     fun findByIdAndOwnerSubject(id: UUID, ownerSubject: String): VocabularySelectionRecipeEntity?
     fun existsByOwnerSubjectAndNameIgnoreCaseAndIdNot(ownerSubject: String, name: String, id: UUID): Boolean
     fun deleteByOwnerSubject(ownerSubject: String): Long
@@ -342,7 +342,13 @@ interface VocabularyPracticeSessionRepo : JpaRepository<VocabularyPracticeSessio
     @Query("select session from VocabularyPracticeSessionEntity session where session.id = :sessionId")
     fun lockById(sessionId: UUID): VocabularyPracticeSessionEntity?
 
+    @Query("select s from VocabularyPracticeSessionEntity s where s.practiceId = :practiceId " +
+        "and not exists (select child.id from VocabularyPracticeSessionEntity child where child.reworkSourceSessionId = s.id) " +
+        "order by s.createdAt asc")
     fun findAllByPracticeIdOrderByCreatedAtAsc(practiceId: UUID): List<VocabularyPracticeSessionEntity>
+    fun findByReworkSourceSessionId(sourceSessionId: UUID): VocabularyPracticeSessionEntity?
+    @Query("select s from VocabularyPracticeSessionEntity s where s.practiceId = :practiceId and s.ownerSubject = :ownerSubject " +
+        "and not exists (select child.id from VocabularyPracticeSessionEntity child where child.reworkSourceSessionId = s.id)")
     fun findByPracticeIdAndOwnerSubject(practiceId: UUID, ownerSubject: String): VocabularyPracticeSessionEntity?
     fun findFirstByOwnerSubjectAndStatusInOrderByUpdatedAtDesc(
         ownerSubject: String,

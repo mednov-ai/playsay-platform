@@ -181,6 +181,14 @@ class VocabularyPracticePlanIntegrationTest @Autowired constructor(
         assertEquals(recipe.id, practice.recipe(owner, recipe.id).id)
         assertEquals(1, practice.recipes(owner).size)
         assertThrows(ResponseStatusException::class.java) { practice.recipe("another-learner", recipe.id) }
+        assertThrows(ResponseStatusException::class.java) { practice.deleteRecipe("another-learner", recipe.id) }
+        practice.deleteRecipe(owner, recipe.id)
+        practice.deleteRecipe(owner, recipe.id)
+        assertEquals(0, practice.recipes(owner).size)
+        assertThrows(ResponseStatusException::class.java) { practice.recipe(owner, recipe.id) }
+        assertThrows(ResponseStatusException::class.java) { practice.preview(owner, VocabularyPracticeSettingsRequest(recipeId = recipe.id)) }
+        assertEquals(launched.sessions.single().totalItems, practice.session(owner, launched.sessions.single().id).totalItems)
+        assertEquals(recipe.id, jdbc.queryForObject("select recipe_id from vocabulary_practice_plans where id = ?", UUID::class.java, firstPreview.planId))
     }
 
     @Test

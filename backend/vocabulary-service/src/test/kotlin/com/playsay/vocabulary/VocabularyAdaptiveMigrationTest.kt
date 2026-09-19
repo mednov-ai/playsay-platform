@@ -52,6 +52,10 @@ class VocabularyAdaptiveMigrationTest {
         migrate(dataSource, "classpath:db/changelog/2026-08-20-001-adaptive-vocabulary-foundation.xml")
         migrate(dataSource, "classpath:db/changelog/2026-08-20-001-adaptive-vocabulary-foundation.xml")
 
+        migrate(dataSource, "classpath:db/changelog/2026-09-19-001-vocabulary-rework-archive.xml")
+        migrate(dataSource, "classpath:db/changelog/2026-09-19-001-vocabulary-rework-archive.xml")
+        jdbc.queryForList("select archived_at from vocabulary_selection_recipes")
+        jdbc.queryForList("select rework_source_session_id from vocabulary_practice_sessions")
         assertEquals(entryId, jdbc.queryForObject("select id from vocabulary_entries", UUID::class.java))
         assertEquals(false, jdbc.queryForObject("select favorite from vocabulary_entries", Boolean::class.java))
         assertEquals(

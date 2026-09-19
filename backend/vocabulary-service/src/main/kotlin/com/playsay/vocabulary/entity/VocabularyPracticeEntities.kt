@@ -162,7 +162,7 @@ class VocabularyPracticePlanEntity(
 @Entity
 @Table(
     name = "vocabulary_practice_sessions",
-    uniqueConstraints = [UniqueConstraint(name = "uq_vocabulary_practice_owner", columnNames = ["practice_id", "owner_subject"])],
+    uniqueConstraints = [UniqueConstraint(name = "uq_vocabulary_rework_source", columnNames = ["rework_source_session_id"])],
 )
 class VocabularyPracticeSessionEntity(
     @Id var id: UUID = UUID.randomUUID(),
@@ -183,7 +183,9 @@ class VocabularyPracticeSessionEntity(
     @Column(name = "completed_at") var completedAt: Instant? = null,
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),
-)
+) {
+    @Column(name = "rework_source_session_id") var reworkSourceSessionId: UUID? = null
+}
 
 @Entity
 @Table(

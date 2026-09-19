@@ -10,6 +10,8 @@ import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.Lock
+import jakarta.persistence.LockModeType
 
 data class MaterialSubmissionRow(
     val id: UUID,
@@ -27,7 +29,9 @@ data class MaterialSubmissionRow(
     val updatedAt: Instant,
 )
 
-interface VocabularyAssignmentProgressEventRepo : JpaRepository<VocabularyAssignmentProgressEventEntity, UUID>
+interface VocabularyAssignmentProgressEventRepo : JpaRepository<VocabularyAssignmentProgressEventEntity, UUID> {
+    fun existsByAssignmentIdAndSessionId(assignmentId: UUID, sessionId: UUID): Boolean
+}
 
 interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
     fun findByTeacherUserId(teacherUserId: UUID): List<AssignmentEntity>
@@ -74,6 +78,10 @@ interface AssignmentRepo : JpaRepository<AssignmentEntity, UUID> {
 }
 
 interface AssignmentRecipientRepo : JpaRepository<AssignmentRecipientEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from AssignmentRecipientEntity r where r.assignmentId = :assignmentId and r.studentUserId = :studentUserId")
+    fun lockByAssignmentIdAndStudentUserId(assignmentId: UUID, studentUserId: UUID): AssignmentRecipientEntity?
+
     fun findByAssignmentIdOrderByCreatedAtAsc(assignmentId: UUID): List<AssignmentRecipientEntity>
 
     fun findByAssignmentIdAndStudentUserId(assignmentId: UUID, studentUserId: UUID): AssignmentRecipientEntity?

@@ -6,6 +6,11 @@ import com.playsay.gateway.controller.AssignmentController
 import com.playsay.gateway.controller.MaterialAssetController
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.ScheduledLessonController
+import com.playsay.gateway.client.VocabularyAssignmentClient
+import com.playsay.gateway.dto.VocabularyHomeworkReworkRequest
+import com.playsay.gateway.dto.VocabularyHomeworkReworkResponse
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.mockito.Mockito
 import com.playsay.gateway.dto.HomeworkAssignmentRequest
 import com.playsay.gateway.dto.LessonHomeworkRequest
 import com.playsay.gateway.dto.LessonMaterialRequest
@@ -104,6 +109,8 @@ class AssignmentControllerTest @Autowired constructor(
     private lateinit var applicationEvents: ApplicationEvents
 
     private val objectMapper = jacksonObjectMapper()
+
+    @MockitoBean lateinit var vocabularyClient: VocabularyAssignmentClient
 
     @BeforeAll
     fun migrateDatabase() {
@@ -605,6 +612,30 @@ class AssignmentControllerTest @Autowired constructor(
         assertEquals(0, BigDecimal("0.25").compareTo(awaiting.accuracy))
         assertEquals(1, vocabularyProgressEventRepo.count())
 
+        // Previously returned work still points at its completed snapshot; a retry repairs it.
+        val legacyRecipient = assignmentRecipientRepo.findByAssignmentIdOrderByCreatedAtAsc(created.assignment.id).single()
+        legacyRecipient.reviewState = "RETURN"
+        legacyRecipient.activityState = "IN_PROGRESS"
+        assignmentRecipientRepo.save(legacyRecipient)
+        val childId = UUID.randomUUID()
+        val reworkRequest = VocabularyHomeworkReworkRequest(created.assignment.id, sessionId, "student-1", "teacher-1")
+        Mockito.`when`(vocabularyClient.rework(reworkRequest)).thenReturn(VocabularyHomeworkReworkResponse(childId))
+        val returned = assignmentStore.reviewVocabularyHomework(
+            teacher, created.assignment.id, "student-1", VocabularyHomeworkReviewRequest(VocabularyHomeworkReviewAction.RETURN),
+        ).recipients.single()
+        assertEquals("IN_PROGRESS", returned.activityState)
+        assertEquals(childId, returned.learnerSnapshotId)
+        assertNull(returned.accuracy)
+        assertEquals(0, returned.distinctGradedPrompts)
+        assignmentStore.reviewVocabularyHomework(
+            teacher, created.assignment.id, "student-1", VocabularyHomeworkReviewRequest(VocabularyHomeworkReviewAction.RETURN),
+        )
+        Mockito.verify(vocabularyClient, Mockito.times(1)).rework(reworkRequest)
+        assignmentStore.updateVocabularyProgress(created.assignment.id, progress.copy(eventId = UUID.randomUUID(), revision = 99))
+        assertEquals("IN_PROGRESS", assignmentStore.teacherDetail(teacher, created.assignment.id).recipients.single().activityState)
+        assignmentStore.updateVocabularyProgress(created.assignment.id, progress.copy(eventId = UUID.randomUUID(), sessionId = childId,
+            learnerSnapshotId = childId, revision = 1))
+
         val accepted = assignmentStore.reviewVocabularyHomework(
             teacher,
             created.assignment.id,
@@ -614,6 +645,9 @@ class AssignmentControllerTest @Autowired constructor(
         assertEquals("COMPLETED", accepted.activityState)
         assertEquals("ACCEPT", accepted.reviewState)
         assertEquals("Enough meaningful work", accepted.reviewNote)
+        assignmentStore.updateVocabularyProgress(created.assignment.id, progress.copy(eventId = UUID.randomUUID(), sessionId = childId,
+            learnerSnapshotId = childId, revision = 2))
+        assertEquals("COMPLETED", assignmentStore.teacherDetail(teacher, created.assignment.id).recipients.single().activityState)
     }
 
     @Test

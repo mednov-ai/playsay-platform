@@ -144,6 +144,7 @@ export function useLiveVocabularyPractice({
   }, [accept, context, enabled, lessonId, ownerSubject, refresh, subscribePractice]);
 
   function update(next: VocabularyPractice | null) {
+    if (contextRef.current !== context) return;
     requestSequence.current += 1;
     accept(next);
     subscribePractice(next?.id);

@@ -8,11 +8,12 @@ import { LessonActivityRail } from "./LessonActivityRail";
 
 const createVocabularyHomeworkAssignment = vi.fn();
 const updateVocabularyPracticeStatus = vi.fn();
+const giveVocabularyPracticeHint = vi.fn();
 
 vi.mock("../../../shared/api/playsay", () => ({
   createVocabularyHomeworkAssignment: (...args: unknown[]) => createVocabularyHomeworkAssignment(...args),
   createVocabularyPractice: vi.fn(),
-  giveVocabularyPracticeHint: vi.fn(),
+  giveVocabularyPracticeHint: (...args: unknown[]) => giveVocabularyPracticeHint(...args),
   updateVocabularyPracticeStatus: (...args: unknown[]) => updateVocabularyPracticeStatus(...args),
 }));
 vi.mock("../../../shared/i18n", () => ({
@@ -25,9 +26,34 @@ afterEach(() => {
   cleanup();
   createVocabularyHomeworkAssignment.mockReset();
   updateVocabularyPracticeStatus.mockReset();
+  giveVocabularyPracticeHint.mockReset();
 });
 
 describe("LessonActivityRail vocabulary delivery", () => {
+  it.each(["hint", "pause"])("keeps failed %s commands recoverable without leaking technical errors", async (command) => {
+    const practice = livePractice();
+    const changed = vi.fn();
+    const api = command === "hint" ? giveVocabularyPracticeHint : updateVocabularyPracticeStatus;
+    api.mockRejectedValueOnce(new Error("private transport details"));
+    api.mockResolvedValueOnce(command === "hint" ? { ...practice.sessions[0], revision: 3 } : { ...practice, status: "PAUSED" });
+    render(<LessonActivityRail
+      assigningMaterial={false} currentMaterialId={null} lessonId="lesson-1" materials={[]}
+      onAssignMaterial={vi.fn()} onClose={vi.fn()} onPracticeChange={changed}
+      onSelectMaterial={vi.fn()} onSelectStudent={vi.fn()} onUploadHtmlGamePage={vi.fn()}
+      onUploadImagePage={vi.fn()} open owners={[]} practice={practice} selectedMaterialId=""
+      selectedStudentSubject="student-1" uploadingHtmlGamePage={false} uploadingImagePage={false}
+    />);
+    const button = screen.getByRole("button", { name: command === "hint" ? /vocabulary.live.giveHint/ : /vocabulary.live.pause/ });
+    fireEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent("vocabulary.practice.errors.save");
+    expect(document.body).not.toHaveTextContent("private transport details");
+    expect(changed).not.toHaveBeenCalled();
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows private live diagnostics and explicitly continues unfinished snapshots at home", async () => {
     const practice = livePractice();
     updateVocabularyPracticeStatus.mockResolvedValue({ ...practice, status: "COMPLETED" });

@@ -41,3 +41,13 @@ it("ignores an older failed refresh after a newer successful refresh", async () 
   await act(async () => { rejectOld(new Error("stale failure")); await stale; });
   expect(result.current.error).toBe(false);
 });
+
+it("ignores a completed command captured before switching lesson context", async () => {
+  fetchActive.mockResolvedValue({ id: "new", sessions: [], updatedAt: "2026-09-19T01:00:00Z" });
+  const { result, rerender } = renderHook(({ lessonId }) => useLiveVocabularyPractice({ lessonId }), { initialProps: { lessonId: "old" } });
+  const oldCommandCompleted = result.current.setPractice;
+  rerender({ lessonId: "new" });
+  await waitFor(() => expect(result.current.practice?.id).toBe("new"));
+  act(() => oldCommandCompleted({ id: "old", sessions: [], updatedAt: "2026-09-19T02:00:00Z" } as never));
+  expect(result.current.practice?.id).toBe("new");
+});

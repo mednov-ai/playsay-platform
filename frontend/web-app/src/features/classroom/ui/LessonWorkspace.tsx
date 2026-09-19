@@ -92,6 +92,7 @@ export function LessonWorkspace({
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
   const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
+  const [vocabularyStartError, setVocabularyStartError] = useState(false);
   const [activityRailOpen, setActivityRailOpen] = useState(() => (
     vocabularyFeatures.personalPracticeV2
     && typeof window !== "undefined"
@@ -102,6 +103,7 @@ export function LessonWorkspace({
   async function startVocabularyPractice() {
     if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
     setStartingVocabularyPractice(true);
+    setVocabularyStartError(false);
     try {
       liveVocabulary.setPractice(await createVocabularyPractice({
         delivery: "LIVE",
@@ -110,6 +112,8 @@ export function LessonWorkspace({
         ownerSubjects: session.participants.map((participant) => participant.subject),
         wordLimit: 10,
       }));
+    } catch {
+      setVocabularyStartError(true);
     } finally {
       setStartingVocabularyPractice(false);
     }
@@ -371,8 +375,8 @@ export function LessonWorkspace({
           </div>
         )}
 
-        {vocabularyFeatures.live && liveVocabulary.error ? (
-          <div role="alert"><p>{t("vocabulary.practice.errors.save")}</p><Button onClick={() => void liveVocabulary.refresh()}>{t("vocabulary.practice.actions.retry")}</Button></div>
+        {vocabularyFeatures.live && (liveVocabulary.error || vocabularyStartError) ? (
+          <div role="alert"><p>{t(vocabularyStartError ? "vocabulary.practice.errors.start" : "vocabulary.practice.errors.save")}</p><Button onClick={() => void (vocabularyStartError ? startVocabularyPractice() : liveVocabulary.refresh())}>{t("vocabulary.practice.actions.retry")}</Button></div>
         ) : null}
         {vocabularyFeatures.live && liveVocabulary.practice ? (
           <VocabularyLiveStage

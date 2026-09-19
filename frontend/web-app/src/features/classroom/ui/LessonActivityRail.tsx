@@ -65,11 +65,12 @@ export function LessonActivityRail({
   async function changeStatus(status: "ACTIVE" | "PAUSED" | "COMPLETED") {
     if (!practice) return;
     setSaving(true);
+    setDeliveryError(null);
     try {
       onPracticeChange(await updateVocabularyPracticeStatus(practice.id, status));
       setDeliveryError(null);
-    } catch (caught) {
-      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
+    } catch {
+      setDeliveryError(t("vocabulary.practice.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -78,12 +79,15 @@ export function LessonActivityRail({
   async function hint() {
     if (!practice || !selectedSession) return;
     setSaving(true);
+    setDeliveryError(null);
     try {
       const updated = await giveVocabularyPracticeHint(selectedSession.id);
       onPracticeChange({
         ...practice,
         sessions: practice.sessions.map((session) => session.id === updated.id ? updated : session),
       });
+    } catch {
+      setDeliveryError(t("vocabulary.practice.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -94,6 +98,7 @@ export function LessonActivityRail({
     const remaining = practice.sessions.filter((session) => session.completedItems < session.totalItems);
     if (!remaining.length) return;
     setSaving(true);
+    setDeliveryError(null);
     try {
       await createVocabularyHomeworkAssignment({
         mode: practice.mode,
@@ -104,8 +109,8 @@ export function LessonActivityRail({
       });
       setContinuedHome(true);
       setDeliveryError(null);
-    } catch (caught) {
-      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
+    } catch {
+      setDeliveryError(t("vocabulary.practice.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -131,8 +136,8 @@ export function LessonActivityRail({
         wordLimit: 30,
       });
       setContinuedHome(true);
-    } catch (caught) {
-      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
+    } catch {
+      setDeliveryError(t("vocabulary.practice.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -166,7 +171,7 @@ export function LessonActivityRail({
                 <Button disabled={saving} onClick={() => setClosing(false)} type="button" variant="outline">{t("common.actions.cancel")}</Button>
               </div>
             ) : null}
-            {deliveryError ? <p aria-live="assertive" className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs font-bold text-destructive">{t("vocabulary.live.deliveryRecoverable")} {deliveryError}</p> : null}
+            {deliveryError ? <p role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs font-bold text-destructive">{t("vocabulary.live.deliveryRecoverable")} {deliveryError}</p> : null}
             {practice.sessions.map((session) => (
               <button
                 className="rounded-2xl border border-border bg-white p-3 text-left"

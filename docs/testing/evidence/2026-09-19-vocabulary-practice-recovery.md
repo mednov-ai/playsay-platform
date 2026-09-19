@@ -48,3 +48,15 @@ Final counts, source commit, Jenkins/security reports, immutable image identitie
 - Key frontend build 99: WHOLE_WORDS, CHARACTER_NGRAMS and MIXED all passed fresh authentication, custom n-gram settings, actual keyboard typing, full server acknowledgement, duplicate result submission (201, same result ID), and return to Honey School. The local backend regression separately proves n-grams do not earn SPELLING schedule credit.
 - Dictionary browser edit/search/favorite/pause/archive and undo after archiving the last visible search result passed. Existing partial group-save regression retries only failed recipients; this failure is injected locally, not by altering other learners.
 - Real live acceptance found the learner workspace was never mounted without a lesson material, so vocabulary could not be discovered. The lesson shell now owns the one vocabulary subscription and passes it into the workspace; incoming practice opens the workspace even without a material. Regression covers discovery and paused visibility. Full web suite: 148 files / 793 tests, lint and build PASS. Post-rollout three-browser retest remains pending.
+
+## Post-backend-rollout retest
+
+Vocabulary build 66 (`36d95e9d94e603b0ae184ec3ed81e4a13d8eefc8`) passed CI and deployed as digest `sha256:0a7ed3f9bf59964ad0b0064655aff48f515675b15fe80d185b0a2df440a664dd`; ArgoCD Synced/Healthy, one ready pod, zero restarts. The same six owned entries matched list/indexed preview across RECENT=6, DUE=4, FORGOTTEN=1, DIFFICULT=0, NEW=0, FAVORITE=1 and FULL_DICTIONARY=6. A paused pinned word was excluded. No clock override was required.
+
+Teacher ACCEPT passed against the real gateway after its completion callback settled. RETURN/rework remains unresolved, rather than being hidden by the later successful ACCEPT.
+
+- Additional real Key test compared the complete SPELLING state before and after a CHARACTER_NGRAMS run and its replay; it remained identical for both owned entries. This supplements the local no-credit regression.
+
+- Final teacher-rail inspection reproduced two regression failures: a rejected hint escaped as an unhandled rejection, and command errors exposed transport text. The current personal-practice rail had separate handlers from the legacy live stage. It now catches hint failures, uses localized recoverable errors, and clears them on explicit retry. The legacy lesson-menu start handler receives the same catch/retry boundary. Before-fix test: 2 failures plus 1 unhandled error; after-fix gate is recorded below.
+
+- Follow-up command-context regression failed before the guard and passed afterward. Full web verification after rail/start/context fixes: 148 files / 796 tests, lint and build PASS. No new strings or wire fields were introduced.

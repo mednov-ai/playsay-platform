@@ -29,8 +29,8 @@ export function useLiveVocabularyPractice({
   const accept = useCallback((next: VocabularyPractice | null) => {
     const previous = practiceRef.current;
     if (next && previous?.id === next.id) {
-      if (Date.parse(next.updatedAt) < Date.parse(previous.updatedAt)) return;
-      next = { ...next, sessions: next.sessions.map((session) => {
+      const metadata = Date.parse(next.updatedAt) < Date.parse(previous.updatedAt) ? previous : next;
+      next = { ...metadata, sessions: next.sessions.map((session) => {
         const current = previous.sessions.find((candidate) => candidate.id === session.id);
         return current && current.revision > session.revision ? current : session;
       }) };

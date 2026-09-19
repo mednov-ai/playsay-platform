@@ -223,7 +223,6 @@ function replaceSession(practice: VocabularyPractice, session: VocabularyPractic
   return {
     ...practice,
     sessions: practice.sessions.map((current) => current.id === session.id ? session : current),
-    updatedAt: session.updatedAt,
   };
 }
 

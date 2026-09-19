@@ -51,3 +51,14 @@ it("ignores a completed command captured before switching lesson context", async
   act(() => oldCommandCompleted({ id: "old", sessions: [], updatedAt: "2026-09-19T02:00:00Z" } as never));
   expect(result.current.practice?.id).toBe("new");
 });
+
+it("accepts newer learner revisions even when practice metadata is older", async () => {
+  const newest = { id: "practice", status: "PAUSED", sessions: [{ id: "session", revision: 3 }], updatedAt: "2026-09-19T02:00:00Z" };
+  fetchActive.mockResolvedValue(newest);
+  const { result } = renderHook(() => useLiveVocabularyPractice({ lessonId: "lesson" }));
+  await waitFor(() => expect(result.current.practice?.sessions[0].revision).toBe(3));
+  act(() => result.current.setPractice({ ...newest, status: "ACTIVE", updatedAt: "2026-09-19T01:00:00Z", sessions: [{ id: "session", revision: 4, teacherHint: "hint" }] } as never));
+  expect(result.current.practice?.status).toBe("PAUSED");
+  expect(result.current.practice?.sessions[0].revision).toBe(4);
+  expect(result.current.practice?.sessions[0].teacherHint).toBe("hint");
+});

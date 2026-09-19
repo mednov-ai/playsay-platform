@@ -569,11 +569,11 @@ Complete the existing dictionary CRUD/group-partial-failure, recipes, all exerci
 - A fresh Key login must retain vocabularySessionId and the allowlisted return context; the ordinary bundled set must not replace the requested vocabulary set after OIDC.
 - DUE list, dashboard due date and practice selection use the earliest due date among available skills, including SPELLING. Unavailable CONTEXT is excluded.
 - DEV runtime acceptance includes checking vocabulary restart count after image/Key use; observed OOMKilled at the former 512 MiB limit is tracked separately from application regressions.
-- Teacher RETURN currently lacks an agreed rework-snapshot lifecycle; record it as unresolved rather than treating a gateway status change as learner acceptance.
+- Teacher RETURN creates a child snapshot with mistaken items, or the entire frozen set if all were correct; verify both learners finish and the teacher accepts the new snapshots, while repeated RETURN and late old callbacks preserve the current generation.
 
 - Live without a material: join a lesson with no material, then start vocabulary. Learners must discover the practice without reload; pausing keeps the workspace and draft visible.
 
 - Reconnect while typing: restore the vocabulary subscription on a new WebSocket and retain the current draft; verify a subsequent teacher hint is visible despite newer learner revisions.
-- Deleting a recipe referenced by an immutable plan currently returns 500; keep this BLOCKED pending archival versus explicit-prohibition semantics.
+- Deleting a recipe referenced by an immutable plan archives it: repeated DELETE succeeds, it disappears from future selection and prior plans/history stay unchanged.
 
 Final delivered build identities, acceptance results and cleanup: [DEV recovery evidence](evidence/2026-09-19-vocabulary-practice-recovery.md).

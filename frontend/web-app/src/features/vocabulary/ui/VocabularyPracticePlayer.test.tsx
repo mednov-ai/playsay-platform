@@ -114,6 +114,26 @@ describe("VocabularyPracticePlayer", () => {
     expect(screen.getByRole("button", { name: "cat" })).toBeEnabled();
   });
 
+  it("shows matching labels after a lost final response instead of internal pair IDs", async () => {
+    const initial = session({ exerciseType: "MATCHING", content: {
+      type: "MATCHING", left: [{ id: "left-id", label: "cat" }], right: [{ id: "right-id", label: "кот" }],
+    } });
+    const completed = { ...initial, revision: 1, currentItem: null, status: "COMPLETED" as const, completedItems: 1 };
+    recordVocabularyAttempt.mockRejectedValueOnce(new Error("response lost"))
+      .mockResolvedValueOnce({ correct: true, expectedAnswer: "left-id:right-id", session: completed });
+    fetchVocabularyPracticeSession.mockResolvedValue(completed);
+    render(<VocabularyPracticePlayer initialSession={initial} />);
+    fireEvent.click(screen.getByRole("button", { name: "cat" }));
+    fireEvent.click(screen.getByRole("button", { name: "кот" }));
+    fireEvent.click(screen.getByText("vocabulary.practice.matching.connect"));
+    fireEvent.click(screen.getByText("vocabulary.practice.actions.check"));
+    await waitFor(() => expect(screen.getByText("vocabulary.practice.actions.retry")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("vocabulary.practice.actions.retry"));
+    await waitFor(() => expect(screen.getByText("cat ↔ кот")).toBeInTheDocument());
+    expect(screen.queryByText("left-id:right-id")).not.toBeInTheDocument();
+    expect(screen.getByText("vocabulary.practice.actions.continue")).toBeInTheDocument();
+  });
+
   it("uses phrase chips once and lets the learner remove one chip", () => {
     render(<VocabularyPracticePlayer initialSession={session({
       exerciseType: "PHRASE_BUILDER",

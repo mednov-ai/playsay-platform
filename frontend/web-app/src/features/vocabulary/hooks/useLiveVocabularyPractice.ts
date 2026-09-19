@@ -65,10 +65,10 @@ export function useLiveVocabularyPractice({
       subscribePractice(active?.id);
       return active;
     } catch {
-      if (contextRef.current === context) setError(true);
+      if (contextRef.current === context && sequence === requestSequence.current) setError(true);
       return null;
     } finally {
-      if (contextRef.current === context) setLoading(false);
+      if (contextRef.current === context && sequence === requestSequence.current) setLoading(false);
     }
   }, [accept, context, enabled, lessonId, subscribePractice]);
 

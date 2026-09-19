@@ -27,3 +27,17 @@ it("exposes refresh errors and supports recovery without rejecting", async () =>
   await act(async () => { await result.current.refresh(); });
   expect(result.current.error).toBe(false);
 });
+
+it("ignores an older failed refresh after a newer successful refresh", async () => {
+  let rejectOld!: (reason: Error) => void;
+  fetchActive.mockResolvedValueOnce(null)
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject; }))
+    .mockResolvedValue(null);
+  openSocket.mockResolvedValue({ readyState: 0, close: vi.fn() });
+  const { result } = renderHook(() => useLiveVocabularyPractice({ lessonId: "lesson" }));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  let stale!: Promise<unknown>;
+  await act(async () => { stale = result.current.refresh(); await result.current.refresh(); });
+  await act(async () => { rejectOld(new Error("stale failure")); await stale; });
+  expect(result.current.error).toBe(false);
+});

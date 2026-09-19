@@ -42,6 +42,7 @@ function PracticePlayerSession({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const pendingAttempt = useRef<VocabularyAttemptInput | null>(null);
+  const pendingItem = useRef<VocabularyPracticeSession["currentItem"]>(null);
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const sessionRef = useRef(session);
@@ -105,6 +106,7 @@ function PracticePlayerSession({
     inFlight.current = true;
     setSaving(true);
     setMessage(null);
+    if (!pendingAttempt.current) pendingItem.current = item;
     const request = pendingAttempt.current ?? {
       answer: value,
       clientAttemptId: crypto.randomUUID(),
@@ -118,7 +120,8 @@ function PracticePlayerSession({
       const result = await recordVocabularyAttempt(session.id, request);
       if (!mounted.current) return;
       pendingAttempt.current = null;
-      setFeedback(result);
+      setFeedback({ ...result, expectedAnswer: readableAnswer(result.expectedAnswer, pendingItem.current) });
+      pendingItem.current = null;
       acceptSession(result.session);
       onSessionChange?.(sessionRef.current);
     } catch (caught) {
@@ -450,4 +453,15 @@ function keyboardOrigin(): string {
   current.port = localDevelopment ? "5175" : "";
   current.pathname = "";
   return current.origin;
+}
+
+function readableAnswer(answer: string, item: VocabularyPracticeSession["currentItem"]) {
+  const content = item?.content;
+  if (item?.exerciseType !== "MATCHING" || !content || !("left" in content) || !("right" in content)) return answer;
+  return (answer ?? "").split("|").flatMap((pair) => {
+    const [leftId, rightId] = pair.split(":");
+    const left = content.left.find((option) => option.id === leftId);
+    const right = content.right.find((option) => option.id === rightId);
+    return left && right ? [`${left.label} ↔ ${right.label}`] : [];
+  }).join(" · ");
 }

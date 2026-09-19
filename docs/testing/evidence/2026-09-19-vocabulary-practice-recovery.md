@@ -25,3 +25,10 @@ Final counts, source commit, Jenkins/security reports, immutable image identitie
 - Vocabulary: pipeline-equivalent `gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar`: PASS; 87 tests, zero failures/errors/skips. Concurrent terminal replay returns one attempt and one evidence record. All four custom completion policies preserve their frozen settings.
 - Initial generic `detekt` invocation reported existing untyped-baseline complexity findings. The repository's Jenkins command uses `detektMain` and its checked-in typed baseline; that required gate passed without baseline changes.
 - No OpenAPI shape or dependency versions changed. Existing gateway sourcePracticeId deduplication supports continuation retry; browser confirmation remains pending.
+
+## Findings during authenticated DEV acceptance
+
+- Real self-practice completed MATCHING, FLASHCARD and MEANING_CHOICE, with wrong-answer feedback and explicit Continue before the final summary. The browser exposed an additional existing presentation defect: matching feedback rendered internal pair IDs. A focused follow-up maps the accepted answer through the retained attempted-item labels, including lost final-response retry. A regression test covers that exact boundary.
+- A late failed live refresh could overwrite recovery from a newer successful refresh. Both success and failure now use the same request generation; regression passes.
+- At 00:44:14 UTC, the DEV vocabulary container was OOMKilled (exit 137) at its 512 MiB limit and nginx returned 502 for key-set. This establishes the failed request boundary, not a proven memory leak. DEV node working set was 74%; GitOps raises only the DEV container limit to 768 MiB, retaining the 256 MiB heap. Repeat authenticated acceptance is required after rollout.
+- Initial localStorage-only locale screenshots did not exercise the intended translated dictionary after profile hydration; they are discarded as acceptance evidence. The corrected run updates/restores the demo profile locale and asserts document language and the actual dictionary view.

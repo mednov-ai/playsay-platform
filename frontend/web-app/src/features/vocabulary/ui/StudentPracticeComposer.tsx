@@ -152,7 +152,7 @@ export function StudentPracticeComposer({ onStart }: { onStart: (session: Vocabu
           <input className="accent-primary" max={30} min={2} onChange={(event) => setTargetMinutes(Number(event.target.value))} type="range" value={targetMinutes} />
         </label>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         {(["QUICK", "BALANCED", "WRITING"] as VocabularyPracticeMode[]).map((value) => (
           <Button key={value} onClick={() => setMode(value)} type="button" variant={mode === value ? "default" : "outline"}>{t(`vocabulary.practice.mode.${value}`)}</Button>
         ))}

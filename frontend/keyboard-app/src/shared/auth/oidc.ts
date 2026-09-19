@@ -23,12 +23,14 @@ type TokenResponse = {
 };
 
 type LoginFlow = {
+  returnPath?: string;
   codeVerifier: string;
   state: string;
   redirectUri: string;
 };
 
 type CompletedLoginFlow = {
+  returnPath?: string;
   clientId: string;
   code: string;
   redirectUri: string;
@@ -99,7 +101,7 @@ export async function startLogin(config = authConfig): Promise<void> {
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
-  const flow: LoginFlow = { codeVerifier, state, redirectUri };
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath: safeLoginReturnPath(window.location.href, window.location.origin) };
 
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
   window.location.assign(
@@ -276,6 +278,7 @@ async function exchangeLoginCode(config: AuthConfig, code: string, state: string
   window.sessionStorage.removeItem(flowStorageKey);
   writeTokens(tokens);
   writeCompletedLoginFlow({
+    returnPath: safeLoginReturnPath(flow.returnPath ?? "/", window.location.origin),
     clientId: config.clientId,
     code,
     redirectUri: flow.redirectUri,
@@ -356,4 +359,19 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+export function completedLoginReturnPath(): string {
+  return safeLoginReturnPath(readCompletedLoginFlow()?.returnPath ?? "/", window.location.origin);
+}
+
+export function safeLoginReturnPath(value: string, origin: string): string {
+  try {
+    const url = new URL(value, origin);
+    if (url.origin !== origin || url.pathname === authConfig.redirectPath
+      || ["code", "state", "access_token", "id_token", "refresh_token"].some((key) => url.searchParams.has(key) || new URLSearchParams(url.hash.slice(1)).has(key))) return "/";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
 }

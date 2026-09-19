@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AuthGate } from "../widgets/shell/AuthGate";
 import { KeyboardTrainerShell } from "../widgets/shell/KeyboardTrainerShell";
-import { buildLogoutUrl, clearTokens, completeLogin, isAuthCallback, readTokens, startLogin } from "../shared/auth/oidc";
+import { buildLogoutUrl, clearTokens, completeLogin, completedLoginReturnPath, isAuthCallback, readTokens, startLogin } from "../shared/auth/oidc";
 import { fetchMe } from "../shared/api/keyboardApi";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../shared/i18n";
 import { useThemeMode, type ThemeMode } from "../shared/theme";
@@ -26,7 +26,7 @@ export function App() {
         if (isAuthCallback(url)) {
           setStatus("callback");
           await completeLogin(url);
-          window.history.replaceState({}, "", "/");
+          window.history.replaceState({}, "", completedLoginReturnPath());
         } else if (!readTokens()) {
           setStatus("unauthenticated");
           return;

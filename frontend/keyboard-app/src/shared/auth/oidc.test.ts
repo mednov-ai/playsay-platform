@@ -3,6 +3,7 @@ import {
   buildAuthorizeUrl,
   defaultAuthIssuer,
   mapTokenResponse,
+  safeLoginReturnPath,
   type AuthConfig,
 } from "./oidc";
 
@@ -59,6 +60,16 @@ describe("keyboard auth helpers", () => {
 
     expect(url.searchParams.has("playsay_theme")).toBe(false);
     expect(url.searchParams.get("ui_locales")).toBe("de");
+  });
+
+  it("preserves the vocabulary launch and return context across sign-in", () => {
+    const path = "/?vocabularySessionId=11111111-1111-4111-a111-111111111111&returnTo=https%3A%2F%2Fdev.online.honey.school%2F";
+    expect(safeLoginReturnPath(`https://dev.key.honey.school${path}`, "https://dev.key.honey.school")).toBe(path);
+    expect(safeLoginReturnPath(path, "https://dev.key.honey.school")).toBe(path);
+  });
+
+  it.each(["//example.com/", "https://example.com/", "/auth/callback?code=secret&state=state", "/?access_token=secret", "/#access_token=secret"])("rejects unsafe auth return path %s", (path) => {
+    expect(safeLoginReturnPath(path, "https://dev.key.honey.school")).toBe("/");
   });
 
   it("maps token expiry to an absolute timestamp", () => {

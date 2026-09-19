@@ -570,3 +570,5 @@ Complete the existing dictionary CRUD/group-partial-failure, recipes, all exerci
 - DUE list, dashboard due date and practice selection use the earliest due date among available skills, including SPELLING. Unavailable CONTEXT is excluded.
 - DEV runtime acceptance includes checking vocabulary restart count after image/Key use; observed OOMKilled at the former 512 MiB limit is tracked separately from application regressions.
 - Teacher RETURN currently lacks an agreed rework-snapshot lifecycle; record it as unresolved rather than treating a gateway status change as learner acceptance.
+
+- Live without a material: join a lesson with no material, then start vocabulary. Learners must discover the practice without reload; pausing keeps the workspace and draft visible.

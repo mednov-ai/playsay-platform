@@ -7,6 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LessonRoomSession } from "../model/session";
 import { LiveLessonExperience } from "./LiveLessonExperience";
 
+const liveState = vi.hoisted(() => ({ practice: null as unknown, teacher: true }));
+vi.mock("../../vocabulary/hooks/useLiveVocabularyPractice", () => ({
+  useLiveVocabularyPractice: () => ({ practice: liveState.practice }),
+}));
+
 vi.mock("@livekit/components-react", () => ({
   LiveKitRoom: ({ children }: { children: ReactNode }) => (
     <div data-testid="livekit-room">{children}</div>
@@ -15,7 +20,7 @@ vi.mock("@livekit/components-react", () => ({
 }));
 
 vi.mock("../../../entities/workspace/model", () => ({
-  canAssignLessons: () => true,
+  canAssignLessons: () => liveState.teacher,
 }));
 
 vi.mock("../../../entities/schedule/model", () => ({
@@ -61,9 +66,29 @@ vi.mock("./LessonWorkspace", () => ({
   ),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); liveState.practice = null; liveState.teacher = true; });
 
 describe("LiveLessonExperience room context", () => {
+  it("discovers a live practice for a student without an assigned material", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    liveState.teacher = false;
+    const props = {
+      materials: [], onAssignMaterial: vi.fn(), onComplete: vi.fn(), onLeave: vi.fn(),
+      onMediaLifecycleChange: vi.fn(), onRetryMedia: vi.fn(),
+      profile: { subject: "student-1", name: "Student" } as never,
+      session: { ...classroomSession(), materialId: null, identity: "student-1" },
+    };
+    const view = render(<LiveLessonExperience {...props} recoveryPhase="idle" />);
+    expect(screen.queryByTestId("lesson-workspace")).not.toBeInTheDocument();
+    liveState.practice = { id: "practice-1", status: "ACTIVE" };
+    view.rerender(<LiveLessonExperience {...props} recoveryPhase="idle" />);
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+    liveState.practice = { id: "practice-1", status: "PAUSED" };
+    view.rerender(<LiveLessonExperience {...props} recoveryPhase="idle" />);
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+  });
+
   it("keeps the video stage and lesson workspace inside the same LiveKit room", () => {
     vi.stubGlobal("matchMedia", () => ({
       addEventListener: vi.fn(),

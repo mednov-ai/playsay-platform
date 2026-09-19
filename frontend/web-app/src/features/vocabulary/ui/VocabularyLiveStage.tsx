@@ -146,7 +146,7 @@ export function VocabularyLiveStage({
     ) : null;
   }
 
-  const completed = practice.sessions.filter((session) => session.status === "COMPLETED").length;
+  const completed = practice.sessions.filter((session) => session.completedItems === session.totalItems).length;
   return (
     <section className="grid gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4">

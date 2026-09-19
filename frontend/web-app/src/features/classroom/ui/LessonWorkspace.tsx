@@ -36,12 +36,13 @@ import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyLessonDialog } from "../../vocabulary/ui/VocabularyLessonDialog";
 import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
-import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
+import type { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 import { LessonActivityRail } from "./LessonActivityRail";
 
 export function LessonWorkspace({
   displayName,
+  liveVocabulary,
   materials,
   onAssignMaterial,
   onPresentationModeChange,
@@ -50,6 +51,7 @@ export function LessonWorkspace({
   session,
 }: {
   displayName: string;
+  liveVocabulary: ReturnType<typeof useLiveVocabularyPractice>;
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onPresentationModeChange: (mode: LessonPresentationMode) => void;
@@ -75,11 +77,6 @@ export function LessonWorkspace({
     uploadingHtmlGamePage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
-  const liveVocabulary = useLiveVocabularyPractice({
-    enabled: vocabularyFeatures.live,
-    lessonId: session.lessonId,
-    ownerSubject: canMonitorSubmissions ? undefined : profile?.subject,
-  });
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
   const isParallelWork = session.workMode === "PARALLEL" &&
     session.participants.length > 1 &&

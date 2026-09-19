@@ -177,7 +177,7 @@ export function LessonActivityRail({
               >
                 <span className="flex items-center justify-between gap-2">
                   <strong className="truncate">{session.ownerName ?? session.ownerSubject}</strong>
-                  {session.status === "COMPLETED" ? <Check className="h-4 w-4 text-[#197a45]" /> : <Users className="h-4 w-4 text-primary" />}
+                  {session.completedItems === session.totalItems ? <Check className="h-4 w-4 text-[#197a45]" /> : <Users className="h-4 w-4 text-primary" />}
                 </span>
                 <span className="mt-2 block text-xs font-bold text-muted-foreground">
                   {t("vocabulary.live.studentProgress", {

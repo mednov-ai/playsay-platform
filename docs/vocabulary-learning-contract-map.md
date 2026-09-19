@@ -50,3 +50,9 @@ At the start of implementation, `contracts/openapi.yaml`, generated web-app API 
 Confirmed entry mutations refresh the affected learner dashboard/search/selection preview and learner summary without a page reload or filter reset. Dashboard and history failures have independent localized retry states; a successful empty response is distinct from an unavailable response, and access denial hides cached entries. Entry mutation failures retain input and provide retry; archive undo remains available when no entries are visible. Group addition reports partial success and retries only failed recipients while the request is unchanged. Manual saving does not wait for translation generation, and late provider responses cannot overwrite a manual translation or a saved/reset form.
 
 This UI contract preserves public request/response shapes, duplicate-entry semantics, immutable practice snapshots and vocabulary ownership. Recovery regression evidence is in `docs/testing/evidence/2026-09-05-dev-vocabulary-hotfix-local.md`.
+
+## Practice recovery contract
+
+Feedback remains until explicit Continue, including the final answer. Same-item control updates preserve drafts. Retried accepted attempts return the original outcome after completion without duplicate evidence, after ownership validation. Publication uses the current preview's frozen completion settings. Dictionary and planner use the earliest due date among available skills, including SPELLING. Key authentication preserves the validated relative launch path and its vocabulary context.
+
+The live subscription belongs to the lesson shell and remains active when no material is assigned. An incoming vocabulary practice opens the learner workspace; pause keeps its draft visible. Only one subscription owns that lesson/owner context. See `docs/testing/evidence/2026-09-19-vocabulary-practice-recovery.md` for observed boundaries and remaining teacher-return acceptance.

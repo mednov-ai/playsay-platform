@@ -3,6 +3,7 @@ package com.playsay.vocabulary.service
 import com.playsay.vocabulary.dto.LearningStage
 import com.playsay.vocabulary.dto.PracticeRating
 import com.playsay.vocabulary.dto.VocabularySkill
+import com.playsay.vocabulary.entity.VocabularyEntryEntity
 import com.playsay.vocabulary.entity.VocabularySkillStateEntity
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -15,6 +16,17 @@ import java.math.BigDecimal
 
 class VocabularySchedulerTest {
     private val now = Instant.parse("2026-07-28T09:00:00Z")
+
+    @Test
+    fun `entry due date includes available spelling and ignores unavailable context`() {
+        val entry = VocabularyEntryEntity(ownerSubject = "learner", sourceText = "apple", normalizedSource = "apple", createdBySubject = "learner")
+        val meaning = state().apply { skill = VocabularySkill.MEANING; dueAt = now.plus(2, ChronoUnit.DAYS) }
+        val spelling = state().apply { skill = VocabularySkill.SPELLING; dueAt = now }
+        val unavailable = state().apply { skill = VocabularySkill.CONTEXT; skillAvailable = false; dueAt = now.minus(1, ChronoUnit.DAYS) }
+        assertEquals(now, vocabularyEntryDueAt(entry, listOf(meaning, spelling, unavailable)))
+        spelling.skillAvailable = false
+        assertEquals(meaning.dueAt, vocabularyEntryDueAt(entry, listOf(meaning, spelling, unavailable)))
+    }
 
     @Test
     fun `good advances through transparent intervals and stages`() {

@@ -1,5 +1,10 @@
 package com.playsay.vocabulary.service
 
+import com.playsay.vocabulary.dto.PracticeRating
+import com.playsay.vocabulary.repo.VocabularyEntryRepo
+import com.playsay.vocabulary.repo.VocabularyOccurrenceRepo
+import com.playsay.vocabulary.repo.VocabularySkillStateRepo
+import org.mockito.Mockito
 import com.playsay.vocabulary.dto.MemoryReviewReason
 import com.playsay.vocabulary.dto.VocabularySelectionCriteriaRequest
 import com.playsay.vocabulary.dto.VocabularySelectionMatch
@@ -18,6 +23,26 @@ import org.junit.jupiter.api.Test
 class VocabularySelectionResolverTest {
     private val now = Instant.parse("2026-08-20T12:00:00Z")
     private val resolver = VocabularySelectionResolver()
+
+    @Test
+    fun `indexed forgotten lookup includes again ratings without a lapsed review reason`() {
+        val again = entry("again", now)
+        val lapsed = entry("lapsed", now)
+        val entries = Mockito.mock(VocabularyEntryRepo::class.java)
+        val occurrences = Mockito.mock(VocabularyOccurrenceRepo::class.java)
+        val statesRepo = Mockito.mock(VocabularySkillStateRepo::class.java)
+        Mockito.`when`(statesRepo.findEntryIdsByReviewReason("learner", "LAPSED")).thenReturn(listOf(lapsed.id))
+        Mockito.`when`(statesRepo.findEntryIdsByLastRating("learner", PracticeRating.AGAIN)).thenReturn(listOf(again.id))
+        val states = mapOf(
+            again.id to listOf(state(again).apply { lastRating = PracticeRating.AGAIN; reviewReason = "DUE" }),
+            lapsed.id to listOf(state(lapsed).apply { reviewReason = "LAPSED" }),
+        )
+        val criteria = VocabularySelectionCriteriaRequest(sources = setOf(VocabularySelectionSource.FORGOTTEN))
+        val indexed = VocabularySelectionResolver(VocabularyIndexedSelectionLookup(entries, occurrences, statesRepo))
+        val expected = resolver.resolve(listOf(again, lapsed), states, criteria, now)
+        assertEquals(expected, indexed.resolve(listOf(again, lapsed), states, criteria, now))
+        assertEquals(setOf(again.id, lapsed.id), expected.eligibleEntries.map { it.id }.toSet())
+    }
 
     @Test
     fun `union combines recent and difficult while intersection requires both`() {

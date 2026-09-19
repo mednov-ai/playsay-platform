@@ -50,7 +50,7 @@ class VocabularyPracticePlanner(
             candidates = eligible.map { entry ->
                 VocabularySelectionCandidate(
                     id = entry.id,
-                    dueAt = entryDueAt(entry, statesByEntry[entry.id].orEmpty()),
+                    dueAt = vocabularyEntryDueAt(entry, statesByEntry[entry.id].orEmpty()),
                     stage = aggregateVocabularyStage(statesByEntry[entry.id].orEmpty()),
                     updatedAt = entry.updatedAt,
                     priority = selectionPriority(entry, statesByEntry[entry.id].orEmpty(), recentLessonEntryIds, now),
@@ -320,7 +320,7 @@ class VocabularyPracticePlanner(
         now: Instant,
     ): PracticeSelectionReason {
         if (entry.id in pinnedIds) return PracticeSelectionReason.PINNED
-        val dueAt = entryDueAt(entry, states)
+        val dueAt = vocabularyEntryDueAt(entry, states)
         if (dueAt.isBefore(now.truncatedTo(ChronoUnit.DAYS))) return PracticeSelectionReason.OVERDUE
         if (!dueAt.isAfter(now)) return PracticeSelectionReason.DUE_TODAY
         if (entry.id in recentLessonEntryIds) return PracticeSelectionReason.RECENT_LESSON
@@ -333,7 +333,7 @@ class VocabularyPracticePlanner(
         recentLessonEntryIds: Set<UUID>,
         now: Instant,
     ): Int {
-        val dueAt = entryDueAt(entry, states)
+        val dueAt = vocabularyEntryDueAt(entry, states)
         return when {
             !dueAt.isAfter(now) -> 0
             dueAt.isBefore(now.plus(1, ChronoUnit.DAYS)) -> 1
@@ -344,13 +344,6 @@ class VocabularyPracticePlanner(
         }
     }
 
-    private fun entryDueAt(entry: VocabularyEntryEntity, states: List<VocabularySkillStateEntity>): Instant {
-        val required = states.filter { state ->
-            state.skill in setOf(VocabularySkill.MEANING, VocabularySkill.FORM) ||
-                (state.skill == VocabularySkill.CONTEXT && exercisePolicy.isSkillAvailable(entry, VocabularySkill.CONTEXT))
-        }
-        return required.minOfOrNull(VocabularySkillStateEntity::dueAt) ?: entry.createdAt
-    }
 
     private fun exactContextMatch(entry: VocabularyEntryEntity): MatchResult? {
         val example = entry.example?.trim().orEmpty()

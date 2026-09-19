@@ -562,3 +562,11 @@ Track this matrix under OpenSpec `restore-vocabulary-practice-reliability`. Exis
 | VR-08 | Leave a generating card open; finish/fail generation | Bounded refresh reaches the allowed terminal state; text practice remains usable. |
 
 Complete the existing dictionary CRUD/group-partial-failure, recipes, all exercise types, live two-student isolation/continuation, homework review/progress retry, Key whole-word/n-gram/mixed and media privacy/reuse scenarios as well. Attach build/source/image identities, viewport/locale, expected/actual, PASS/FAIL/BLOCKED and sanitized evidence per scenario. Mock tests and healthy pods do not close real-API acceptance.
+
+### Additional findings from DEV browser acceptance (2026-09-19)
+
+- Matching feedback must show source/translation pairs, including retry after a lost final response; internal matching IDs are never learner-facing text.
+- A fresh Key login must retain vocabularySessionId and the allowlisted return context; the ordinary bundled set must not replace the requested vocabulary set after OIDC.
+- DUE list, dashboard due date and practice selection use the earliest due date among available skills, including SPELLING. Unavailable CONTEXT is excluded.
+- DEV runtime acceptance includes checking vocabulary restart count after image/Key use; observed OOMKilled at the former 512 MiB limit is tracked separately from application regressions.
+- Teacher RETURN currently lacks an agreed rework-snapshot lifecycle; record it as unresolved rather than treating a gateway status change as learner acceptance.

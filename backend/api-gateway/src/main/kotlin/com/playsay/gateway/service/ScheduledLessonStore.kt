@@ -30,6 +30,7 @@ class ScheduledLessonStore(
     private val lessonEmailReminderRepo: LessonEmailReminderRepo,
     private val participantLinkService: ScheduledLessonParticipantLinkService,
     private val lessonAccessLinkService: LessonAccessLinkService,
+    private val materialAssignmentService: ScheduledLessonMaterialAssignmentService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional(readOnly = true)
@@ -192,59 +193,19 @@ class ScheduledLessonStore(
         return updated
     }
 
-    @Transactional
     fun assignSharedMaterial(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
         materialId: UUID,
-    ): ScheduledLessonResponse {
-        authentication.requireScheduleManager()
-        requireLessonManagement(authentication, lessonId)
-        validateMaterialId(authentication, materialId)
-        val lesson = lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        if (lesson.workMode == MetaData.LessonWorkModes.PARALLEL) {
-            throw ProjectResponseException.localized(
-                HttpStatus.BAD_REQUEST,
-                MetaData.ErrorCodes.MATERIAL_IMAGE_PAGE_PARALLEL_UNSUPPORTED,
-            )
-        }
-        lesson.materialId = materialId
-        lesson.inheritTemplateMaterial = false
-        lesson.updatedAt = Instant.now()
-        lessonRepo.saveAndFlush(lesson)
+    ): ScheduledLessonResponse = materialAssignmentService.assignShared(authentication, lessonId, materialId)
 
-        val updated = requireNotNull(find(lessonId)).withParticipants()
-        eventPublisher.publishEvent(LessonChangedEvent(updated))
-        return updated
-    }
-
-    @Transactional
     fun assignParticipantMaterial(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
         participantSubject: String,
         materialId: UUID,
-    ): ScheduledLessonResponse {
-        authentication.requireScheduleManager()
-        requireLessonManagement(authentication, lessonId)
-        validateMaterialId(authentication, materialId)
-        val lesson = lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        if (lesson.workMode != MetaData.LessonWorkModes.PARALLEL) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID)
-        }
-        val participant = lessonParticipantRepo.findByLessonId(lessonId).firstOrNull { item ->
-            appUserRepo.findById(item.studentUserId).orElse(null)?.keycloakSubject == participantSubject
-        } ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        participant.materialId = materialId
-        lessonParticipantRepo.saveAndFlush(participant)
-        lesson.updatedAt = Instant.now()
-        lessonRepo.saveAndFlush(lesson)
-        val updated = requireNotNull(find(lessonId)).withParticipants()
-        eventPublisher.publishEvent(LessonChangedEvent(updated))
-        return updated
-    }
+    ): ScheduledLessonResponse =
+        materialAssignmentService.assignParticipant(authentication, lessonId, participantSubject, materialId)
 
     @Transactional
     fun delete(authentication: JwtAuthenticationToken, lessonId: UUID) {

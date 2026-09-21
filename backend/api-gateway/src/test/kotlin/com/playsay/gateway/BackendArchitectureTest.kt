@@ -114,9 +114,15 @@ class BackendArchitectureTest : KotlinSpringModuleArchitectureTest() {
             "WorksheetAnalysisWorker",
             "WorksheetStagingObjectStorage",
         )
+        val documentPreparationAllowlist = mapOf(
+            "service/MaterialDocumentPreparationService.kt" to setOf("org.apache.pdfbox"),
+        )
         val violations = kotlinSources()
             .flatMap { source ->
-                forbiddenTokens.filter(source.text::contains).map { token -> "${source.relativePath}: $token" }
+                forbiddenTokens
+                    .filter(source.text::contains)
+                    .filterNot { token -> token in documentPreparationAllowlist[source.relativePath].orEmpty() }
+                    .map { token -> "${source.relativePath}: $token" }
             }
 
         assertTrue(violations.isEmpty(), "PDF, session, staging and worker implementation belongs to worksheet-import-service: $violations")

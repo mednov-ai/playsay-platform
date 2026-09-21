@@ -26,7 +26,7 @@ spec:
       tty: true
       env:
         - name: NODE_OPTIONS
-          value: "--max-old-space-size=1024"
+          value: "--max-old-space-size=1280"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /cache/npm

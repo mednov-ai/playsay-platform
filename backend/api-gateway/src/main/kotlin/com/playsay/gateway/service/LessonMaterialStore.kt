@@ -288,10 +288,8 @@ class LessonMaterialStore(
 
     @Transactional
     fun uploadDocument(
-        authentication: JwtAuthenticationToken,
-        materialId: UUID,
-        file: MultipartFile,
-        idempotencyKey: String?,
+        authentication: JwtAuthenticationToken, materialId: UUID,
+        file: MultipartFile, idempotencyKey: String?,
     ): MaterialDocumentUploadResponse {
         lessonMaterialCatalogService.requireEditable(
             authentication,
@@ -303,9 +301,7 @@ class LessonMaterialStore(
 
     @Transactional(readOnly = true)
     fun documentUploadStatus(
-        authentication: JwtAuthenticationToken,
-        materialId: UUID,
-        uploadId: UUID,
+        authentication: JwtAuthenticationToken, materialId: UUID, uploadId: UUID,
     ): MaterialDocumentUploadResponse {
         lessonMaterialCatalogService.requireEditable(
             authentication,

@@ -981,7 +981,7 @@ async function verifyAnchoredTextScroll(teacherPage, studentPage) {
   await assertAnchoredTextFollowsImageScroll(teacherPage, "teacher");
   await assertAnchoredTextFollowsImageScroll(studentPage, "student");
 
-  await studentPage.locator("[data-testid='material-focus-close']").click();
+  await teacherPage.locator("[data-testid='material-focus-close']").click();
   const closeResults = await Promise.allSettled([
     waitForFocusedSmokeImageClosed(teacherPage, "teacher"),
     waitForFocusedSmokeImageClosed(studentPage, "student"),

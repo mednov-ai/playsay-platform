@@ -107,6 +107,38 @@ class MaterialDocumentPreparationService {
             ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
         val relationshipsBytes = entries[PRESENTATION_RELS_PATH]
             ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
+        validatePptxSafety(entries)
+
+        val presentation = parseXml(presentationBytes)
+        val relationships = parseXml(relationshipsBytes)
+        val slides = readPptxSlides(presentation, relationships)
+        if (slides.visible.isEmpty() || slides.visible.size > DOCUMENT_MAX_PAGES) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
+        }
+        removeHiddenSlideIds(presentation)
+
+        val removed = entries.keys.filterTo(mutableSetOf()) { path ->
+            path.startsWith("ppt/notesSlides/") ||
+                path.startsWith("ppt/notesMasters/") ||
+                path.startsWith("ppt/comments/") ||
+                path.startsWith("ppt/commentAuthors") ||
+                slides.hidden.any { hidden -> path == hidden || path == slideRelsPath(hidden) }
+        }
+        return PreparedMaterialDocument(
+            format = MaterialDocumentFormat.PPTX,
+            mimeType = PPTX_MIME,
+            extension = "pptx",
+            originalFileName = null,
+            sourceBytes = source,
+            displayBytes = writeSanitizedPptx(entries, presentation, removed),
+            revision = "",
+            pages = slides.visible.mapIndexed { index, _ ->
+                MaterialDocumentPageManifestResponse("slide-${index + 1}", index, slides.width, slides.height)
+            },
+        )
+    }
+
+    private fun validatePptxSafety(entries: Map<String, ByteArray>) {
         if (entries.keys.any(::isUnsafePptxEntry)) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
         entries.filterKeys { it.endsWith(".rels") }.values.forEach { bytes ->
             val relationships = parseXml(bytes)
@@ -118,65 +150,62 @@ class MaterialDocumentPreparationService {
                 }
             }
         }
+    }
 
-        val presentation = parseXml(presentationBytes)
-        val relationships = parseXml(relationshipsBytes)
+    private fun readPptxSlides(presentation: Document, relationships: Document): PptxSlides {
         val slideTargetsById = relationshipTargets(relationships)
         val slideIds = presentation.getElementsByTagNameNS(PRESENTATION_NS, "sldId")
-        val visibleSlides = mutableListOf<String>()
-        val hiddenSlides = mutableSetOf<String>()
+        val visible = mutableListOf<String>()
+        val hidden = mutableSetOf<String>()
         repeat(slideIds.length) { index ->
             val slide = slideIds.item(index) as Element
             val relationshipId = slide.getAttributeNS(OFFICE_RELATIONSHIPS_NS, "id")
             val target = slideTargetsById[relationshipId]
                 ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
             val path = resolvePptTarget(PRESENTATION_PATH, target)
-            val hidden = slide.getAttribute("show").lowercase() in setOf("0", "false", "off")
-            if (hidden) hiddenSlides += path else visibleSlides += path
+            if (slide.isHidden()) hidden += path else visible += path
         }
-        if (visibleSlides.isEmpty() || visibleSlides.size > DOCUMENT_MAX_PAGES) {
-            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
-        }
-        removeHiddenSlideIds(presentation)
-
         val slideSize = presentation.getElementsByTagNameNS(PRESENTATION_NS, "sldSz").item(0) as? Element
-        val width = slideSize?.getAttribute("cx")?.toDoubleOrNull()?.div(12_700.0) ?: 960.0
-        val height = slideSize?.getAttribute("cy")?.toDoubleOrNull()?.div(12_700.0) ?: 540.0
-        val removed = entries.keys.filterTo(mutableSetOf()) { path ->
-            path.startsWith("ppt/notesSlides/") ||
-                path.startsWith("ppt/notesMasters/") ||
-                path.startsWith("ppt/comments/") ||
-                path.startsWith("ppt/commentAuthors") ||
-                hiddenSlides.any { hidden -> path == hidden || path == slideRelsPath(hidden) }
-        }
+        return PptxSlides(
+            visible = visible,
+            hidden = hidden,
+            width = slideSize?.getAttribute("cx")?.toDoubleOrNull()?.div(12_700.0) ?: 960.0,
+            height = slideSize?.getAttribute("cy")?.toDoubleOrNull()?.div(12_700.0) ?: 540.0,
+        )
+    }
 
+    private fun Element.isHidden(): Boolean = getAttribute("show").lowercase() in setOf("0", "false", "off")
+
+    private fun writeSanitizedPptx(
+        entries: Map<String, ByteArray>,
+        presentation: Document,
+        removed: Set<String>,
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             entries.forEach { (path, bytes) ->
-                if (path in removed) return@forEach
-                val sanitized = when {
-                    path == PRESENTATION_PATH -> serializeXml(presentation)
-                    path.endsWith(".rels") -> sanitizeRelationships(bytes, path, removed)
-                    path == "[Content_Types].xml" -> sanitizeContentTypes(bytes, removed)
-                    else -> bytes
-                }
-                zip.putNextEntry(ZipEntry(path))
-                zip.write(sanitized)
-                zip.closeEntry()
+                if (path !in removed) writeSanitizedPptxEntry(zip, path, bytes, presentation, removed)
             }
         }
-        return PreparedMaterialDocument(
-            format = MaterialDocumentFormat.PPTX,
-            mimeType = PPTX_MIME,
-            extension = "pptx",
-            originalFileName = null,
-            sourceBytes = source,
-            displayBytes = output.toByteArray(),
-            revision = "",
-            pages = visibleSlides.mapIndexed { index, _ ->
-                MaterialDocumentPageManifestResponse("slide-${index + 1}", index, width, height)
-            },
-        )
+        return output.toByteArray()
+    }
+
+    private fun writeSanitizedPptxEntry(
+        zip: ZipOutputStream,
+        path: String,
+        bytes: ByteArray,
+        presentation: Document,
+        removed: Set<String>,
+    ) {
+        val sanitized = when {
+            path == PRESENTATION_PATH -> serializeXml(presentation)
+            path.endsWith(".rels") -> sanitizeRelationships(bytes, path, removed)
+            path == "[Content_Types].xml" -> sanitizeContentTypes(bytes, removed)
+            else -> bytes
+        }
+        zip.putNextEntry(ZipEntry(path))
+        zip.write(sanitized)
+        zip.closeEntry()
     }
 
     private fun readBoundedZip(bytes: ByteArray): LinkedHashMap<String, ByteArray> {
@@ -185,26 +214,39 @@ class MaterialDocumentPreparationService {
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                val path = entry.name.replace('\\', '/')
-                if (path.startsWith("/") || path.split('/').any { it == ".." } || entries.containsKey(path)) {
-                    fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
-                }
-                if (entries.size >= DOCUMENT_MAX_ZIP_ENTRIES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = zip.read(buffer)
-                    if (read < 0) break
-                    expandedBytes += read
-                    if (expandedBytes > DOCUMENT_MAX_EXPANDED_BYTES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
-                    output.write(buffer, 0, read)
-                }
-                if (!entry.isDirectory) entries[path] = output.toByteArray()
+                expandedBytes = readZipEntry(zip, entry, entries, expandedBytes)
                 zip.closeEntry()
             }
         }
         if (entries["[Content_Types].xml"] == null) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
         return entries
+    }
+
+    private fun readZipEntry(
+        zip: ZipInputStream,
+        entry: ZipEntry,
+        entries: MutableMap<String, ByteArray>,
+        initialExpandedBytes: Long,
+    ): Long {
+        val path = entry.name.replace('\\', '/')
+        if (path.startsWith("/") || path.split('/').any { it == ".." } || entries.containsKey(path)) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
+        }
+        if (entries.size >= DOCUMENT_MAX_ZIP_ENTRIES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var expandedBytes = initialExpandedBytes
+        while (true) {
+            val read = zip.read(buffer)
+            if (read < 0) break
+            expandedBytes += read
+            if (expandedBytes > DOCUMENT_MAX_EXPANDED_BYTES) {
+                fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
+            }
+            output.write(buffer, 0, read)
+        }
+        if (!entry.isDirectory) entries[path] = output.toByteArray()
+        return expandedBytes
     }
 
     private fun sanitizeRelationships(bytes: ByteArray, relsPath: String, removed: Set<String>): ByteArray {
@@ -343,6 +385,13 @@ data class PreparedMaterialDocument(
     val displayBytes: ByteArray,
     val revision: String,
     val pages: List<MaterialDocumentPageManifestResponse>,
+)
+
+private data class PptxSlides(
+    val visible: List<String>,
+    val hidden: Set<String>,
+    val width: Double,
+    val height: Double,
 )
 
 private const val DOCUMENT_MAX_MEGABYTES = 64

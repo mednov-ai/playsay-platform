@@ -144,6 +144,21 @@ export type LessonMaterialAsset = {
   metadata: LessonMaterialJson;
   createdAt: string;
 };
+export type MaterialDocumentPageManifest = {
+  id: string;
+  index: number;
+  width: number;
+  height: number;
+};
+export type MaterialDocumentUpload = {
+  uploadId: string;
+  status: "VALIDATING" | "READY" | "FAILED" | string;
+  format: "PDF" | "PPTX" | string;
+  revision?: string | null;
+  displayAsset?: LessonMaterialAsset | null;
+  pageManifest: MaterialDocumentPageManifest[];
+  errorCode?: string | null;
+};
 export type MaterialImagePageResult = {
   material: LessonMaterial;
   activePageId: string;

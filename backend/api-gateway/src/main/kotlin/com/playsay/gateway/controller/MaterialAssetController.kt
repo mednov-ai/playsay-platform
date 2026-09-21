@@ -2,6 +2,7 @@ package com.playsay.gateway.controller
 
 import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
+import com.playsay.gateway.dto.MaterialDocumentUploadResponse
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
 import com.playsay.gateway.error.ProjectErrorResponse
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestPart
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
@@ -33,6 +35,42 @@ import org.springframework.web.multipart.MultipartFile
 class MaterialAssetController(
     private val store: LessonMaterialStore,
 ) {
+    @PostMapping(
+        "/materials/{materialId}/assets/documents",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "uploadMaterialDocument",
+        summary = "Upload a PDF or PPTX document",
+        description = "Validates the source and creates an immutable sanitized display revision.",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun uploadDocument(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @RequestPart("file") file: MultipartFile,
+        @RequestHeader("Idempotency-Key", required = false) idempotencyKey: String?,
+    ): ResponseEntity<MaterialDocumentUploadResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            store.uploadDocument(authentication, materialId, file, idempotencyKey),
+        )
+
+    @GetMapping(
+        "/materials/{materialId}/assets/document-uploads/{uploadId}",
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "getMaterialDocumentUpload",
+        summary = "Get PDF or PPTX validation status",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun documentUploadStatus(
+        authentication: JwtAuthenticationToken,
+        @PathVariable materialId: UUID,
+        @PathVariable uploadId: UUID,
+    ): MaterialDocumentUploadResponse = store.documentUploadStatus(authentication, materialId, uploadId)
+
     @PostMapping(
         "/materials/{materialId}/assets/images",
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],

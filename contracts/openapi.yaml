@@ -2568,6 +2568,46 @@ paths:
           description: Object storage failed
       security:
       - bearerAuth: []
+  /materials/{materialId}/assets/documents:
+    post:
+      tags:
+      - Materials
+      summary: Upload a PDF or PPTX document
+      description: Validates the source and creates an immutable sanitized display
+        revision.
+      operationId: uploadMaterialDocument
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDocumentUploadResponse"
+      security:
+      - bearerAuth: []
   /materials/{materialId}/answer-suggestions:
     post:
       tags:
@@ -4091,6 +4131,34 @@ paths:
           description: Material asset not found
         "502":
           description: Object storage failed
+      security:
+      - bearerAuth: []
+  /materials/{materialId}/assets/document-uploads/{uploadId}:
+    get:
+      tags:
+      - Materials
+      summary: Get PDF or PPTX validation status
+      operationId: getMaterialDocumentUpload
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: uploadId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDocumentUploadResponse"
       security:
       - bearerAuth: []
   /hello:
@@ -6960,6 +7028,56 @@ components:
       - materialId
       - metadata
       - provider
+    MaterialDocumentPageManifestResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        index:
+          type: integer
+          format: int32
+        width:
+          type: number
+          format: double
+        height:
+          type: number
+          format: double
+      required:
+      - height
+      - id
+      - index
+      - width
+    MaterialDocumentUploadResponse:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        format:
+          type: string
+        revision:
+          type:
+          - string
+          - "null"
+        displayAsset:
+          oneOf:
+          - $ref: "#/components/schemas/MaterialAssetResponse"
+          - type: "null"
+        pageManifest:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialDocumentPageManifestResponse"
+        errorCode:
+          type:
+          - string
+          - "null"
+      required:
+      - format
+      - pageManifest
+      - status
+      - uploadId
     MaterialAnswerSuggestionsRequest:
       type: object
       properties:

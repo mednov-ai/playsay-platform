@@ -2,9 +2,15 @@ export type MaterialViewportPresentationMode =
   | "default"
   | "html-game-focus"
   | "image-focus"
+  | "document-focus"
   | "external-activity-focus";
 
 export type MaterialViewportState = {
+  documentBlockId?: string;
+  documentPageIndex?: number;
+  documentPdfLayout?: "SINGLE" | "SPREAD";
+  documentPdfSeparateCover?: boolean;
+  documentRevision?: string;
   focusedBlockId?: string;
   materialId: string;
   pageId: string;

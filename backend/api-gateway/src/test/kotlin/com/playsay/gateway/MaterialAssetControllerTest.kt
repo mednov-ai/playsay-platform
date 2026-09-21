@@ -9,6 +9,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.io.ByteArrayOutputStream
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.TestInstance
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpStatus
@@ -386,6 +389,45 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
                 assertTrue(error.errorCode != MetaData.ErrorCodes.MATERIAL_HTML_GAME_TOO_LARGE)
             }
         }
+    }
+
+    @Test
+    fun `document upload is idempotent and keeps teacher source private`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val material = materialCrudController.create(
+            teacher,
+            LessonMaterialRequest(
+                title = "Public document",
+                status = "PUBLISHED",
+                visibility = "PUBLIC",
+            ),
+        ).body!!
+        val pdf = ByteArrayOutputStream().use { output ->
+            PDDocument().use { document ->
+                document.addPage(PDPage())
+                document.save(output)
+            }
+            output.toByteArray()
+        }
+        val file = MockMultipartFile("file", "lesson.pdf", "application/pdf", pdf)
+
+        val first = materialAssetController.uploadDocument(teacher, material.id, file, "stable-key").body!!
+        val retry = materialAssetController.uploadDocument(teacher, material.id, file, "stable-key").body!!
+
+        assertEquals("READY", first.status)
+        assertEquals(first.uploadId, retry.uploadId)
+        assertEquals(first.displayAsset!!.id, retry.displayAsset!!.id)
+        assertEquals(1, first.pageManifest.size)
+        assertEquals(1, materialAssetController.listAssets(teacher, material.id).count { it.kind == "DOCUMENT_DISPLAY" })
+        assertFalse(materialAssetController.listAssets(teacher, material.id).any { it.kind == "DOCUMENT_SOURCE" })
+        assertEquals("application/pdf", materialAssetController.assetContent(student, material.id, first.displayAsset!!.id).headers.contentType?.toString())
+
+        val source = materialAssetRepo.findByMaterialId(material.id).single { it.kind == "DOCUMENT_SOURCE" }
+        val forbidden = assertFailsWith<ResponseStatusException> {
+            materialAssetController.assetContent(student, material.id, source.id)
+        }
+        assertEquals(HttpStatus.FORBIDDEN, forbidden.statusCode)
     }
 
     @Test

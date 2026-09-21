@@ -3,6 +3,9 @@ build/
 **/build/
 node_modules/
 dist/
+frontend/web-app/public/pdfjs/
+frontend/web-app/public/vendor/pptx-viewer.css
+frontend/web-app/public/viewer-fixtures/
 frontend/browser-extension/playsay-browser-extension.zip
 *.tsbuildinfo
 .env

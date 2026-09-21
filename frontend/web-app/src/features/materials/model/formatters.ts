@@ -185,6 +185,8 @@ export function materialBlockLabel(type: MaterialBlockType): string {
       return i18n.t("materials.blockTypes.externalActivity");
     case "interactiveWorksheet":
       return i18n.t("materials.blockTypes.interactiveWorksheet");
+    case "document":
+      return i18n.t("materials.blockTypes.document");
     default:
       return i18n.t("materials.blockTypes.fallback");
   }
@@ -377,6 +379,7 @@ export function normalizeMaterialBlockType(value: string): MaterialBlockType | n
     "externalActivity",
     "generatedImage",
     "interactiveWorksheet",
+    "document",
   ];
 
   return allowed.includes(value as MaterialBlockType) ? value as MaterialBlockType : null;

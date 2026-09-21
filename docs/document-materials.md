@@ -1,0 +1,15 @@
+# PDF and PPTX material contract
+
+PDF/PPTX viewing is a separate material flow from worksheet preparation. Worksheet import may rasterize and interpret pages and keeps its source provenance teacher-only. Document material upload preserves a static visible document for direct browser reading and never exposes worksheet provenance through document endpoints.
+
+`POST /materials/{materialId}/assets/documents` accepts multipart PDF or PPTX with `Idempotency-Key`. The same key and bytes return the same upload; the same key with different bytes returns `409 MATERIAL_DOCUMENT_IDEMPOTENCY_CONFLICT`. `GET /materials/{materialId}/assets/document-uploads/{uploadId}` returns the recoverable status. A ready result contains an immutable display asset, revision and ordered page manifest. Source assets are excluded from normal asset lists and learner reads.
+
+Uploading during a lesson uses the same private-draft material flow as the library. A ready document is added to the teacher's material selector while the current lesson material remains active. The teacher must explicitly assign the ready material through the existing lesson-material assignment contract.
+
+Validation limits are 64 MiB, 50 visible pages/slides, 10,000 PPTX ZIP entries and 256 MiB expanded PPTX content. PDF display bytes remove actions, forms, embedded files, JavaScript and annotations. PPTX display bytes reject external relationships and active/OLE/executable/media payloads and remove hidden slides, notes and comments. Visible content, including visible answer keys, is intentionally shared.
+
+Material blocks use `type=document`, `documentAssetId`, `documentFormat`, `documentRevision`, ordered `documentPages`, `documentPdfLayout` and `documentPdfSeparateCover`. Existing schema v1/v2 readers remain valid. The browser loads `react-pdf` or `pptx-react-viewer` lazily from the application bundle; PDF.js worker, CMaps, fonts and WASM are served from the application origin.
+
+The teacher publishes document focus, revision, page/spread and placement through an authorized command on the existing lesson viewport. The API token carries a fail-closed viewport publication claim; collaboration-service assigns the canonical revision, persists accepted state in the Yjs snapshot and rejects learner commands or direct learner Yjs mutations of `materialViewport`. Learner cursor, answer and permitted annotation updates remain writable. Zoom and pan remain local. Annotation anchors include block, immutable revision and page identity. Panel/expanded switches retain viewer state, and only one focused primary activity occupies the workspace.
+
+Document collaboration reuses the existing authenticated Yjs `/collab/ws` connection and does not open a document-specific WebSocket, WebRTC connection or TURN allocation. For the approved `.ru` route that socket therefore follows the existing Selectel `rf-two-hop` policy. Any future separate realtime channel for documents must be added to the same server-authored Selectel route contract before it can be enabled; it must not select an edge endpoint in the browser or bypass the collaboration route.

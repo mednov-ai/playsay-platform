@@ -22,6 +22,7 @@ import {
 import { RenderedMaterialBlock } from "./blocks/RenderedMaterialBlock";
 import { HtmlGameFrame } from "./blocks/HtmlGameFrame";
 import { ExternalActivityFrame } from "./blocks/ExternalActivityFrame";
+import { DocumentMaterialViewer, defaultDocumentViewerState, type DocumentViewerState } from "./document/DocumentMaterialViewer";
 import { useAppTranslation } from "../../../shared/i18n";
 
 export const MATERIAL_ASSET_LOAD_TIMEOUT_MS = 30_000;
@@ -64,6 +65,10 @@ export function LessonMaterialDocumentView({
   externalActivitySync,
   onPresentationModeChange,
   sharedImageFocusBlockId,
+  canControlDocuments = false,
+  onDocumentPresentationChange,
+  sharedDocumentPresentation,
+  sharedDocumentFocusBlockId,
 }: {
   activePageId?: string | null;
   allowVideoFullscreen?: boolean;
@@ -85,10 +90,26 @@ export function LessonMaterialDocumentView({
   videoSync?: MaterialVideoSync;
   externalActivitySync?: MaterialExternalActivitySync;
   onPresentationModeChange?: (
-    mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus",
+    mode: "default" | "html-game-focus" | "image-focus" | "external-activity-focus" | "document-focus",
     blockId?: string,
   ) => void;
   sharedImageFocusBlockId?: string | null;
+  canControlDocuments?: boolean;
+  onDocumentPresentationChange?: (state: {
+    blockId: string;
+    pageIndex: number;
+    pdfLayout: "SINGLE" | "SPREAD";
+    pdfSeparateCover: boolean;
+    revision: string;
+  }) => void;
+  sharedDocumentPresentation?: {
+    blockId: string;
+    pageIndex: number;
+    pdfLayout: "SINGLE" | "SPREAD";
+    pdfSeparateCover: boolean;
+    revision: string;
+  } | null;
+  sharedDocumentFocusBlockId?: string | null;
 }) {
   const { t } = useAppTranslation();
   const document = useMemo(
@@ -105,7 +126,8 @@ export function LessonMaterialDocumentView({
   const [assetTags, setAssetTags] = useState<Record<string, string[]>>({});
   const [assetLoadState, setAssetLoadState] = useState<"idle" | "loading" | "ready" | "partial-error" | "error">("idle");
   const [assetReloadVersion, setAssetReloadVersion] = useState(0);
-  const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image" | "externalActivity"; blockId: string } | null>(null);
+  const [focusedBlock, setFocusedBlock] = useState<{ kind: "htmlGame" | "image" | "externalActivity" | "document"; blockId: string } | null>(null);
+  const [documentViewerStates, setDocumentViewerStates] = useState<Record<string, DocumentViewerState>>({});
   const onPresentationModeChangeRef = useRef(onPresentationModeChange);
   const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
@@ -125,6 +147,7 @@ export function LessonMaterialDocumentView({
     setInternalActivePageId(null);
     setFocusedBlock(null);
     setLaunchedGameIds(new Set());
+    setDocumentViewerStates({});
   }, [material.id]);
 
   useEffect(() => {
@@ -176,12 +199,52 @@ export function LessonMaterialDocumentView({
   }, [allBlocks, sharedImageFocusBlockId]);
 
   useEffect(() => {
+    if (sharedDocumentFocusBlockId === undefined) return;
+    if (sharedDocumentFocusBlockId === null) {
+      setFocusedBlock((current) => current?.kind === "document" ? null : current);
+      return;
+    }
+    const block = allBlocks.find((candidate) => candidate.id === sharedDocumentFocusBlockId && candidate.type === "document");
+    if (block) setFocusedBlock({ kind: "document", blockId: block.id });
+  }, [allBlocks, sharedDocumentFocusBlockId]);
+
+  useEffect(() => {
+    if (!sharedDocumentPresentation) return;
+    const block = allBlocks.find((candidate) => candidate.id === sharedDocumentPresentation.blockId && candidate.type === "document");
+    if (!block || block.documentRevision !== sharedDocumentPresentation.revision) return;
+    setDocumentViewerStates((current) => ({
+      ...current,
+      [block.id]: {
+        ...(current[block.id] ?? defaultDocumentViewerState(block)),
+        pageIndex: Math.min(Math.max(0, sharedDocumentPresentation.pageIndex), Math.max(0, (block.documentPages?.length ?? 1) - 1)),
+        pdfLayout: sharedDocumentPresentation.pdfLayout,
+        pdfSeparateCover: sharedDocumentPresentation.pdfSeparateCover,
+      },
+    }));
+  }, [allBlocks, sharedDocumentPresentation]);
+
+  function updateDocumentState(block: MaterialEditorBlock, state: DocumentViewerState) {
+    setDocumentViewerStates((current) => ({ ...current, [block.id]: state }));
+    if (canControlDocuments && block.documentRevision) {
+      onDocumentPresentationChange?.({
+        blockId: block.id,
+        pageIndex: state.pageIndex,
+        pdfLayout: state.pdfLayout,
+        pdfSeparateCover: state.pdfSeparateCover,
+        revision: block.documentRevision,
+      });
+    }
+  }
+
+  useEffect(() => {
     onPresentationModeChangeRef.current?.(focusedBlock === null
       ? "default"
       : focusedBlock.kind === "htmlGame"
         ? "html-game-focus"
         : focusedBlock.kind === "externalActivity"
           ? "external-activity-focus"
+          : focusedBlock.kind === "document"
+            ? "document-focus"
           : "image-focus", focusedBlock?.blockId);
   }, [focusedBlock]);
 
@@ -272,7 +335,7 @@ export function LessonMaterialDocumentView({
     };
   }, [assetKey, assetReloadVersion, material.id, material.updatedAt]);
 
-  function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity", blockId: string) {
+  function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity" | "document", blockId: string) {
     if (kind === "htmlGame") {
       const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "htmlGame");
       const assetId = block?.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
@@ -428,6 +491,14 @@ export function LessonMaterialDocumentView({
             onBlockPatch={onBlockPatch}
             onRequestFocus={requestBlockFocus}
             pageLayout={page.layout}
+            documentExpanded={focusedBlock?.kind === "document" && focusedBlock.blockId === block.id}
+            canControlDocumentPage={canControlDocuments}
+            documentState={block.type === "document"
+              ? documentViewerStates[block.id] ?? defaultDocumentViewerState(block)
+              : undefined}
+            onDocumentStateChange={block.type === "document"
+              ? (state) => updateDocumentState(block, state)
+              : undefined}
           />;
         })}
       </div>
@@ -441,13 +512,17 @@ export function LessonMaterialDocumentView({
           <button
             aria-label={focusedBlock.kind === "htmlGame"
               ? t("materials.renderer.closeGame")
-              : t("materials.renderer.closeImage")}
+              : focusedBlock.kind === "document"
+                ? t("materials.document.restorePanel")
+                : t("materials.renderer.closeImage")}
             className="playsay-material-focus-close"
             data-testid="material-focus-close"
             onClick={closeBlockFocus}
             title={focusedBlock.kind === "htmlGame"
               ? t("materials.renderer.closeGame")
-              : t("materials.renderer.closeImage")}
+              : focusedBlock.kind === "document"
+                ? t("materials.document.restorePanel")
+                : t("materials.renderer.closeImage")}
             type="button"
           >
             <Minimize2 className="h-5 w-5" />
@@ -495,6 +570,17 @@ export function LessonMaterialDocumentView({
               />
             ) : null}
           </figure>
+        ) : null}
+        {focusedBlock?.kind === "document" && focusedBlockValue?.type === "document" ? (
+          <DocumentMaterialViewer
+            block={focusedBlockValue}
+            canControlPage={canControlDocuments}
+            expanded
+            onExpandedChange={(expanded) => { if (!expanded) closeBlockFocus(); }}
+            onStateChange={(state) => updateDocumentState(focusedBlockValue, state)}
+            src={focusedBlockValue.documentAssetId ? assetUrls[focusedBlockValue.documentAssetId] : undefined}
+            state={documentViewerStates[focusedBlockValue.id] ?? defaultDocumentViewerState(focusedBlockValue)}
+          />
         ) : null}
       </div>
     </div>

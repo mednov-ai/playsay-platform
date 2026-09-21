@@ -66,6 +66,23 @@ data class MaterialAssetResponse(
     val createdAt: Instant,
 )
 
+data class MaterialDocumentPageManifestResponse(
+    val id: String,
+    val index: Int,
+    val width: Double,
+    val height: Double,
+)
+
+data class MaterialDocumentUploadResponse(
+    val uploadId: UUID,
+    val status: String,
+    val format: String,
+    val revision: String?,
+    val displayAsset: MaterialAssetResponse?,
+    val pageManifest: List<MaterialDocumentPageManifestResponse>,
+    val errorCode: String? = null,
+)
+
 data class MaterialImagePageResponse(
     val material: LessonMaterialResponse,
     val activePageId: String,

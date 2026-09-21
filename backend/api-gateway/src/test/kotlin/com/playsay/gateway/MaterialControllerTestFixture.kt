@@ -34,6 +34,8 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
 import javax.sql.DataSource
 import liquibase.integration.spring.SpringLiquibase
 
@@ -117,6 +119,17 @@ abstract class MaterialControllerTestFixture {
         content: String = "<html><head><title>Memory game</title></head><body><button id=\"start\">Start</button><script>document.querySelector('#start').addEventListener('click', () => document.body.dataset.started = 'true')</script></body></html>",
     ): MockMultipartFile =
         MockMultipartFile("file", name, "text/html", content.toByteArray(Charsets.UTF_8))
+
+    protected fun pdfFile(name: String = "lesson.pdf", pages: Int = 2): MockMultipartFile {
+        val bytes = java.io.ByteArrayOutputStream().use { output ->
+            PDDocument().use { document ->
+                repeat(pages) { document.addPage(PDPage()) }
+                document.save(output)
+            }
+            output.toByteArray()
+        }
+        return MockMultipartFile("file", name, "application/pdf", bytes)
+    }
 
     protected fun authentication(
         subject: String = UUID.randomUUID().toString(),

@@ -977,12 +977,28 @@ export type KeySetCompletionContext = {
   lastAcknowledgedPosition: number;
 } | null;
 
+export type KeySetReturnContextTarget = typeof KeySetReturnContextTarget[keyof typeof KeySetReturnContextTarget];
+
+
+export const KeySetReturnContextTarget = {
+  HONEY_SCHOOL_VOCABULARY: 'HONEY_SCHOOL_VOCABULARY',
+  HONEY_SCHOOL_LESSON: 'HONEY_SCHOOL_LESSON',
+  HONEY_SCHOOL_HOMEWORK: 'HONEY_SCHOOL_HOMEWORK',
+} as const;
+
+export type KeySetReturnContextPath = typeof KeySetReturnContextPath[keyof typeof KeySetReturnContextPath];
+
+
+export const KeySetReturnContextPath = {
+  '/': '/',
+} as const;
+
 /**
  * @nullable
  */
 export type KeySetReturnContext = {
-  target: 'HONEY_SCHOOL_VOCABULARY' | 'HONEY_SCHOOL_LESSON' | 'HONEY_SCHOOL_HOMEWORK';
-  path: '/';
+  target: KeySetReturnContextTarget;
+  path: KeySetReturnContextPath;
 } | null;
 
 export interface KeySet {
@@ -1215,11 +1231,25 @@ export const getPostApiVocabularyTranslationSuggestionsUrl = () => {
 
 export const postApiVocabularyTranslationSuggestions = async (translationSuggestionRequest: TranslationSuggestionRequest, options?: RequestInit): Promise<postApiVocabularyTranslationSuggestionsResponse> => {
 
-  const res = await fetch(getPostApiVocabularyTranslationSuggestionsUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyTranslationSuggestionsUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(translationSuggestionRequest)
   }
 )
@@ -1302,11 +1332,25 @@ export const getPostApiVocabularyEntriesUrl = () => {
 
 export const postApiVocabularyEntries = async (createEntry: CreateEntry, options?: RequestInit): Promise<postApiVocabularyEntriesResponse> => {
 
-  const res = await fetch(getPostApiVocabularyEntriesUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyEntriesUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createEntry)
   }
 )
@@ -1343,11 +1387,25 @@ export const getPatchApiVocabularyEntriesEntryIdUrl = (entryId: string,) => {
 export const patchApiVocabularyEntriesEntryId = async (entryId: string,
     updateEntry: UpdateEntry, options?: RequestInit): Promise<patchApiVocabularyEntriesEntryIdResponse> => {
 
-  const res = await fetch(getPatchApiVocabularyEntriesEntryIdUrl(entryId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPatchApiVocabularyEntriesEntryIdUrl(entryId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateEntry)
   }
 )
@@ -1514,11 +1572,25 @@ export const getPutApiVocabularyEntriesEntryIdMediaOverrideUrl = (entryId: strin
 export const putApiVocabularyEntriesEntryIdMediaOverride = async (entryId: string,
     mediaOverride: MediaOverride, options?: RequestInit): Promise<putApiVocabularyEntriesEntryIdMediaOverrideResponse> => {
 
-  const res = await fetch(getPutApiVocabularyEntriesEntryIdMediaOverrideUrl(entryId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPutApiVocabularyEntriesEntryIdMediaOverrideUrl(entryId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(mediaOverride)
   }
 )
@@ -1557,11 +1629,25 @@ export const postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReport = async (en
     assetId: string,
     postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody: PostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody, options?: RequestInit): Promise<postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportResponse> => {
 
-  const res = await fetch(getPostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportUrl(entryId,assetId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportUrl(entryId,assetId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(postApiVocabularyEntriesEntryIdMediaAssetsAssetIdReportBody)
   }
 )
@@ -1749,11 +1835,25 @@ export const getPatchApiVocabularyMediaCandidatesAssetIdUrl = (assetId: string,)
 export const patchApiVocabularyMediaCandidatesAssetId = async (assetId: string,
     mediaReview: MediaReview, options?: RequestInit): Promise<patchApiVocabularyMediaCandidatesAssetIdResponse> => {
 
-  const res = await fetch(getPatchApiVocabularyMediaCandidatesAssetIdUrl(assetId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPatchApiVocabularyMediaCandidatesAssetIdUrl(assetId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(mediaReview)
   }
 )
@@ -1829,11 +1929,25 @@ export const getPatchApiVocabularyMediaSensesSenseIdImageabilityUrl = (senseId: 
 export const patchApiVocabularyMediaSensesSenseIdImageability = async (senseId: string,
     patchApiVocabularyMediaSensesSenseIdImageabilityBody: PatchApiVocabularyMediaSensesSenseIdImageabilityBody, options?: RequestInit): Promise<patchApiVocabularyMediaSensesSenseIdImageabilityResponse> => {
 
-  const res = await fetch(getPatchApiVocabularyMediaSensesSenseIdImageabilityUrl(senseId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPatchApiVocabularyMediaSensesSenseIdImageabilityUrl(senseId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(patchApiVocabularyMediaSensesSenseIdImageabilityBody)
   }
 )
@@ -2073,11 +2187,25 @@ export const getPostApiVocabularyPracticesPreviewUrl = () => {
 
 export const postApiVocabularyPracticesPreview = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesPreviewResponse> => {
 
-  const res = await fetch(getPostApiVocabularyPracticesPreviewUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticesPreviewUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(practiceSettings)
   }
 )
@@ -2116,11 +2244,25 @@ export const getPostApiVocabularyPracticesRecommendedPreviewUrl = () => {
  */
 export const postApiVocabularyPracticesRecommendedPreview = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesRecommendedPreviewResponse> => {
 
-  const res = await fetch(getPostApiVocabularyPracticesRecommendedPreviewUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticesRecommendedPreviewUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(practiceSettings)
   }
 )
@@ -2196,11 +2338,25 @@ export const getPostApiVocabularySelectionRecipesUrl = () => {
 
 export const postApiVocabularySelectionRecipes = async (selectionRecipeRequest: SelectionRecipeRequest, options?: RequestInit): Promise<postApiVocabularySelectionRecipesResponse> => {
 
-  const res = await fetch(getPostApiVocabularySelectionRecipesUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularySelectionRecipesUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(selectionRecipeRequest)
   }
 )
@@ -2284,11 +2440,25 @@ export const getPutApiVocabularySelectionRecipesRecipeIdUrl = (recipeId: string,
 export const putApiVocabularySelectionRecipesRecipeId = async (recipeId: string,
     selectionRecipeRequest: SelectionRecipeRequest, options?: RequestInit): Promise<putApiVocabularySelectionRecipesRecipeIdResponse> => {
 
-  const res = await fetch(getPutApiVocabularySelectionRecipesRecipeIdUrl(recipeId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPutApiVocabularySelectionRecipesRecipeIdUrl(recipeId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(selectionRecipeRequest)
   }
 )
@@ -2375,11 +2545,25 @@ export const getPostApiVocabularyPracticesUrl = () => {
  */
 export const postApiVocabularyPractices = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesResponse> => {
 
-  const res = await fetch(getPostApiVocabularyPracticesUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticesUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(practiceSettings)
   }
 )
@@ -2426,11 +2610,25 @@ export const getPostApiVocabularyPracticesSelfUrl = () => {
  */
 export const postApiVocabularyPracticesSelf = async (practiceSettings: PracticeSettings, options?: RequestInit): Promise<postApiVocabularyPracticesSelfResponse> => {
 
-  const res = await fetch(getPostApiVocabularyPracticesSelfUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticesSelfUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(practiceSettings)
   }
 )
@@ -2514,11 +2712,25 @@ export const getPatchApiVocabularyPracticesPracticeIdStatusUrl = (practiceId: st
 export const patchApiVocabularyPracticesPracticeIdStatus = async (practiceId: string,
     patchApiVocabularyPracticesPracticeIdStatusBody: PatchApiVocabularyPracticesPracticeIdStatusBody, options?: RequestInit): Promise<patchApiVocabularyPracticesPracticeIdStatusResponse> => {
 
-  const res = await fetch(getPatchApiVocabularyPracticesPracticeIdStatusUrl(practiceId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPatchApiVocabularyPracticesPracticeIdStatusUrl(practiceId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(patchApiVocabularyPracticesPracticeIdStatusBody)
   }
 )
@@ -2649,11 +2861,25 @@ export const getPostApiVocabularyPracticeSessionsSessionIdAttemptsUrl = (session
 export const postApiVocabularyPracticeSessionsSessionIdAttempts = async (sessionId: string,
     attemptRequest: AttemptRequest, options?: RequestInit): Promise<postApiVocabularyPracticeSessionsSessionIdAttemptsResponse> => {
 
-  const res = await fetch(getPostApiVocabularyPracticeSessionsSessionIdAttemptsUrl(sessionId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticeSessionsSessionIdAttemptsUrl(sessionId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(attemptRequest)
   }
 )
@@ -2785,11 +3011,25 @@ export const getPatchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementUrl
 export const patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgement = async (sessionId: string,
     keyAcknowledgementRequest: KeyAcknowledgementRequest, options?: RequestInit): Promise<patchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementResponse> => {
 
-  const res = await fetch(getPatchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementUrl(sessionId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPatchApiVocabularyPracticeSessionsSessionIdKeyAcknowledgementUrl(sessionId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(keyAcknowledgementRequest)
   }
 )
@@ -2926,11 +3166,25 @@ export const getPostInternalVocabularyAssignmentsUrl = () => {
 
 export const postInternalVocabularyAssignments = async (homeworkPreparation: HomeworkPreparation, options?: RequestInit): Promise<postInternalVocabularyAssignmentsResponse> => {
 
-  const res = await fetch(getPostInternalVocabularyAssignmentsUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostInternalVocabularyAssignmentsUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(homeworkPreparation)
   }
 )
@@ -3034,11 +3288,25 @@ export const getPostInternalVocabularyPracticeSessionsSessionIdKeyResultsUrl = (
 export const postInternalVocabularyPracticeSessionsSessionIdKeyResults = async (sessionId: string,
     keyResult: KeyResult, options?: RequestInit): Promise<postInternalVocabularyPracticeSessionsSessionIdKeyResultsResponse> => {
 
-  const res = await fetch(getPostInternalVocabularyPracticeSessionsSessionIdKeyResultsUrl(sessionId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostInternalVocabularyPracticeSessionsSessionIdKeyResultsUrl(sessionId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(keyResult)
   }
 )

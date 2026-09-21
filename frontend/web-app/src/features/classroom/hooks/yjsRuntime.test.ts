@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
+import * as decoding from "lib0/decoding";
 import * as Y from "yjs";
 import {
   createYjsWorkspaceRuntime,
@@ -357,23 +358,67 @@ describe("yjs workspace runtime annotations", () => {
     });
 
     runtime.setMaterialViewport({
-      focusedBlockId: "image-1",
+      documentBlockId: "document-1",
+      documentPageIndex: 3.8,
+      documentPdfLayout: "SPREAD",
+      documentPdfSeparateCover: true,
+      documentRevision: "revision-1",
+      focusedBlockId: "document-1",
       materialId: "material-1",
       pageId: "page-1",
-      presentationMode: "image-focus",
-      scrollContainer: "image",
+      presentationMode: "document-focus",
+      scrollContainer: "document",
       x: 1.5,
       y: -0.2,
     });
 
     expect(viewportChanges.at(-1)).toEqual(expect.objectContaining({
-      focusedBlockId: "image-1",
+      documentBlockId: "document-1",
+      documentPageIndex: 3,
+      documentPdfLayout: "SPREAD",
+      documentPdfSeparateCover: true,
+      documentRevision: "revision-1",
+      focusedBlockId: "document-1",
       materialId: "material-1",
-      presentationMode: "image-focus",
-      scrollContainer: "image",
+      presentationMode: "document-focus",
+      scrollContainer: "document",
       x: 1,
       y: 0,
     }));
+    runtime.destroy();
+  });
+
+  it("publishes viewport changes as an authoritative collaboration command", () => {
+    const sent: Uint8Array[] = [];
+    const socket = {
+      OPEN: 1,
+      readyState: 1,
+      send: (payload: Uint8Array) => sent.push(payload),
+    } as unknown as WebSocket;
+    const runtime = createYjsWorkspaceRuntime({
+      color: "#ff5c00",
+      onAnnotationChange: () => undefined,
+      onHtmlGameEffectsChange: () => undefined,
+      onHtmlGameInputsChange: () => undefined,
+      onHtmlGameSnapshotsChange: () => undefined,
+      onParticipantsChange: () => undefined,
+      onTextChange: () => undefined,
+      participantName: "Teacher",
+      snapshot: null,
+    });
+    runtime.startSocketSync(socket);
+
+    runtime.setMaterialViewport({
+      materialId: "material-1",
+      pageId: "page-1",
+      presentationMode: "document-focus",
+      scrollContainer: "document",
+      x: 0,
+      y: 0,
+    }, { presentationChanged: true });
+
+    const messageTypes = sent.map((payload) => decoding.readVarUint(decoding.createDecoder(payload)));
+    expect(messageTypes.at(-1)).toBe(3);
     runtime.destroy();
   });
 

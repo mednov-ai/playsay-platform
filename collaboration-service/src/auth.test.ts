@@ -15,6 +15,7 @@ describe("verifyCollaborationToken", () => {
       documentKind: "MATERIAL_WORK",
       scope: "INDIVIDUAL",
       yjsDocumentId: "lesson:22222222-2222-4222-8222-222222222222:material:33333333-3333-4333-8333-333333333333:student:44444444-4444-4444-8444-444444444444:kind:MATERIAL_WORK",
+      canPublishMaterialViewport: false,
     });
 
     const claims = await verifyCollaborationToken(token, {
@@ -23,7 +24,25 @@ describe("verifyCollaborationToken", () => {
 
     expect(claims.documentId).toBe("11111111-1111-4111-8111-111111111111");
     expect(claims.subject).toBe("student-1");
+    expect(claims.canPublishMaterialViewport).toBe(false);
     expect(collaborationRoomName(claims)).toBe(claims.yjsDocumentId);
+  });
+
+  it("defaults viewport publication permission to false for rolling deployments", async () => {
+    const token = await signedToken({
+      documentId: "11111111-1111-4111-8111-111111111111",
+      lessonId: "22222222-2222-4222-8222-222222222222",
+      materialId: "33333333-3333-4333-8333-333333333333",
+      documentKind: "MATERIAL_WORK",
+      scope: "GROUP",
+      yjsDocumentId: "lesson:22222222-2222-4222-8222-222222222222:material:33333333-3333-4333-8333-333333333333:group:kind:MATERIAL_WORK",
+    });
+
+    const claims = await verifyCollaborationToken(token, {
+      tokenSecret: "01234567890123456789012345678901",
+    });
+
+    expect(claims.canPublishMaterialViewport).toBe(false);
   });
 
   it("rejects tokens missing required collaboration claims", async () => {

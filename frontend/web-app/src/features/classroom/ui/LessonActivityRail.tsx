@@ -25,6 +25,7 @@ export function LessonActivityRail({
   onSelectStudent,
   onUploadHtmlGamePage,
   onUploadImagePage,
+  onUploadDocumentPage,
   open,
   owners,
   practice,
@@ -32,6 +33,7 @@ export function LessonActivityRail({
   selectedStudentSubject,
   uploadingHtmlGamePage,
   uploadingImagePage,
+  uploadingDocumentPage,
 }: {
   assigningMaterial: boolean;
   currentMaterialId: string | null;
@@ -42,8 +44,9 @@ export function LessonActivityRail({
   onPracticeChange: (practice: VocabularyPractice | null) => void;
   onSelectMaterial: (materialId: string) => void;
   onSelectStudent: (subject: string) => void;
-  onUploadHtmlGamePage: (file: File) => void;
-  onUploadImagePage: (file: File) => void;
+  onUploadHtmlGamePage?: (file: File) => void;
+  onUploadImagePage?: (file: File) => void;
+  onUploadDocumentPage?: (file: File) => void;
   open: boolean;
   owners: PersonalPracticeOwner[];
   practice: VocabularyPractice | null;
@@ -51,6 +54,7 @@ export function LessonActivityRail({
   selectedStudentSubject: string | null;
   uploadingHtmlGamePage: boolean;
   uploadingImagePage: boolean;
+  uploadingDocumentPage: boolean;
 }) {
   const { t } = useAppTranslation();
   const [tab, setTab] = useState<"MATERIALS" | "PERSONAL">("PERSONAL");
@@ -246,8 +250,10 @@ export function LessonActivityRail({
                   <TeacherAddMaterialMenu
                     onUploadHtmlGamePage={onUploadHtmlGamePage}
                     onUploadImagePage={onUploadImagePage}
+                    onUploadDocumentPage={onUploadDocumentPage}
                     uploadingHtmlGamePage={uploadingHtmlGamePage}
                     uploadingImagePage={uploadingImagePage}
+                    uploadingDocumentPage={uploadingDocumentPage}
                   />
                 </div>
               ) : (

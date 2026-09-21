@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
-  fetchMaterialAssets,
   fetchMaterial,
+  fetchMaterialAssets,
   fetchMaterialAssetText,
   fetchMaterialGameAdaptation,
   fetchMaterialHtmlGameEnrichment,
@@ -53,6 +53,11 @@ import {
   readPromptFromSourceMeta,
   readUrlFromSourceMeta,
 } from "../model/materialDocument";
+import {
+  createReadyDocumentMaterial,
+  documentFileFingerprint,
+  type PendingDocumentMaterialUpload,
+} from "../model/documentUpload";
 import { hasInvalidManualHtmlGameTitle, isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
 import { useMaterialAssets } from "../hooks/useMaterialAssets";
 import { useMaterialLibraryState } from "../hooks/useMaterialLibraryState";
@@ -70,6 +75,7 @@ import { GameAdaptationReviewDialog } from "./GameAdaptationReviewDialog";
 import { MaterialReaderPreview } from "./MaterialReaderPreview";
 import { WorksheetImportWorkspace } from "./WorksheetImportWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
+import { documentMaterialsEnabled } from "../../../shared/config/documentMaterials";
 
 export function MaterialLibraryPanel({
   courses,
@@ -146,6 +152,7 @@ export function MaterialLibraryPanel({
   const mountedRef = useRef(true);
   const formRef = useRef(form);
   const savedFormFingerprintRef = useRef(savedFormFingerprint);
+  const documentUploadDraftRef = useRef<PendingDocumentMaterialUpload | null>(null);
   const { assetLibrary, currentMaterialAssets, syncMaterialAssets } = useMaterialAssets({
     canManage,
     formMaterialId: form.id,
@@ -742,6 +749,30 @@ export function MaterialLibraryPanel({
     }
   }
 
+  async function uploadDocumentMaterial(file: File) {
+    setAssetUploadMessage(t("materials.document.uploading"));
+    try {
+      const fileFingerprint = documentFileFingerprint(file);
+      const pending = documentUploadDraftRef.current?.fileFingerprint === fileFingerprint
+        ? documentUploadDraftRef.current
+        : null;
+      const saved = await createReadyDocumentMaterial({
+        file,
+        onPending: (nextPending) => { documentUploadDraftRef.current = nextPending; },
+        pending,
+        save: onSave,
+        titleFallback: t("materials.defaults.materialTitle"),
+      });
+      selectMaterial(saved);
+      setWorkspaceMode("preview");
+      setAssetUploadMessage(t("materials.document.uploadReady"));
+      documentUploadDraftRef.current = null;
+      onRefresh();
+    } catch (caught) {
+      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.document.uploadFailed"));
+    }
+  }
+
   async function regenerateHtmlGameIcon(blockId: string) {
     const currentForm = formRef.current;
     const block = currentForm.document.pages.flatMap((page) => page.blocks).find((item) => item.id === blockId);
@@ -1033,6 +1064,7 @@ export function MaterialLibraryPanel({
                 onDraftImageChange={(file) => void handleDraftImageChange(file)}
                 onGenerateDraft={() => void generateDraft()}
                 onOpenWorksheetImport={() => setWorksheetImportOpen(true)}
+                onDocumentUpload={documentMaterialsEnabled() ? (file) => void uploadDocumentMaterial(file) : undefined}
                 onRemoveDraftImage={() => setDraftImage(null)}
                 onUpdateDraftPrompt={setDraftPrompt}
                 onUpdateDraftUrl={(value) => {

@@ -30,6 +30,7 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
     implementation("org.bitbucket.b_c:jose4j:0.9.6")
     implementation("org.jsoup:jsoup:1.18.3")
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.0.3")
     implementation(platform("software.amazon.awssdk:bom:2.44.12"))

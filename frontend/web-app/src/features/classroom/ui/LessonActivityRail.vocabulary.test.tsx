@@ -42,6 +42,7 @@ describe("LessonActivityRail vocabulary delivery", () => {
       onSelectMaterial={vi.fn()} onSelectStudent={vi.fn()} onUploadHtmlGamePage={vi.fn()}
       onUploadImagePage={vi.fn()} open owners={[]} practice={practice} selectedMaterialId=""
       selectedStudentSubject="student-1" uploadingHtmlGamePage={false} uploadingImagePage={false}
+      uploadingDocumentPage={false}
     />);
     const button = screen.getByRole("button", { name: command === "hint" ? /vocabulary.live.giveHint/ : /vocabulary.live.pause/ });
     fireEvent.click(button);
@@ -72,6 +73,7 @@ describe("LessonActivityRail vocabulary delivery", () => {
         onSelectStudent={vi.fn()}
         onUploadHtmlGamePage={vi.fn()}
         onUploadImagePage={vi.fn()}
+        onUploadDocumentPage={vi.fn()}
         open
         owners={[]}
         practice={practice}
@@ -79,6 +81,7 @@ describe("LessonActivityRail vocabulary delivery", () => {
         selectedStudentSubject="student-1"
         uploadingHtmlGamePage={false}
         uploadingImagePage={false}
+        uploadingDocumentPage={false}
       />,
     );
 

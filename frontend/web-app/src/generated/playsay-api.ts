@@ -1409,6 +1409,25 @@ export interface MaterialAssetResponse {
   createdAt: string;
 }
 
+export interface MaterialDocumentPageManifestResponse {
+  id: string;
+  index: number;
+  width: number;
+  height: number;
+}
+
+export interface MaterialDocumentUploadResponse {
+  uploadId: string;
+  status: string;
+  format: string;
+  /** @nullable */
+  revision?: string | null;
+  displayAsset?: MaterialAssetResponse | null;
+  pageManifest: MaterialDocumentPageManifestResponse[];
+  /** @nullable */
+  errorCode?: string | null;
+}
+
 export interface MaterialAnswerSuggestionsRequest {
   /** @maxLength 80 */
   blockId: string;
@@ -2214,7 +2233,7 @@ export interface ChatPushUnsubscribeRequest {
 
 export type CreateWorksheetImportBody = {
   metadata: WorksheetImportCreateRequest;
-  files: Blob[];
+  files: (Blob | File)[];
 };
 
 export type DelegationsParams = {
@@ -2227,11 +2246,11 @@ title?: string;
 };
 
 export type AppendScheduledLessonImagePageBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type AppendScheduledLessonHtmlGamePageBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type GetCurrentCollaborationDocumentParams = {
@@ -2247,7 +2266,7 @@ title?: string;
 };
 
 export type AppendMaterialImagePageBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type GetMaterialHtmlGameEnrichmentParams = {
@@ -2255,11 +2274,15 @@ blockId: string;
 };
 
 export type UploadMaterialImageAssetBody = {
-  file: Blob;
+  file: Blob | File;
 };
 
 export type UploadMaterialHtmlGameAssetBody = {
-  file: Blob;
+  file: Blob | File;
+};
+
+export type UploadMaterialDocumentBody = {
+  file: Blob | File;
 };
 
 export type MessagesParams = {
@@ -2319,11 +2342,25 @@ export const getReplaceWorksheetImportReviewUrl = (sessionId: string,) => {
 export const replaceWorksheetImportReview = async (sessionId: string,
     jsonNode: JsonNode, options?: RequestInit): Promise<replaceWorksheetImportReviewResponse> => {
 
-  const res = await fetch(getReplaceWorksheetImportReviewUrl(sessionId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getReplaceWorksheetImportReviewUrl(sessionId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(jsonNode)
   }
 )
@@ -2483,11 +2520,25 @@ export const getUpdateMyUserProfileUrl = () => {
  */
 export const updateMyUserProfile = async (updateUserProfileRequest: UpdateUserProfileRequest, options?: RequestInit): Promise<updateMyUserProfileResponse> => {
 
-  const res = await fetch(getUpdateMyUserProfileUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateMyUserProfileUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateUserProfileRequest)
   }
 )
@@ -2575,11 +2626,25 @@ export const getUpdateLessonTranslationPermissionUrl = (subject: string,) => {
 export const updateLessonTranslationPermission = async (subject: string,
     updateStudentLessonTranslationPermissionRequest: UpdateStudentLessonTranslationPermissionRequest, options?: RequestInit): Promise<updateLessonTranslationPermissionResponse> => {
 
-  const res = await fetch(getUpdateLessonTranslationPermissionUrl(subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateLessonTranslationPermissionUrl(subject),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStudentLessonTranslationPermissionRequest)
   }
 )
@@ -2698,11 +2763,25 @@ export const getUpdateScheduledLessonUrl = (lessonId: string,) => {
 export const updateScheduledLesson = async (lessonId: string,
     scheduledLessonRequest: ScheduledLessonRequest, options?: RequestInit): Promise<updateScheduledLessonResponse> => {
 
-  const res = await fetch(getUpdateScheduledLessonUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateScheduledLessonUrl(lessonId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(scheduledLessonRequest)
   }
 )
@@ -2877,11 +2956,25 @@ export const getSaveScheduledLessonMaterialSubmissionUrl = (lessonId: string,) =
 export const saveScheduledLessonMaterialSubmission = async (lessonId: string,
     materialSubmissionRequest: MaterialSubmissionRequest, options?: RequestInit): Promise<saveScheduledLessonMaterialSubmissionResponse> => {
 
-  const res = await fetch(getSaveScheduledLessonMaterialSubmissionUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveScheduledLessonMaterialSubmissionUrl(lessonId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialSubmissionRequest)
   }
 )
@@ -2995,11 +3088,25 @@ export const getSaveScheduledLessonMaterialAnnotationUrl = (lessonId: string,) =
 export const saveScheduledLessonMaterialAnnotation = async (lessonId: string,
     materialAnnotationRequest: MaterialAnnotationRequest, options?: RequestInit): Promise<saveScheduledLessonMaterialAnnotationResponse> => {
 
-  const res = await fetch(getSaveScheduledLessonMaterialAnnotationUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveScheduledLessonMaterialAnnotationUrl(lessonId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialAnnotationRequest)
   }
 )
@@ -3064,11 +3171,25 @@ export const saveCollaborationDocumentSnapshot = async (lessonId: string,
     documentId: string,
     saveCollaborationSnapshotRequest: SaveCollaborationSnapshotRequest, options?: RequestInit): Promise<saveCollaborationDocumentSnapshotResponse> => {
 
-  const res = await fetch(getSaveCollaborationDocumentSnapshotUrl(lessonId,documentId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveCollaborationDocumentSnapshotUrl(lessonId,documentId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(saveCollaborationSnapshotRequest)
   }
 )
@@ -3153,11 +3274,25 @@ export const getSaveMyHomeworkAssignmentSubmissionUrl = (assignmentId: string,) 
 export const saveMyHomeworkAssignmentSubmission = async (assignmentId: string,
     materialSubmissionRequest: MaterialSubmissionRequest, options?: RequestInit): Promise<saveMyHomeworkAssignmentSubmissionResponse> => {
 
-  const res = await fetch(getSaveMyHomeworkAssignmentSubmissionUrl(assignmentId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveMyHomeworkAssignmentSubmissionUrl(assignmentId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialSubmissionRequest)
   }
 )
@@ -3276,11 +3411,25 @@ export const getUpdateMaterialUrl = (materialId: string,) => {
 export const updateMaterial = async (materialId: string,
     lessonMaterialRequest: LessonMaterialRequest, options?: RequestInit): Promise<updateMaterialResponse> => {
 
-  const res = await fetch(getUpdateMaterialUrl(materialId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateMaterialUrl(materialId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonMaterialRequest)
   }
 )
@@ -3460,11 +3609,25 @@ export const getUpdateCourseUrl = (courseId: string,) => {
 export const updateCourse = async (courseId: string,
     courseRequest: CourseRequest, options?: RequestInit): Promise<updateCourseResponse> => {
 
-  const res = await fetch(getUpdateCourseUrl(courseId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateCourseUrl(courseId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(courseRequest)
   }
 )
@@ -3568,11 +3731,25 @@ export const updateCurriculumTopic = async (courseId: string,
     topicId: string,
     curriculumTopicRequest: CurriculumTopicRequest, options?: RequestInit): Promise<updateCurriculumTopicResponse> => {
 
-  const res = await fetch(getUpdateCurriculumTopicUrl(courseId,topicId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateCurriculumTopicUrl(courseId,topicId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(curriculumTopicRequest)
   }
 )
@@ -3683,11 +3860,25 @@ export const updateCourseLesson = async (courseId: string,
     lessonId: string,
     courseLessonRequest: CourseLessonRequest, options?: RequestInit): Promise<updateCourseLessonResponse> => {
 
-  const res = await fetch(getUpdateCourseLessonUrl(courseId,lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateCourseLessonUrl(courseId,lessonId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(courseLessonRequest)
   }
 )
@@ -3793,11 +3984,25 @@ export const replaceCourseLessonCards = async (courseId: string,
     lessonId: string,
     lessonTemplateCardsRequest: LessonTemplateCardsRequest, options?: RequestInit): Promise<replaceCourseLessonCardsResponse> => {
 
-  const res = await fetch(getReplaceCourseLessonCardsUrl(courseId,lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getReplaceCourseLessonCardsUrl(courseId,lessonId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonTemplateCardsRequest)
   }
 )
@@ -3833,11 +4038,25 @@ export const getUpsertPushSubscriptionUrl = () => {
 
 export const upsertPushSubscription = async (chatPushSubscriptionRequest: ChatPushSubscriptionRequest, options?: RequestInit): Promise<upsertPushSubscriptionResponse> => {
 
-  const res = await fetch(getUpsertPushSubscriptionUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpsertPushSubscriptionUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(chatPushSubscriptionRequest)
   }
 )
@@ -3873,11 +4092,25 @@ export const getRemovePushSubscriptionUrl = () => {
 
 export const removePushSubscription = async (chatPushUnsubscribeRequest: ChatPushUnsubscribeRequest, options?: RequestInit): Promise<removePushSubscriptionResponse> => {
 
-  const res = await fetch(getRemovePushSubscriptionUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRemovePushSubscriptionUrl(),
   {
     ...options,
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(chatPushUnsubscribeRequest)
   }
 )
@@ -3914,11 +4147,25 @@ export const getMarkReadUrl = (conversationId: string,) => {
 export const markRead = async (conversationId: string,
     markChatReadRequest: MarkChatReadRequest, options?: RequestInit): Promise<markReadResponse> => {
 
-  const res = await fetch(getMarkReadUrl(conversationId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getMarkReadUrl(conversationId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(markChatReadRequest)
   }
 )
@@ -3955,11 +4202,25 @@ export const getUpdateRolesUrl = (subject: string,) => {
 export const updateRoles = async (subject: string,
     updateUserRolesRequest: UpdateUserRolesRequest, options?: RequestInit): Promise<updateRolesResponse> => {
 
-  const res = await fetch(getUpdateRolesUrl(subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateRolesUrl(subject),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateUserRolesRequest)
   }
 )
@@ -3996,11 +4257,25 @@ export const getAssignTeacherUrl = (subject: string,) => {
 export const assignTeacher = async (subject: string,
     assignPrimaryTeacherRequest: AssignPrimaryTeacherRequest, options?: RequestInit): Promise<assignTeacherResponse> => {
 
-  const res = await fetch(getAssignTeacherUrl(subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getAssignTeacherUrl(subject),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(assignPrimaryTeacherRequest)
   }
 )
@@ -4167,11 +4442,25 @@ export const getMaterializeWorksheetImportUrl = (sessionId: string,) => {
 export const materializeWorksheetImport = async (sessionId: string,
     worksheetMaterializeRequest: WorksheetMaterializeRequest, options?: RequestInit): Promise<materializeWorksheetImportResponse> => {
 
-  const res = await fetch(getMaterializeWorksheetImportUrl(sessionId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getMaterializeWorksheetImportUrl(sessionId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(worksheetMaterializeRequest)
   }
 )
@@ -4367,11 +4656,25 @@ export const getAttachUrl = () => {
 
 export const attach = async (attachStudentRequest: AttachStudentRequest, options?: RequestInit): Promise<attachResponse> => {
 
-  const res = await fetch(getAttachUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getAttachUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(attachStudentRequest)
   }
 )
@@ -4454,11 +4757,25 @@ export const getCreateDelegationUrl = () => {
 
 export const createDelegation = async (createDelegationRequest: CreateDelegationRequest, options?: RequestInit): Promise<createDelegationResponse> => {
 
-  const res = await fetch(getCreateDelegationUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateDelegationUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createDelegationRequest)
   }
 )
@@ -4520,11 +4837,25 @@ export const getCreateManagedStudentUrl = () => {
  */
 export const createManagedStudent = async (managedStudentRequest: ManagedStudentRequest, options?: RequestInit): Promise<createManagedStudentResponse> => {
 
-  const res = await fetch(getCreateManagedStudentUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateManagedStudentUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(managedStudentRequest)
   }
 )
@@ -4632,11 +4963,25 @@ export const getCreateScheduledLessonUrl = () => {
  */
 export const createScheduledLesson = async (scheduledLessonRequest: ScheduledLessonRequest, options?: RequestInit): Promise<createScheduledLessonResponse> => {
 
-  const res = await fetch(getCreateScheduledLessonUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateScheduledLessonUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(scheduledLessonRequest)
   }
 )
@@ -4976,11 +5321,25 @@ export const approve = async (lessonId: string,
     attemptId: string,
     lessonLobbyDecisionRequest: LessonLobbyDecisionRequest, options?: RequestInit): Promise<approveResponse> => {
 
-  const res = await fetch(getApproveUrl(lessonId,attemptId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getApproveUrl(lessonId,attemptId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonLobbyDecisionRequest)
   }
 )
@@ -5219,11 +5578,25 @@ export const getCreateHomeworkFromScheduledLessonUrl = (lessonId: string,) => {
 export const createHomeworkFromScheduledLesson = async (lessonId: string,
     lessonHomeworkRequest: LessonHomeworkRequest, options?: RequestInit): Promise<createHomeworkFromScheduledLessonResponse> => {
 
-  const res = await fetch(getCreateHomeworkFromScheduledLessonUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateHomeworkFromScheduledLessonUrl(lessonId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonHomeworkRequest)
   }
 )
@@ -5417,11 +5790,25 @@ export const finalizeCollaborationDocument = async (lessonId: string,
     documentId: string,
     finalizeCollaborationDocumentRequest: FinalizeCollaborationDocumentRequest, options?: RequestInit): Promise<finalizeCollaborationDocumentResponse> => {
 
-  const res = await fetch(getFinalizeCollaborationDocumentUrl(lessonId,documentId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getFinalizeCollaborationDocumentUrl(lessonId,documentId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(finalizeCollaborationDocumentRequest)
   }
 )
@@ -5549,11 +5936,25 @@ export const getCreateCurrentCollaborationDocumentUrl = (lessonId: string,) => {
 export const createCurrentCollaborationDocument = async (lessonId: string,
     createCollaborationDocumentRequest: CreateCollaborationDocumentRequest, options?: RequestInit): Promise<createCurrentCollaborationDocumentResponse> => {
 
-  const res = await fetch(getCreateCurrentCollaborationDocumentUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateCurrentCollaborationDocumentUrl(lessonId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createCollaborationDocumentRequest)
   }
 )
@@ -5592,11 +5993,25 @@ export const readmit = async (lessonId: string,
     subject: string,
     lessonAdmissionActionRequest?: LessonAdmissionActionRequest, options?: RequestInit): Promise<readmitResponse> => {
 
-  const res = await fetch(getReadmitUrl(lessonId,subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getReadmitUrl(lessonId,subject),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonAdmissionActionRequest)
   }
 )
@@ -5635,11 +6050,25 @@ export const kick = async (lessonId: string,
     subject: string,
     lessonAdmissionActionRequest?: LessonAdmissionActionRequest, options?: RequestInit): Promise<kickResponse> => {
 
-  const res = await fetch(getKickUrl(lessonId,subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getKickUrl(lessonId,subject),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonAdmissionActionRequest)
   }
 )
@@ -5798,11 +6227,25 @@ export const getStartUrl = (lessonId: string,) => {
 export const start = async (lessonId: string,
     lessonAccessStartRequest: LessonAccessStartRequest, options?: RequestInit): Promise<startResponse> => {
 
-  const res = await fetch(getStartUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getStartUrl(lessonId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonAccessStartRequest)
   }
 )
@@ -5841,11 +6284,25 @@ export const requestLobby = async (lessonId: string,
     attemptId: string,
     lessonLobbyRequest: LessonLobbyRequest, options?: RequestInit): Promise<requestLobbyResponse> => {
 
-  const res = await fetch(getRequestLobbyUrl(lessonId,attemptId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestLobbyUrl(lessonId,attemptId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonLobbyRequest)
   }
 )
@@ -5884,11 +6341,25 @@ export const requestEmailCode = async (lessonId: string,
     attemptId: string,
     lessonEmailCodeRequest: LessonEmailCodeRequest, options?: RequestInit): Promise<requestEmailCodeResponse> => {
 
-  const res = await fetch(getRequestEmailCodeUrl(lessonId,attemptId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestEmailCodeUrl(lessonId,attemptId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonEmailCodeRequest)
   }
 )
@@ -5927,11 +6398,25 @@ export const verifyEmailCode = async (lessonId: string,
     attemptId: string,
     lessonEmailCodeVerifyRequest: LessonEmailCodeVerifyRequest, options?: RequestInit): Promise<verifyEmailCodeResponse> => {
 
-  const res = await fetch(getVerifyEmailCodeUrl(lessonId,attemptId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getVerifyEmailCodeUrl(lessonId,attemptId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonEmailCodeVerifyRequest)
   }
 )
@@ -5967,11 +6452,25 @@ export const getStartCompactUrl = () => {
 
 export const startCompact = async (lessonCompactAccessStartRequest: LessonCompactAccessStartRequest, options?: RequestInit): Promise<startCompactResponse> => {
 
-  const res = await fetch(getStartCompactUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getStartCompactUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonCompactAccessStartRequest)
   }
 )
@@ -6047,11 +6546,25 @@ export const getCreateInvoiceUrl = () => {
 
 export const createInvoice = async (paymentInvoiceCreateRequest: PaymentInvoiceCreateRequest, options?: RequestInit): Promise<createInvoiceResponse> => {
 
-  const res = await fetch(getCreateInvoiceUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateInvoiceUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(paymentInvoiceCreateRequest)
   }
 )
@@ -6127,11 +6640,25 @@ export const getYookassaWebhookUrl = () => {
 
 export const yookassaWebhook = async (yookassaWebhookBody: YookassaWebhookBody, options?: RequestInit): Promise<yookassaWebhookResponse> => {
 
-  const res = await fetch(getYookassaWebhookUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getYookassaWebhookUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(yookassaWebhookBody)
   }
 )
@@ -6239,11 +6766,25 @@ export const getCreateMaterialUrl = () => {
  */
 export const createMaterial = async (lessonMaterialRequest: LessonMaterialRequest, options?: RequestInit): Promise<createMaterialResponse> => {
 
-  const res = await fetch(getCreateMaterialUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateMaterialUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(lessonMaterialRequest)
   }
 )
@@ -6296,11 +6837,25 @@ export const getCreateMaterialVideoPlaybackUrl = (materialId: string,) => {
 export const createMaterialVideoPlayback = async (materialId: string,
     materialVideoPlaybackRequest: MaterialVideoPlaybackRequest, options?: RequestInit): Promise<createMaterialVideoPlaybackResponse> => {
 
-  const res = await fetch(getCreateMaterialVideoPlaybackUrl(materialId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateMaterialVideoPlaybackUrl(materialId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialVideoPlaybackRequest)
   }
 )
@@ -6443,11 +6998,25 @@ export const getGenerateMaterialImagesUrl = (materialId: string,) => {
 export const generateMaterialImages = async (materialId: string,
     materialGenerateImagesRequest: MaterialGenerateImagesRequest, options?: RequestInit): Promise<generateMaterialImagesResponse> => {
 
-  const res = await fetch(getGenerateMaterialImagesUrl(materialId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getGenerateMaterialImagesUrl(materialId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialGenerateImagesRequest)
   }
 )
@@ -6544,11 +7113,25 @@ export const requestMaterialHtmlGameEnrichment = async (materialId: string,
     assetId: string,
     materialHtmlGameEnrichmentRequest: MaterialHtmlGameEnrichmentRequest, options?: RequestInit): Promise<requestMaterialHtmlGameEnrichmentResponse> => {
 
-  const res = await fetch(getRequestMaterialHtmlGameEnrichmentUrl(materialId,assetId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestMaterialHtmlGameEnrichmentUrl(materialId,assetId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialHtmlGameEnrichmentRequest)
   }
 )
@@ -6590,11 +7173,25 @@ export const requestMaterialGameAdaptation = async (materialId: string,
     assetId: string,
     materialGameAdaptationRequest: MaterialGameAdaptationRequest, options?: RequestInit): Promise<requestMaterialGameAdaptationResponse> => {
 
-  const res = await fetch(getRequestMaterialGameAdaptationUrl(materialId,assetId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestMaterialGameAdaptationUrl(materialId,assetId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialGameAdaptationRequest)
   }
 )
@@ -6903,6 +7500,55 @@ if(uploadMaterialHtmlGameAssetBody?.file !== undefined) {
 
 
 
+export type uploadMaterialDocumentResponse200 = {
+  data: MaterialDocumentUploadResponse
+  status: 200
+}
+
+export type uploadMaterialDocumentResponseSuccess = (uploadMaterialDocumentResponse200) & {
+  headers: Headers;
+};
+;
+
+export type uploadMaterialDocumentResponse = (uploadMaterialDocumentResponseSuccess)
+
+export const getUploadMaterialDocumentUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/documents`
+}
+
+/**
+ * Validates the source and creates an immutable sanitized display revision.
+ * @summary Upload a PDF or PPTX document
+ */
+export const uploadMaterialDocument = async (materialId: string,
+    uploadMaterialDocumentBody?: UploadMaterialDocumentBody, options?: RequestInit): Promise<uploadMaterialDocumentResponse> => {
+    const formData = new FormData();
+if(uploadMaterialDocumentBody?.file !== undefined) {
+ formData.append(`file`, uploadMaterialDocumentBody.file);
+ }
+
+  const res = await fetch(getUploadMaterialDocumentUrl(materialId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadMaterialDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadMaterialDocumentResponse
+}
+
+
+
 export type suggestMaterialAcceptedAnswersResponse200 = {
   data: MaterialAnswerSuggestionsResponse
   status: 200
@@ -6947,11 +7593,25 @@ export const getSuggestMaterialAcceptedAnswersUrl = (materialId: string,) => {
 export const suggestMaterialAcceptedAnswers = async (materialId: string,
     materialAnswerSuggestionsRequest: MaterialAnswerSuggestionsRequest, options?: RequestInit): Promise<suggestMaterialAcceptedAnswersResponse> => {
 
-  const res = await fetch(getSuggestMaterialAcceptedAnswersUrl(materialId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSuggestMaterialAcceptedAnswersUrl(materialId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialAnswerSuggestionsRequest)
   }
 )
@@ -7013,11 +7673,25 @@ export const getDraftMaterialFromUrlUrl = () => {
  */
 export const draftMaterialFromUrl = async (materialUrlImportRequest: MaterialUrlImportRequest, options?: RequestInit): Promise<draftMaterialFromUrlResponse> => {
 
-  const res = await fetch(getDraftMaterialFromUrlUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getDraftMaterialFromUrlUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialUrlImportRequest)
   }
 )
@@ -7069,11 +7743,25 @@ export const getResolveMaterialExternalActivityUrl = () => {
  */
 export const resolveMaterialExternalActivity = async (materialExternalActivityResolveRequest: MaterialExternalActivityResolveRequest, options?: RequestInit): Promise<resolveMaterialExternalActivityResponse> => {
 
-  const res = await fetch(getResolveMaterialExternalActivityUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getResolveMaterialExternalActivityUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialExternalActivityResolveRequest)
   }
 )
@@ -7130,11 +7818,25 @@ export const getDraftMaterialWithAiUrl = () => {
  */
 export const draftMaterialWithAi = async (materialAiDraftRequest: MaterialAiDraftRequest, options?: RequestInit): Promise<draftMaterialWithAiResponse> => {
 
-  const res = await fetch(getDraftMaterialWithAiUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getDraftMaterialWithAiUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialAiDraftRequest)
   }
 )
@@ -7171,11 +7873,25 @@ export const getUpdateProgressUrl = (assignmentId: string,) => {
 export const updateProgress = async (assignmentId: string,
     vocabularyAssignmentProgressUpdateRequest: VocabularyAssignmentProgressUpdateRequest, options?: RequestInit): Promise<updateProgressResponse> => {
 
-  const res = await fetch(getUpdateProgressUrl(assignmentId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateProgressUrl(assignmentId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(vocabularyAssignmentProgressUpdateRequest)
   }
 )
@@ -7326,11 +8042,25 @@ export const getCreateCourseUrl = () => {
  */
 export const createCourse = async (courseRequest: CourseRequest, options?: RequestInit): Promise<createCourseResponse> => {
 
-  const res = await fetch(getCreateCourseUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateCourseUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(courseRequest)
   }
 )
@@ -7415,11 +8145,25 @@ export const getCreateCurriculumTopicUrl = (courseId: string,) => {
 export const createCurriculumTopic = async (courseId: string,
     curriculumTopicRequest: CurriculumTopicRequest, options?: RequestInit): Promise<createCurriculumTopicResponse> => {
 
-  const res = await fetch(getCreateCurriculumTopicUrl(courseId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateCurriculumTopicUrl(courseId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(curriculumTopicRequest)
   }
 )
@@ -7538,11 +8282,25 @@ export const getCreateCourseLessonUrl = (courseId: string,) => {
 export const createCourseLesson = async (courseId: string,
     courseLessonRequest: CourseLessonRequest, options?: RequestInit): Promise<createCourseLessonResponse> => {
 
-  const res = await fetch(getCreateCourseLessonUrl(courseId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateCourseLessonUrl(courseId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(courseLessonRequest)
   }
 )
@@ -7618,11 +8376,25 @@ export const getCreateConversationUrl = () => {
 
 export const createConversation = async (createChatConversationRequest: CreateChatConversationRequest, options?: RequestInit): Promise<createConversationResponse> => {
 
-  const res = await fetch(getCreateConversationUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateConversationUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createChatConversationRequest)
   }
 )
@@ -7708,11 +8480,25 @@ export const getSendMessageUrl = (conversationId: string,) => {
 export const sendMessage = async (conversationId: string,
     chatMessageRequest: ChatMessageRequest, options?: RequestInit): Promise<sendMessageResponse> => {
 
-  const res = await fetch(getSendMessageUrl(conversationId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSendMessageUrl(conversationId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(chatMessageRequest)
   }
 )
@@ -7818,11 +8604,25 @@ export const getCreateHomeworkAssignmentUrl = () => {
  */
 export const createHomeworkAssignment = async (homeworkAssignmentRequest: HomeworkAssignmentRequest, options?: RequestInit): Promise<createHomeworkAssignmentResponse> => {
 
-  const res = await fetch(getCreateHomeworkAssignmentUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateHomeworkAssignmentUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(homeworkAssignmentRequest)
   }
 )
@@ -7862,11 +8662,25 @@ export const getCreateVocabularyHomeworkAssignmentUrl = () => {
  */
 export const createVocabularyHomeworkAssignment = async (vocabularyHomeworkRequest: VocabularyHomeworkRequest, options?: RequestInit): Promise<createVocabularyHomeworkAssignmentResponse> => {
 
-  const res = await fetch(getCreateVocabularyHomeworkAssignmentUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateVocabularyHomeworkAssignmentUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(vocabularyHomeworkRequest)
   }
 )
@@ -7902,11 +8716,25 @@ export const getConsumeUrl = () => {
 
 export const consume = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consumeResponse> => {
 
-  const res = await fetch(getConsumeUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getConsumeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(studentInviteConsumeRequest)
   }
 )
@@ -7942,11 +8770,25 @@ export const getConsume1Url = () => {
 
 export const consume1 = async (studentInviteConsumeRequest: StudentInviteConsumeRequest, options?: RequestInit): Promise<consume1Response> => {
 
-  const res = await fetch(getConsume1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getConsume1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(studentInviteConsumeRequest)
   }
 )
@@ -7982,11 +8824,25 @@ export const getStart1Url = () => {
 
 export const start1 = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<start1Response> => {
 
-  const res = await fetch(getStart1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getStart1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRegistrationRequest)
   }
 )
@@ -8022,11 +8878,25 @@ export const getStart2Url = () => {
 
 export const start2 = async (startRegistrationRequest: StartRegistrationRequest, options?: RequestInit): Promise<start2Response> => {
 
-  const res = await fetch(getStart2Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getStart2Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRegistrationRequest)
   }
 )
@@ -8062,11 +8932,25 @@ export const getResetPasswordUrl = () => {
 
 export const resetPassword = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<resetPasswordResponse> => {
 
-  const res = await fetch(getResetPasswordUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getResetPasswordUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(resetPasswordRequest)
   }
 )
@@ -8102,11 +8986,25 @@ export const getResetPassword1Url = () => {
 
 export const resetPassword1 = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<resetPassword1Response> => {
 
-  const res = await fetch(getResetPassword1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getResetPassword1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(resetPasswordRequest)
   }
 )
@@ -8142,11 +9040,25 @@ export const getResendUrl = () => {
 
 export const resend = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resendResponse> => {
 
-  const res = await fetch(getResendUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getResendUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(resendRegistrationRequest)
   }
 )
@@ -8182,11 +9094,25 @@ export const getResend1Url = () => {
 
 export const resend1 = async (resendRegistrationRequest: ResendRegistrationRequest, options?: RequestInit): Promise<resend1Response> => {
 
-  const res = await fetch(getResend1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getResend1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(resendRegistrationRequest)
   }
 )
@@ -8222,11 +9148,25 @@ export const getForgotPasswordUrl = () => {
 
 export const forgotPassword = async (forgotPasswordRequest: ForgotPasswordRequest, options?: RequestInit): Promise<forgotPasswordResponse> => {
 
-  const res = await fetch(getForgotPasswordUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getForgotPasswordUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(forgotPasswordRequest)
   }
 )
@@ -8262,11 +9202,25 @@ export const getForgotPassword1Url = () => {
 
 export const forgotPassword1 = async (forgotPasswordRequest: ForgotPasswordRequest, options?: RequestInit): Promise<forgotPassword1Response> => {
 
-  const res = await fetch(getForgotPassword1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getForgotPassword1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(forgotPasswordRequest)
   }
 )
@@ -8302,11 +9256,25 @@ export const getConfirmUrl = () => {
 
 export const confirm = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirmResponse> => {
 
-  const res = await fetch(getConfirmUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getConfirmUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(confirmRegistrationRequest)
   }
 )
@@ -8342,11 +9310,25 @@ export const getConfirm1Url = () => {
 
 export const confirm1 = async (confirmRegistrationRequest: ConfirmRegistrationRequest, options?: RequestInit): Promise<confirm1Response> => {
 
-  const res = await fetch(getConfirm1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getConfirm1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(confirmRegistrationRequest)
   }
 )
@@ -8429,11 +9411,25 @@ export const getCreateUrl = () => {
 
 export const create = async (createUserManagementUserRequest: CreateUserManagementUserRequest, options?: RequestInit): Promise<createResponse> => {
 
-  const res = await fetch(getCreateUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createUserManagementUserRequest)
   }
 )
@@ -8516,11 +9512,25 @@ export const getCreateDelegation1Url = () => {
 
 export const createDelegation1 = async (createDelegationRequest: CreateDelegationRequest, options?: RequestInit): Promise<createDelegation1Response> => {
 
-  const res = await fetch(getCreateDelegation1Url(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateDelegation1Url(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createDelegationRequest)
   }
 )
@@ -8631,11 +9641,25 @@ export const getRescheduleScheduledLessonUrl = (lessonId: string,) => {
 export const rescheduleScheduledLesson = async (lessonId: string,
     scheduledLessonScheduleUpdateRequest: ScheduledLessonScheduleUpdateRequest, options?: RequestInit): Promise<rescheduleScheduledLessonResponse> => {
 
-  const res = await fetch(getRescheduleScheduledLessonUrl(lessonId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRescheduleScheduledLessonUrl(lessonId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(scheduledLessonScheduleUpdateRequest)
   }
 )
@@ -8695,11 +9719,25 @@ export const updateMaterialAsset = async (materialId: string,
     assetId: string,
     materialAssetUpdateRequest: MaterialAssetUpdateRequest, options?: RequestInit): Promise<updateMaterialAssetResponse> => {
 
-  const res = await fetch(getUpdateMaterialAssetUrl(materialId,assetId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateMaterialAssetUrl(materialId,assetId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(materialAssetUpdateRequest)
   }
 )
@@ -8742,11 +9780,25 @@ export const reviewVocabularyHomeworkAssignment = async (assignmentId: string,
     studentSubject: string,
     vocabularyHomeworkReviewRequest: VocabularyHomeworkReviewRequest, options?: RequestInit): Promise<reviewVocabularyHomeworkAssignmentResponse> => {
 
-  const res = await fetch(getReviewVocabularyHomeworkAssignmentUrl(assignmentId,studentSubject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getReviewVocabularyHomeworkAssignmentUrl(assignmentId,studentSubject),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(vocabularyHomeworkReviewRequest)
   }
 )
@@ -9906,6 +10958,51 @@ export const getMaterialAssetContent = async (materialId: string,
 
   const data: getMaterialAssetContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
   return { data, status: res.status, headers: res.headers } as getMaterialAssetContentResponse
+}
+
+
+
+export type getMaterialDocumentUploadResponse200 = {
+  data: MaterialDocumentUploadResponse
+  status: 200
+}
+
+export type getMaterialDocumentUploadResponseSuccess = (getMaterialDocumentUploadResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getMaterialDocumentUploadResponse = (getMaterialDocumentUploadResponseSuccess)
+
+export const getGetMaterialDocumentUploadUrl = (materialId: string,
+    uploadId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/assets/document-uploads/${uploadId}`
+}
+
+/**
+ * @summary Get PDF or PPTX validation status
+ */
+export const getMaterialDocumentUpload = async (materialId: string,
+    uploadId: string, options?: RequestInit): Promise<getMaterialDocumentUploadResponse> => {
+
+  const res = await fetch(getGetMaterialDocumentUploadUrl(materialId,uploadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getMaterialDocumentUploadResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getMaterialDocumentUploadResponse
 }
 
 

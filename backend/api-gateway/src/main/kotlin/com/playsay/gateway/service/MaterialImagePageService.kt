@@ -176,12 +176,13 @@ class MaterialImagePageService(
         originalFileName: String?,
         title: String?,
         fallbackTitle: String,
+        currentMaterialId: UUID? = null,
     ): LessonMaterialEntity {
-        val currentMaterialId = lessonRepo.findScheduledMaterialLookup(lessonId)?.materialId
-        if (currentMaterialId == null) {
+        val resolvedMaterialId = currentMaterialId ?: lessonRepo.findScheduledMaterialLookup(lessonId)?.materialId
+        if (resolvedMaterialId == null) {
             return createEmptyLiveLessonMaterial(authentication, lessonId, originalFileName, title, fallbackTitle)
         }
-        val currentMaterial = lessonMaterialRepo.findById(currentMaterialId).orElse(null)
+        val currentMaterial = lessonMaterialRepo.findById(resolvedMaterialId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         return if (currentMaterial.isLiveLessonCopyFor(lessonId)) {
             currentMaterial

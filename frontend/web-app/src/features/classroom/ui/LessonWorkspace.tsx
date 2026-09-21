@@ -38,6 +38,7 @@ import { VocabularyLessonDialog } from "../../vocabulary/ui/VocabularyLessonDial
 import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
 import type { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
+import { documentMaterialsEnabled } from "../../../shared/config/documentMaterials";
 import { LessonActivityRail } from "./LessonActivityRail";
 
 export function LessonWorkspace({
@@ -68,13 +69,16 @@ export function LessonWorkspace({
     material,
     materialError,
     materialLoading,
+    readyDocumentMaterials,
     liveActivePageId,
     selectedMaterialId,
     setSelectedMaterialId,
     uploadImagePage,
     uploadHtmlGamePage,
+    uploadDocumentPage,
     uploadingImagePage,
     uploadingHtmlGamePage,
+    uploadingDocumentPage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
@@ -130,8 +134,12 @@ export function LessonWorkspace({
   const activeParticipant = canMonitorSubmissions
     ? teacherWorkParticipants.find((participant) => participant.subject === activeStudentSubject) ?? teacherWorkParticipants[0] ?? null
     : null;
+  const availableMaterials = useMemo(
+    () => [...readyDocumentMaterials, ...materials.filter((item) => !readyDocumentMaterials.some((ready) => ready.id === item.id))],
+    [materials, readyDocumentMaterials],
+  );
   const activeAssignedMaterial = canMonitorSubmissions && isParallelWork && activeParticipant?.materialId
-    ? materials.find((item) => item.id === activeParticipant.materialId) ?? null
+    ? availableMaterials.find((item) => item.id === activeParticipant.materialId) ?? null
     : null;
   const visibleMaterial = activeAssignedMaterial ?? material;
   const {
@@ -145,7 +153,7 @@ export function LessonWorkspace({
   const activeStudentSubmission = canMonitorSubmissions
     ? submissionSnapshots.find((item) => item.userSubject === activeParticipant?.subject) ?? null
     : null;
-  const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
+  const selectableMaterials = availableMaterials.filter((item) => item.status !== "ARCHIVED");
   const lessonScore = canMonitorSubmissions && activeParticipant
     ? activeStudentSubmission?.score ?? null
     : canMonitorSubmissions
@@ -202,6 +210,7 @@ export function LessonWorkspace({
     [teacherAnnotationWorkspace.htmlGameSync],
   );
   const teacherViewportSync = useMemo(() => ({
+    canPublish: true,
     clientId: teacherAnnotationWorkspace.workspaceClientId,
     publish: teacherAnnotationWorkspace.setMaterialViewport,
     ready: teacherAnnotationWorkspace.connected,
@@ -287,18 +296,21 @@ export function LessonWorkspace({
           activeStudentSubject={activeParticipant?.subject ?? null}
           assigningMaterial={assigningMaterial}
           canManageMaterial={canManageMaterial}
+          canUploadDocument={canAssignLessons(profile) && documentMaterialsEnabled()}
           currentMaterialId={session.materialId}
           compact={vocabularyFeatures.personalPracticeV2}
           materials={selectableMaterials}
           onAssignMaterial={() => void assignMaterial()}
           onSelectMaterial={setSelectedMaterialId}
           onSelectStudent={selectStudentWork}
-          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
-          onUploadImagePage={(file) => void uploadImagePage(file)}
+          onUploadHtmlGamePage={isParallelWork ? undefined : (file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={isParallelWork ? undefined : (file) => void uploadImagePage(file)}
+          onUploadDocumentPage={documentMaterialsEnabled() ? (file) => void uploadDocumentPage(file) : undefined}
           participants={teacherWorkParticipants}
           selectedMaterialId={selectedMaterialId}
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
+          uploadingDocumentPage={uploadingDocumentPage}
           vocabularyAction={(
             <VocabularyLessonDialog
               ownerLabel={activeParticipantLabel}
@@ -520,8 +532,9 @@ export function LessonWorkspace({
           }}
           onSelectMaterial={setSelectedMaterialId}
           onSelectStudent={selectStudentWork}
-          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
-          onUploadImagePage={(file) => void uploadImagePage(file)}
+          onUploadHtmlGamePage={isParallelWork ? undefined : (file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={isParallelWork ? undefined : (file) => void uploadImagePage(file)}
+          onUploadDocumentPage={documentMaterialsEnabled() ? (file) => void uploadDocumentPage(file) : undefined}
           open={activityRailOpen}
           owners={session.participants.map((participant) => ({
             name: participant.displayName ?? participant.username ?? participant.subject,
@@ -534,6 +547,7 @@ export function LessonWorkspace({
           selectedStudentSubject={activeParticipant?.subject ?? null}
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
+          uploadingDocumentPage={uploadingDocumentPage}
         />
       ) : null}
       </div>

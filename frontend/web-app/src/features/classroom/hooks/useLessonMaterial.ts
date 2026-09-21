@@ -3,6 +3,7 @@ import {
   appendScheduledLessonImagePage,
   appendScheduledLessonHtmlGamePage,
   fetchScheduledLessonMaterial,
+  saveMaterial,
   type LessonMaterial,
   type LiveLessonImagePageResult,
   type LiveLessonHtmlGamePageResult,
@@ -10,6 +11,11 @@ import {
 } from "../../../shared/api/playsay";
 import { htmlGameUploadErrorMessage, validateHtmlGameUpload } from "../../../shared/api/htmlGameUploadPolicy";
 import { useAppTranslation } from "../../../shared/i18n";
+import {
+  createReadyDocumentMaterial,
+  documentFileFingerprint,
+  type PendingDocumentMaterialUpload,
+} from "../../materials/model/documentUpload";
 import type { LessonRoomSession } from "../model/session";
 
 export function useLessonMaterial({
@@ -27,6 +33,9 @@ export function useLessonMaterial({
   const [assigningMaterial, setAssigningMaterial] = useState(false);
   const [uploadingImagePage, setUploadingImagePage] = useState(false);
   const [uploadingHtmlGamePage, setUploadingHtmlGamePage] = useState(false);
+  const [uploadingDocumentPage, setUploadingDocumentPage] = useState(false);
+  const [readyDocumentMaterials, setReadyDocumentMaterials] = useState<LessonMaterial[]>([]);
+  const documentUploadDraftRef = useRef<PendingDocumentMaterialUpload | null>(null);
   const [liveActivePageId, setLiveActivePageId] = useState<string | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
   const htmlGameUploadAttemptRef = useRef(0);
@@ -49,6 +58,8 @@ export function useLessonMaterial({
       assignmentMessage !== t("classroom.messages.materialAssigned") &&
       assignmentMessage !== t("classroom.messages.imagePageAdded") &&
       assignmentMessage !== t("classroom.messages.htmlGamePageAdded") &&
+      assignmentMessage !== t("classroom.messages.documentPageAdded") &&
+      assignmentMessage !== t("materials.document.uploadReady") &&
       assignmentMessage !== t("classroom.messages.materialUnassigned")
     ) {
       return undefined;
@@ -166,6 +177,34 @@ export function useLessonMaterial({
     }
   }
 
+  async function uploadDocumentPage(file: File): Promise<LessonMaterial | null> {
+    setUploadingDocumentPage(true);
+    setAssignmentMessage(null);
+    try {
+      const fileFingerprint = documentFileFingerprint(file);
+      const pending = documentUploadDraftRef.current?.fileFingerprint === fileFingerprint
+        ? documentUploadDraftRef.current
+        : null;
+      const ready = await createReadyDocumentMaterial({
+        file,
+        onPending: (nextPending) => { documentUploadDraftRef.current = nextPending; },
+        pending,
+        save: (input, materialId) => saveMaterial(input, materialId),
+        titleFallback: t("materials.defaults.materialTitle"),
+      });
+      setReadyDocumentMaterials((current) => [ready, ...current.filter((item) => item.id !== ready.id)]);
+      setSelectedMaterialId(ready.id);
+      setAssignmentMessage(t("materials.document.uploadReady"));
+      documentUploadDraftRef.current = null;
+      return ready;
+    } catch (caught) {
+      setAssignmentMessage(caught instanceof Error ? caught.message : t("materials.document.uploadFailed"));
+      return null;
+    } finally {
+      setUploadingDocumentPage(false);
+    }
+  }
+
   return {
     assigningMaterial,
     assignmentMessage,
@@ -173,12 +212,15 @@ export function useLessonMaterial({
     material,
     materialError,
     materialLoading,
+    readyDocumentMaterials,
     liveActivePageId,
     selectedMaterialId,
     setSelectedMaterialId,
     uploadImagePage,
     uploadHtmlGamePage,
+    uploadDocumentPage,
     uploadingImagePage,
     uploadingHtmlGamePage,
+    uploadingDocumentPage,
   };
 }

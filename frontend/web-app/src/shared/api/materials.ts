@@ -9,6 +9,7 @@ import type {
   LessonMaterialAnswerSuggestions,
   LessonMaterialAnswerSuggestionsInput,
   LessonMaterialAsset,
+  MaterialDocumentUpload,
   LessonMaterialAssetUpdateInput,
   LessonMaterialDraft,
   LessonMaterialDraftInput,
@@ -203,6 +204,39 @@ export async function uploadMaterialHtmlGameAsset(
 ): Promise<LessonMaterialAsset> {
   validateHtmlGameUpload(file);
   return uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config);
+}
+
+export async function uploadMaterialDocument(
+  materialId: string,
+  file: File,
+  idempotencyKey: string = crypto.randomUUID(),
+  config = authConfig,
+): Promise<MaterialDocumentUpload> {
+  const authorized = await authorizedOptions(config);
+  const body = new FormData();
+  body.append("file", file);
+  const response = await apiFetch(`/api/materials/${materialId}/assets/documents`, {
+    method: "POST",
+    headers: { ...authorized.headers, "Idempotency-Key": idempotencyKey },
+    body,
+  });
+  if (response.status === 401) clearTokens();
+  if (response.status !== 201) {
+    throw await apiErrorFromResponse(response, `Document upload failed with HTTP ${response.status}.`);
+  }
+  return (await response.json()) as MaterialDocumentUpload;
+}
+
+export async function fetchMaterialDocumentUpload(
+  materialId: string,
+  uploadId: string,
+  config = authConfig,
+): Promise<MaterialDocumentUpload> {
+  return apiJson<MaterialDocumentUpload>(
+    `/api/materials/${materialId}/assets/document-uploads/${uploadId}`,
+    { method: "GET" },
+    config,
+  );
 }
 
 export async function requestMaterialHtmlGameEnrichment(

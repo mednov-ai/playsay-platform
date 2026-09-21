@@ -276,6 +276,25 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
     result.intrinsicHeight = asPositiveNumber(block.intrinsicHeight) ?? undefined;
     result.worksheetGroups = normalizeWorksheetGroups(block.groups);
   }
+  if (type === "document") {
+    const format = asString(block.documentFormat).toUpperCase();
+    result.documentAssetId = asString(block.documentAssetId)
+      || asString(block.url).trim().replace(/^material-asset:/, "")
+      || undefined;
+    result.documentFormat = format === "PPTX" ? "PPTX" : "PDF";
+    result.documentRevision = asString(block.documentRevision) || undefined;
+    result.documentPdfLayout = asString(block.documentPdfLayout) === "SPREAD" ? "SPREAD" : "SINGLE";
+    result.documentPdfSeparateCover = block.documentPdfSeparateCover !== false;
+    result.documentPages = Array.isArray(block.documentPages)
+      ? block.documentPages.flatMap((value, index) => {
+        const page = asJsonObject(value);
+        const width = asPositiveNumber(page.width);
+        const height = asPositiveNumber(page.height);
+        if (!width || !height) return [];
+        return [{ id: asString(page.id) || `page-${index + 1}`, index: asNumber(page.index) ?? index, width, height }];
+      })
+      : [];
+  }
 
   return result;
 }
@@ -307,6 +326,14 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
     clean.intrinsicWidth = block.intrinsicWidth;
     clean.intrinsicHeight = block.intrinsicHeight;
     clean.worksheetGroups = block.worksheetGroups;
+  }
+  if (block.type === "document") {
+    clean.documentAssetId = block.documentAssetId;
+    clean.documentFormat = block.documentFormat;
+    clean.documentRevision = block.documentRevision;
+    clean.documentPages = block.documentPages;
+    clean.documentPdfLayout = block.documentPdfLayout ?? "SINGLE";
+    clean.documentPdfSeparateCover = block.documentPdfSeparateCover ?? true;
   }
   if (block.assessment || isObjectiveMaterialBlockType(block.type)) {
     clean.assessment = cleanMaterialAssessment(block.assessment ?? defaultObjectiveAssessmentPolicy());
@@ -532,7 +559,7 @@ export function materialMatchingPairTargetKind(pair: MaterialMatchingPair): Mate
 
 function normalizeMaterialPageLayout(value: string): MaterialEditorPage["layout"] {
   const layout = value.trim().toUpperCase();
-  if (layout === "WORKSHEET" || layout === "STATIC_IMAGE" || layout === "HTML_GAME") {
+  if (layout === "WORKSHEET" || layout === "STATIC_IMAGE" || layout === "HTML_GAME" || layout === "DOCUMENT") {
     return layout;
   }
   return "FLOW";

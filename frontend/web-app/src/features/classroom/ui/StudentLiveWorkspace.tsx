@@ -93,6 +93,7 @@ export function StudentLiveWorkspace({
     [groupAnnotationWorkspace.htmlGameSync],
   );
   const viewportSync = useMemo(() => ({
+    canPublish: false,
     clientId: groupAnnotationWorkspace.workspaceClientId,
     publish: groupAnnotationWorkspace.setMaterialViewport,
     ready: groupAnnotationWorkspace.connected,

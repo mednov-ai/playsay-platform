@@ -14,6 +14,7 @@ import { isMaterialViewportNewer } from "../model/materialViewport";
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
+const messageMaterialViewport = 3;
 const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
@@ -384,6 +385,7 @@ export function createYjsWorkspaceRuntime({
         materialViewportState = normalized;
         onMaterialViewportChange(normalized);
         awareness.setLocalStateField("materialViewport", normalized);
+        sendMaterialViewportCommand(socket, normalized, presentationChanged);
       }
     },
     setVideoPlayback(blockId, state, { heartbeat = false } = {}) {
@@ -887,14 +889,25 @@ function normalizeMaterialViewport(value) {
     || !pageId
     || sourceClientId === null
     || revision === null
-    || !["default", "html-game-focus", "image-focus", "external-activity-focus"].includes(presentationMode)
+    || !["default", "html-game-focus", "image-focus", "document-focus", "external-activity-focus"].includes(presentationMode)
   ) {
     return null;
   }
   const focusedBlockId = asString(viewport?.focusedBlockId);
   const presentationRevision = finiteNumberOr(viewport?.presentationRevision, revision);
+  const documentBlockId = asString(viewport?.documentBlockId);
+  const documentRevision = asString(viewport?.documentRevision);
+  const documentPageIndex = finiteNumberOr(viewport?.documentPageIndex, null);
+  const documentPdfLayout = viewport?.documentPdfLayout === "SPREAD" ? "SPREAD" : "SINGLE";
   return {
     ...(focusedBlockId ? { focusedBlockId } : {}),
+    ...(documentBlockId && documentRevision && documentPageIndex !== null ? {
+      documentBlockId,
+      documentPageIndex: Math.max(0, Math.floor(documentPageIndex)),
+      documentPdfLayout,
+      documentPdfSeparateCover: viewport?.documentPdfSeparateCover !== false,
+      documentRevision,
+    } : {}),
     materialId,
     pageId,
     presentationRevision,
@@ -1041,6 +1054,16 @@ function sendEphemeralMessage(socket, message) {
   if (payload.byteLength > 64 * 1024) return;
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageEphemeral);
+  encoding.writeVarUint8Array(encoder, payload);
+  socket.send(encoding.toUint8Array(encoder));
+}
+
+function sendMaterialViewportCommand(socket, viewport, presentationChanged) {
+  if (!isSocketOpen(socket)) return;
+  const payload = new TextEncoder().encode(JSON.stringify({ presentationChanged, viewport }));
+  if (payload.byteLength > 16 * 1024) return;
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageMaterialViewport);
   encoding.writeVarUint8Array(encoder, payload);
   socket.send(encoding.toUint8Array(encoder));
 }

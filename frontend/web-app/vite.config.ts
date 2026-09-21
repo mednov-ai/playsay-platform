@@ -7,6 +7,12 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@napi-rs/canvas": resolve(projectRoot, "src/shims/napiCanvas.ts"),
+      "ai": resolve(projectRoot, "src/shims/aiDisabled.ts"),
+    },
+  },
   build: {
     rollupOptions: {
       input: {

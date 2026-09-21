@@ -347,7 +347,7 @@ private fun normalizedMaterialAssetContentType(value: String?): String? =
         ?.let { if (it == "image/jpg") "image/jpeg" else it }
         ?.takeIf { it.isNotEmpty() }
 
-private fun cleanMaterialAssetFileName(value: String?): String? =
+internal fun cleanMaterialAssetFileName(value: String?): String? =
     value
         ?.replace('\\', '/')
         ?.substringAfterLast('/')

@@ -1,4 +1,4 @@
-import { FileImage, FilePlus2, Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { FileImage, FilePlus2, FileText, Globe2, Paperclip, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { formatFileSize, type MaterialDraftSourceImage } from "../model/materialDocument";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -17,6 +17,7 @@ export function MaterialDraftPanel({
   onDraftImageChange,
   onGenerateDraft,
   onOpenWorksheetImport,
+  onDocumentUpload,
   onRemoveDraftImage,
   onUpdateDraftPrompt,
   onUpdateDraftUrl,
@@ -34,6 +35,7 @@ export function MaterialDraftPanel({
   onDraftImageChange: (file: File | null) => void;
   onGenerateDraft: () => void;
   onOpenWorksheetImport: () => void;
+  onDocumentUpload?: (file: File) => void;
   onRemoveDraftImage: () => void;
   onUpdateDraftPrompt: (value: string) => void;
   onUpdateDraftUrl: (value: string) => void;
@@ -49,6 +51,20 @@ export function MaterialDraftPanel({
       <div className="material-creation-actions">
         <Button disabled={disabled} onClick={onCreateBlank} type="button" variant="outline"><FilePlus2 />{t("materials.creation.blank")}</Button>
         <Button data-testid="worksheet-import-create" disabled={disabled} onClick={onOpenWorksheetImport} type="button"><FileImage />{t("materials.creation.files")}</Button>
+        {onDocumentUpload ? <label className="playsay-button playsay-button-outline" data-disabled={disabled ? "true" : "false"}>
+          <FileText />{t("materials.document.upload")}
+          <input
+            accept="application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pdf,.pptx"
+            className="sr-only"
+            disabled={disabled}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (file) onDocumentUpload(file);
+            }}
+            type="file"
+          />
+        </label> : null}
         <div><Sparkles />{t("materials.creation.prompt")}</div>
         <div><Globe2 />{t("materials.creation.url")}</div>
       </div>

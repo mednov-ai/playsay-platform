@@ -19,7 +19,7 @@ describe("PlaySayRelayVideoPlayer", () => {
     expect(markup).toContain("playsay-relay-player-poster");
     expect(markup).toContain("/api/materials/material-1/assets/asset-1/content");
     expect(markup).toContain("preload=\"none\"");
-    expect(markup).toContain("playsinline=\"\"");
+    expect(markup).toContain("playsInline=\"\"");
     expect(markup).not.toContain("playsay-relay-player-controls");
     expect(markup).not.toContain(">Warm-up<");
     expect(markup).not.toContain("src=\"/api/media/video-playback-sessions/session-1/stream\"");

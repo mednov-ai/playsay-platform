@@ -59,6 +59,7 @@ type LiveAnnotationSync = {
 };
 
 type MaterialViewportSync = {
+  canPublish?: boolean;
   clientId: number | null;
   publish: (
     viewport: MaterialViewportUpdate,
@@ -68,7 +69,7 @@ type MaterialViewportSync = {
   state: MaterialViewportState | null;
 };
 
-export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
+export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus" | "document-focus";
 
 export function LessonTaskCanvas({
   annotationSync,
@@ -300,8 +301,15 @@ export function LessonTaskCanvas({
     mode = presentationMode,
     blockId = focusedBlockId,
     options?: MaterialViewportPublishOptions,
+    documentPresentation?: {
+      blockId: string;
+      pageIndex: number;
+      pdfLayout: "SINGLE" | "SPREAD";
+      pdfSeparateCover: boolean;
+      revision: string;
+    },
   ) => {
-    if (!viewportSync?.ready || !material) return;
+    if (!viewportSync?.ready || viewportSync.canPublish === false || !material) return;
     const scrollContainer = mode === "image-focus" ? "image" : "document";
     const node = scrollContainer === "image"
       ? materialSurfaceRef.current?.querySelector<HTMLElement>(".playsay-material-focused-image") ?? null
@@ -311,6 +319,13 @@ export function LessonTaskCanvas({
     const maxTop = Math.max(0, node.scrollHeight - node.clientHeight);
     const nextViewport = {
       ...(blockId ? { focusedBlockId: blockId } : {}),
+      ...(documentPresentation ? {
+        documentBlockId: documentPresentation.blockId,
+        documentPageIndex: documentPresentation.pageIndex,
+        documentPdfLayout: documentPresentation.pdfLayout,
+        documentPdfSeparateCover: documentPresentation.pdfSeparateCover,
+        documentRevision: documentPresentation.revision,
+      } : {}),
       materialId: material.id,
       pageId,
       presentationMode: mode,
@@ -675,8 +690,9 @@ export function LessonTaskCanvas({
               <LessonMaterialDocumentView
                 activePageId={activePageId}
                 answers={effectiveAnswers}
-                canControlPages={canControlPages || Boolean(viewportSync)}
+                canControlPages={canControlPages || viewportSync?.canPublish === true}
                 material={material}
+                canControlDocuments={canControlPages || !viewportSync || viewportSync.canPublish === true}
                 htmlGameSync={htmlGameSync}
                 videoSync={videoSync}
                 exerciseParticipants={exerciseSync?.participants}
@@ -713,6 +729,32 @@ export function LessonTaskCanvas({
                     { presentationChanged: true },
                   ));
                 }}
+                onDocumentPresentationChange={(state) => {
+                  window.requestAnimationFrame(() => publishViewport(
+                    activePageId,
+                    presentationMode,
+                    focusedBlockId,
+                    { presentationChanged: true },
+                    state,
+                  ));
+                }}
+                sharedDocumentFocusBlockId={viewportSync?.state?.materialId === material.id
+                  ? viewportSync.state.presentationMode === "document-focus"
+                    ? viewportSync.state.focusedBlockId ?? null
+                    : null
+                  : undefined}
+                sharedDocumentPresentation={viewportSync?.state?.materialId === material.id
+                  && viewportSync.state.documentBlockId
+                  && viewportSync.state.documentRevision
+                  && viewportSync.state.documentPageIndex !== undefined
+                  ? {
+                      blockId: viewportSync.state.documentBlockId,
+                      pageIndex: viewportSync.state.documentPageIndex,
+                      pdfLayout: viewportSync.state.documentPdfLayout ?? "SINGLE",
+                      pdfSeparateCover: viewportSync.state.documentPdfSeparateCover !== false,
+                      revision: viewportSync.state.documentRevision,
+                    }
+                  : null}
                 sharedImageFocusBlockId={viewportSync?.state?.materialId === material.id
                   ? viewportSync.state.presentationMode === "image-focus"
                     ? viewportSync.state.focusedBlockId ?? null

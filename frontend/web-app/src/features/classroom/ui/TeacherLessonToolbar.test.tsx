@@ -10,9 +10,11 @@ const translations: Record<string, string> = {
   "classroom.actions.add": "Добавить",
   "classroom.actions.addHtmlGamePage": "Добавить HTML-игру",
   "classroom.actions.addImagePage": "Добавить картинку",
+  "classroom.actions.addDocumentPage": "Загрузить PDF или PowerPoint в библиотеку",
   "classroom.actions.assign": "Назначить",
   "classroom.actions.uploadingHtmlGamePage": "Загружаем игру",
   "classroom.actions.uploadingImagePage": "Загружаем",
+  "classroom.actions.uploadingDocumentPage": "Загружаем документ",
   "classroom.material.pickerEmpty": "Материал не выбран",
   "classroom.material.pickerLabel": "Карточка урока",
   "classroom.teacherTask.targetLabel": "Зачёт ученику",
@@ -71,10 +73,13 @@ describe("TeacherLessonToolbar", () => {
 
     fireEvent.click(trigger);
     const imageAction = screen.getByRole("menuitem", { name: "Добавить картинку" });
+    const documentAction = screen.getByRole("menuitem", { name: "Загрузить PDF или PowerPoint в библиотеку" });
     const htmlAction = screen.getByRole("menuitem", { name: "Добавить HTML-игру" });
     expect(imageAction).toHaveFocus();
 
     fireEvent.keyDown(imageAction, { key: "ArrowDown" });
+    expect(documentAction).toHaveFocus();
+    fireEvent.keyDown(documentAction, { key: "ArrowDown" });
     expect(htmlAction).toHaveFocus();
 
     fireEvent.keyDown(document, { key: "Escape" });
@@ -90,14 +95,18 @@ describe("TeacherLessonToolbar", () => {
   it("keeps accepted file types and forwards selected uploads", () => {
     const onUploadHtmlGamePage = vi.fn();
     const onUploadImagePage = vi.fn();
-    const { container } = renderToolbar({ onUploadHtmlGamePage, onUploadImagePage });
+    const onUploadDocumentPage = vi.fn();
+    const { container } = renderToolbar({ onUploadDocumentPage, onUploadHtmlGamePage, onUploadImagePage });
     const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
     const imageInput = inputs[0]!;
-    const htmlInput = inputs[1]!;
+    const documentInput = inputs[1]!;
+    const htmlInput = inputs[2]!;
     const imageFile = new File(["image"], "lesson.webp", { type: "image/webp" });
     const htmlFile = new File(["<html></html>"], "game.html", { type: "text/html" });
+    const documentFile = new File(["pdf"], "lesson.pdf", { type: "application/pdf" });
 
     expect(imageInput).toHaveAttribute("accept", "image/jpeg,image/png,image/webp,image/svg+xml");
+    expect(documentInput).toHaveAttribute("accept", "application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pdf,.pptx");
     expect(htmlInput).toHaveAttribute("accept", "text/html,.html");
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
@@ -106,12 +115,17 @@ describe("TeacherLessonToolbar", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
+    fireEvent.change(documentInput, { target: { files: [documentFile] } });
+    expect(onUploadDocumentPage).toHaveBeenCalledWith(documentFile);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
     fireEvent.change(htmlInput, { target: { files: [htmlFile] } });
     expect(onUploadHtmlGamePage).toHaveBeenCalledWith(htmlFile);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("keeps parallel-work supervision compact without shared-material actions", () => {
+  it("keeps parallel-work supervision compact with participant document upload", () => {
     renderToolbar({
       canManageMaterial: false,
       participants: [participant("student-1", "Мила"), participant("student-2", "Саша")],
@@ -120,7 +134,10 @@ describe("TeacherLessonToolbar", () => {
     expect(screen.getByRole("combobox", { name: "Зачёт ученику" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "В словарик" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Карточка урока" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Добавить" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Добавить" }));
+    expect(screen.getByRole("menuitem", { name: "Загрузить PDF или PowerPoint в библиотеку" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Добавить картинку" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Добавить HTML-игру" })).not.toBeInTheDocument();
   });
 
   it("exposes busy states without enabling conflicting actions", () => {
@@ -144,6 +161,7 @@ function renderToolbar(overrides: Partial<Parameters<typeof TeacherLessonToolbar
     activeStudentSubject: "student-1",
     assigningMaterial: false,
     canManageMaterial: true,
+    canUploadDocument: true,
     currentMaterialId: null,
     materials: [material("material-1", "Present Simple")],
     onAssignMaterial: vi.fn(),
@@ -151,10 +169,12 @@ function renderToolbar(overrides: Partial<Parameters<typeof TeacherLessonToolbar
     onSelectStudent: vi.fn(),
     onUploadHtmlGamePage: vi.fn(),
     onUploadImagePage: vi.fn(),
+    onUploadDocumentPage: vi.fn(),
     participants: [participant("student-1", "Мила")],
     selectedMaterialId: "",
     uploadingHtmlGamePage: false,
     uploadingImagePage: false,
+    uploadingDocumentPage: false,
     vocabularyAction: <button aria-label="В словарик" type="button">В словарик</button>,
     ...overrides,
   };

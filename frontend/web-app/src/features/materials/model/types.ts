@@ -21,7 +21,8 @@ export type MaterialBlockType =
   | "generatedImage"
   | "htmlGame"
   | "externalActivity"
-  | "interactiveWorksheet";
+  | "interactiveWorksheet"
+  | "document";
 
 export type ExternalActivityProvider =
   | "LIVEWORKSHEETS"
@@ -482,6 +483,12 @@ export type MaterialEditorBlock = {
   intrinsicWidth?: number;
   intrinsicHeight?: number;
   worksheetGroups?: MaterialWorksheetGroup[];
+  documentAssetId?: string;
+  documentFormat?: "PDF" | "PPTX";
+  documentRevision?: string;
+  documentPages?: Array<{ id: string; index: number; width: number; height: number }>;
+  documentPdfLayout?: "SINGLE" | "SPREAD";
+  documentPdfSeparateCover?: boolean;
 };
 
 export const MIN_MANUAL_INPUT_HINTS = 3;
@@ -495,7 +502,7 @@ export type MaterialExerciseItem = NonNullable<MaterialEditorBlock["items"]>[num
 export type MaterialEditorPage = {
   id: string;
   title: string;
-  layout: "FLOW" | "WORKSHEET" | "STATIC_IMAGE" | "HTML_GAME";
+  layout: "FLOW" | "WORKSHEET" | "STATIC_IMAGE" | "HTML_GAME" | "DOCUMENT";
   blocks: MaterialEditorBlock[];
 };
 

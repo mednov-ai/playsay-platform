@@ -220,6 +220,33 @@ class ScheduledLessonStore(
     }
 
     @Transactional
+    fun assignParticipantMaterial(
+        authentication: JwtAuthenticationToken,
+        lessonId: UUID,
+        participantSubject: String,
+        materialId: UUID,
+    ): ScheduledLessonResponse {
+        authentication.requireScheduleManager()
+        requireLessonManagement(authentication, lessonId)
+        validateMaterialId(authentication, materialId)
+        val lesson = lessonRepo.lockById(lessonId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        if (lesson.workMode != MetaData.LessonWorkModes.PARALLEL) {
+            throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID)
+        }
+        val participant = lessonParticipantRepo.findByLessonId(lessonId).firstOrNull { item ->
+            appUserRepo.findById(item.studentUserId).orElse(null)?.keycloakSubject == participantSubject
+        } ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        participant.materialId = materialId
+        lessonParticipantRepo.saveAndFlush(participant)
+        lesson.updatedAt = Instant.now()
+        lessonRepo.saveAndFlush(lesson)
+        val updated = requireNotNull(find(lessonId)).withParticipants()
+        eventPublisher.publishEvent(LessonChangedEvent(updated))
+        return updated
+    }
+
+    @Transactional
     fun delete(authentication: JwtAuthenticationToken, lessonId: UUID) {
         authentication.requireScheduleManager()
         requireLessonManagement(authentication, lessonId)

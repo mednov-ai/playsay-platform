@@ -3,6 +3,138 @@
   overflow: visible;
 }
 
+.playsay-render-block-document {
+  padding: 0;
+  overflow: hidden;
+}
+
+.playsay-document-viewer {
+  display: grid;
+  min-height: 28rem;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  border-radius: 1rem;
+  background: hsl(var(--muted) / 0.35);
+  overflow: hidden;
+}
+
+.playsay-document-viewer[data-expanded="true"] {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.playsay-document-toolbar,
+.playsay-document-navigation {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .55rem .7rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+}
+
+.playsay-document-navigation {
+  justify-content: center;
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 0;
+}
+
+.playsay-document-toolbar button,
+.playsay-document-navigation button {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: .65rem;
+  background: hsl(var(--background));
+}
+
+.playsay-document-toolbar button[data-active="true"] {
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
+}
+
+.playsay-document-toolbar button svg,
+.playsay-document-navigation button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.playsay-document-toolbar-spacer { flex: 1; }
+.playsay-document-zoom { min-width: 3.4rem; text-align: center; font-size: .75rem; font-weight: 800; }
+
+.playsay-document-cover-option {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .75rem;
+  font-size: .75rem;
+  font-weight: 700;
+  background: hsl(var(--background));
+}
+
+.playsay-document-stage {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: .75rem;
+  background: #d8dde5;
+}
+
+.playsay-pdf-pages > .react-pdf__Document {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: .75rem;
+  min-width: min-content;
+}
+
+.playsay-pdf-pages .react-pdf__Page {
+  overflow: hidden;
+  box-shadow: 0 .5rem 1.5rem rgb(15 23 42 / .18);
+}
+
+.playsay-pptx-static-viewer { height: 100%; min-height: 26rem; transform-origin: top left; }
+.playsay-pptx-static-viewer > * { height: 100%; }
+
+/* pptx-react-viewer is used as a renderer. Honey School owns all material controls. */
+.playsay-pptx-static-viewer > div > div > div {
+  display: none !important;
+}
+
+.playsay-pptx-static-viewer > div > div > div[class~="z-10"][class~="flex-1"][class~="min-h-0"] {
+  display: flex !important;
+}
+
+.playsay-document-message {
+  display: flex;
+  min-height: 18rem;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  width: 100%;
+  font-weight: 800;
+}
+
+.playsay-document-expanded-placeholder {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  min-height: 8rem;
+}
+
+@media (max-width: 640px) {
+  .playsay-document-viewer { min-height: 32rem; }
+  .playsay-document-toolbar strong { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .playsay-document-toolbar { gap: .25rem; padding-inline: .4rem; }
+  .playsay-document-stage { padding: .4rem; }
+  .playsay-pdf-pages > .react-pdf__Document { flex-direction: column; align-items: center; }
+}
+
 .playsay-material-library-workspace {
   display: grid;
   gap: 1rem;

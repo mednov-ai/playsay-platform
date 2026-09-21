@@ -34,5 +34,6 @@ function fixture(lessonId: string, subject: string): CollaborationClaims {
     documentKind: "MATERIAL_WORK",
     scope: "GROUP",
     yjsDocumentId: `lesson:${lessonId}:material:material-1:group:kind:MATERIAL_WORK`,
+    canPublishMaterialViewport: false,
   };
 }

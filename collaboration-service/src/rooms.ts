@@ -9,6 +9,7 @@ export interface CollaborationClaims {
   documentKind: string;
   scope: CollaborationScope;
   yjsDocumentId: string;
+  canPublishMaterialViewport: boolean;
 }
 
 export function collaborationRoomName(claims: CollaborationClaims): string {
@@ -38,6 +39,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const scope = requiredScope(payload);
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
   const studentUserId = optionalString(payload, "studentUserId");
+  const canPublishMaterialViewport = optionalBoolean(payload, "canPublishMaterialViewport") ?? false;
   const claims: CollaborationClaims = {
     subject,
     documentId,
@@ -47,10 +49,22 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
     documentKind,
     scope,
     yjsDocumentId,
+    canPublishMaterialViewport,
   };
 
   assertRoomMatchesClaims(yjsDocumentId, claims);
   return claims;
+}
+
+function optionalBoolean(payload: Record<string, unknown>, key: string): boolean | undefined {
+  const value = payload[key];
+  if (value == null) {
+    return undefined;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(`invalid ${key}`);
+  }
+  return value;
 }
 
 function requiredString(payload: Record<string, unknown>, key: string): string {

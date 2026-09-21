@@ -69,6 +69,8 @@ export function newMaterialBlock(type: MaterialBlockType): MaterialEditorBlock {
       return { ...base, height: 640, url: "" };
     case "externalActivity":
       return { ...base, url: "", provider: "EXPERIMENTAL", externalActivitySupportLevel: "EXPERIMENTAL" };
+    case "document":
+      return { ...base, documentFormat: "PDF", documentPages: [], documentPdfLayout: "SINGLE", documentPdfSeparateCover: true };
     case "flashcards":
       return {
         ...base,

@@ -10,12 +10,23 @@ const apiMocks = vi.hoisted(() => ({
   appendHtmlGame: vi.fn(),
   appendImage: vi.fn(),
   fetchMaterial: vi.fn(),
+  saveMaterial: vi.fn(),
 }));
 
 vi.mock("../../../shared/api/playsay", () => ({
   appendScheduledLessonHtmlGamePage: apiMocks.appendHtmlGame,
   appendScheduledLessonImagePage: apiMocks.appendImage,
   fetchScheduledLessonMaterial: apiMocks.fetchMaterial,
+  saveMaterial: apiMocks.saveMaterial,
+}));
+
+const documentUploadMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+}));
+
+vi.mock("../../materials/model/documentUpload", () => ({
+  createReadyDocumentMaterial: documentUploadMocks.create,
+  documentFileFingerprint: (file: File) => `${file.name}:${file.size}:${file.lastModified}`,
 }));
 
 vi.mock("../../../shared/i18n", () => ({
@@ -240,4 +251,32 @@ describe("useLessonMaterial live uploads", () => {
 
     expect(await pending).toBeNull();
   });
+
+  it("keeps the active lesson material until the ready library material is explicitly assigned", async () => {
+    const currentMaterial = material("current-material", "page-current");
+    const readyMaterial = { ...material("ready-document", "page-document"), status: "DRAFT" } as LessonMaterial;
+    apiMocks.fetchMaterial.mockResolvedValue(currentMaterial);
+    documentUploadMocks.create.mockResolvedValue(readyMaterial);
+    const onAssignMaterial = vi.fn();
+    const { result } = renderHook(() => useLessonMaterial({
+      onAssignMaterial,
+      session: {
+        lessonId: "lesson-1",
+        lessonUpdatedAt: "2026-09-21T12:00:00Z",
+        materialId: currentMaterial.id,
+      } as LessonRoomSession,
+    }));
+    await waitFor(() => expect(result.current.material?.id).toBe(currentMaterial.id));
+
+    await act(async () => {
+      await result.current.uploadDocumentPage(new File(["pptx"], "slides.pptx", { lastModified: 42 }));
+    });
+
+    expect(result.current.material?.id).toBe(currentMaterial.id);
+    expect(result.current.liveActivePageId).toBeNull();
+    expect(result.current.selectedMaterialId).toBe(readyMaterial.id);
+    expect(result.current.readyDocumentMaterials.map((item) => item.id)).toEqual([readyMaterial.id]);
+    expect(onAssignMaterial).not.toHaveBeenCalled();
+  });
+
 });

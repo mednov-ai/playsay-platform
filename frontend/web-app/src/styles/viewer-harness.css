@@ -1,0 +1,2 @@
+.viewer-harness { display: grid; gap: 24px; margin: 0 auto; max-width: 1200px; padding: 24px; }
+.viewer-harness-card { min-height: 520px; }

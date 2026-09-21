@@ -1,6 +1,6 @@
 import { Button } from "../../../../components/ui/button";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
-import { CircleAlert, ExternalLink, Gamepad2, ImageIcon, Loader2, Maximize2, Play, Video } from "lucide-react";
+import { CircleAlert, ExternalLink, FileText, Gamepad2, ImageIcon, Loader2, Maximize2, Play, Video } from "lucide-react";
 import { createMaterialVideoPlayback, type MaterialVideoPlayback } from "../../../../shared/api/playsay";
 import {
   clampNumber,
@@ -27,6 +27,7 @@ import { RenderedFillGapExercise } from "./RenderedFillGapExercise";
 import { RenderedMatchingPairsExercise } from "./RenderedMatchingPairsExercise";
 import { RenderedInteractiveWorksheet } from "./RenderedInteractiveWorksheet";
 import { useAppTranslation } from "../../../../shared/i18n";
+import { DocumentMaterialViewer, type DocumentViewerState } from "../document/DocumentMaterialViewer";
 
 type MaterialVideoQuality = "LOW" | "MEDIUM" | "HIGH";
 
@@ -50,6 +51,10 @@ export function RenderedMaterialBlock({
   pageLayout,
   materialId,
   videoSync,
+  documentExpanded = false,
+  canControlDocumentPage = true,
+  documentState,
+  onDocumentStateChange,
 }: {
   allowVideoFullscreen?: boolean;
   answer?: MaterialAnswerBlock;
@@ -68,8 +73,12 @@ export function RenderedMaterialBlock({
   onVideoMetadataEdit?: (blockId: string) => void;
   onBlockPatchCommit?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
   onBlockPatch?: (blockId: string, patch: Partial<MaterialEditorBlock>) => void;
-  onRequestFocus?: (kind: "htmlGame" | "image" | "externalActivity", blockId: string) => void;
+  onRequestFocus?: (kind: "htmlGame" | "image" | "externalActivity" | "document", blockId: string) => void;
   pageLayout?: MaterialEditorPage["layout"];
+  documentExpanded?: boolean;
+  canControlDocumentPage?: boolean;
+  documentState?: DocumentViewerState;
+  onDocumentStateChange?: (state: DocumentViewerState) => void;
 }) {
   const { t } = useAppTranslation();
   const [videoPlayback, setVideoPlayback] = useState<MaterialVideoPlayback | null>(null);
@@ -130,6 +139,26 @@ export function RenderedMaterialBlock({
   );
 
   switch (block.type) {
+    case "document":
+      return blockSection(
+        documentExpanded ? (
+          <button className="playsay-document-expanded-placeholder" onClick={() => onRequestFocus?.("document", block.id)} type="button">
+            <FileText />
+            <strong>{block.title}</strong>
+          </button>
+        ) : documentState ? (
+          <DocumentMaterialViewer
+            block={block}
+            canControlPage={canControlDocumentPage}
+            expanded={false}
+            onExpandedChange={() => onRequestFocus?.("document", block.id)}
+            onStateChange={onDocumentStateChange ?? (() => undefined)}
+            src={block.documentAssetId ? assetUrls[block.documentAssetId] : undefined}
+            state={documentState}
+          />
+        ) : null,
+        "playsay-render-block playsay-render-block-document",
+      );
     case "interactiveWorksheet":
       return blockSection(
         <RenderedInteractiveWorksheet

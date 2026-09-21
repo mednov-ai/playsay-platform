@@ -11,6 +11,7 @@ import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialAssetResponse
 import com.playsay.gateway.dto.MaterialAssetUpdateRequest
+import com.playsay.gateway.dto.MaterialDocumentUploadResponse
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentRequest
 import com.playsay.gateway.dto.MaterialHtmlGameEnrichmentResponse
 import com.playsay.gateway.dto.MaterialGameAdaptationRequest
@@ -44,6 +45,7 @@ class LessonMaterialStore(
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val lessonMaterialAuthoringService: LessonMaterialAuthoringService,
     private val materialAssetService: MaterialAssetService,
+    private val materialDocumentAssetService: MaterialDocumentAssetService,
     private val materialReadAccessPolicy: MaterialReadAccessPolicy,
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialGameAdaptationService: MaterialGameAdaptationService,
@@ -228,7 +230,15 @@ class LessonMaterialStore(
 
     @Transactional
     fun assetContent(authentication: JwtAuthenticationToken, materialId: UUID, assetId: UUID): ResponseEntity<ByteArray> {
-        materialReadAccessPolicy.requireReadable(authentication, materialId)
+        if (materialAssetService.isDocumentSource(materialId, assetId)) {
+            lessonMaterialCatalogService.requireEditable(
+                authentication,
+                materialId,
+                MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
+            )
+        } else {
+            materialReadAccessPolicy.requireReadable(authentication, materialId)
+        }
         return materialAssetService.content(materialId, assetId)
     }
 
@@ -273,6 +283,35 @@ class LessonMaterialStore(
             MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
         )
         return materialAssetService.uploadHtmlGameAsset(materialId, file)
+    }
+
+    @Transactional
+    fun uploadDocument(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        file: MultipartFile,
+        idempotencyKey: String?,
+    ): MaterialDocumentUploadResponse {
+        lessonMaterialCatalogService.requireEditable(
+            authentication,
+            materialId,
+            MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
+        )
+        return materialDocumentAssetService.upload(materialId, file, idempotencyKey)
+    }
+
+    @Transactional(readOnly = true)
+    fun documentUploadStatus(
+        authentication: JwtAuthenticationToken,
+        materialId: UUID,
+        uploadId: UUID,
+    ): MaterialDocumentUploadResponse {
+        lessonMaterialCatalogService.requireEditable(
+            authentication,
+            materialId,
+            MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
+        )
+        return materialDocumentAssetService.status(materialId, uploadId)
     }
 
     @Transactional

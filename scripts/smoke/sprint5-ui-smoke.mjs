@@ -69,6 +69,7 @@ try {
   const { chromium } = loadPlaywright();
   browser = await chromium.launch({
     headless,
+    executablePath: process.env.CHROMIUM_EXECUTABLE || undefined,
     args: fakeMedia
       ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
       : [],
@@ -604,7 +605,14 @@ async function addSmokeScrollImage(token, material) {
 
 async function uploadSmokeImageAsset(token, materialId) {
   const formData = new FormData();
-  formData.append("file", new Blob([tallSmokeSvg()], { type: "image/svg+xml" }), "annotation-scroll.svg");
+  const imagePage = await browser.newPage({ viewport: { width: 800, height: 2400 } });
+  try {
+    await imagePage.setContent(`<style>body{margin:0}</style>${tallSmokeSvg()}`);
+    const jpeg = await imagePage.screenshot({ type: "jpeg", quality: 90 });
+    formData.append("file", new Blob([jpeg], { type: "image/jpeg" }), "annotation-scroll.jpeg");
+  } finally {
+    await imagePage.close();
+  }
   const response = await fetch(`${apiBaseUrl}/materials/${materialId}/assets/images`, {
     method: "POST",
     headers: {
@@ -876,11 +884,11 @@ async function drawTextAndMindMap(page) {
   await textEditor.waitFor({ timeout: timeoutMs });
   await textEditor.fill("Friendly text");
   const initialTextSize = await textEditor.evaluate((editor) => {
-    const frame = editor.closest("foreignObject");
+    const frame = editor.closest(".playsay-annotation-html-element, foreignObject");
     return frame ? {
       backgroundColor: getComputedStyle(editor.parentElement).backgroundColor,
-      height: Number(frame.getAttribute("height")),
-      width: Number(frame.getAttribute("width")),
+      height: parseFloat(frame.style.height || frame.getAttribute("height")),
+      width: parseFloat(frame.style.width || frame.getAttribute("width")),
     } : null;
   });
   if (
@@ -898,11 +906,11 @@ async function drawTextAndMindMap(page) {
   );
   await page.waitForFunction(() => {
     const editor = document.querySelector(".playsay-annotation-text-text textarea");
-    const frame = editor?.closest("foreignObject");
-    return Number(frame?.getAttribute("height")) > 56;
+    const frame = editor?.closest(".playsay-annotation-html-element, foreignObject");
+    return parseFloat(frame?.style.height || frame?.getAttribute("height")) > 56;
   }, null, { timeout: timeoutMs });
   const expandedTextHeight = await textEditor.evaluate((editor) => (
-    Number(editor.closest("foreignObject")?.getAttribute("height"))
+    parseFloat(editor.closest(".playsay-annotation-html-element, foreignObject")?.style.height || editor.closest("foreignObject")?.getAttribute("height"))
   ));
   if (expandedTextHeight <= initialTextSize.height) {
     throw new Error(`Text did not grow to fit wrapped content: ${expandedTextHeight}`);
@@ -921,17 +929,17 @@ async function drawTextAndMindMap(page) {
   await mindMapEditor.press("Escape");
   await waitForLocatorCount(page, ".playsay-annotation-text-mindMapNode", 2, "compact mind map nodes");
 
-  const sizes = await page.locator("foreignObject.playsay-annotation-element").evaluateAll((elements) => elements
+  const sizes = await page.locator(".playsay-annotation-html-element, foreignObject.playsay-annotation-element").evaluateAll((elements) => elements
     .map((element) => {
       const content = element.querySelector(".playsay-annotation-text-text, .playsay-annotation-text-mindMapNode");
       const visibleText = content?.querySelector("span:not(.playsay-annotation-text-measure)");
       const textRange = visibleText ? document.createRange() : null;
       if (textRange && visibleText) textRange.selectNodeContents(visibleText);
       return content ? {
-        height: Number(element.getAttribute("height")),
+        height: parseFloat(element.style.height || element.getAttribute("height")),
         kind: content.classList.contains("playsay-annotation-text-text") ? "text" : "mindMapNode",
         lineCount: textRange ? textRange.getClientRects().length : null,
-        width: Number(element.getAttribute("width")),
+        width: parseFloat(element.style.width || element.getAttribute("width")),
       } : null;
     })
     .filter(Boolean));
@@ -968,13 +976,13 @@ async function verifyAnchoredTextScroll(teacherPage, studentPage) {
   const clickY = Math.min(Math.max(teacherBounds.y + 180, teacherBounds.y + 48), teacherViewport.height - 140);
   await teacherPage.locator("[data-testid='annotation-tool-text']").click();
   await teacherPage.mouse.click(teacherBounds.x + teacherBounds.width * 0.52, clickY);
-  const teacherEditor = teacherLayer.locator(".playsay-annotation-text-text textarea");
+  const teacherEditor = teacherPage.locator(`.playsay-annotation-html-layer[data-anchor-id='${scrollImageBlockId}'] .playsay-annotation-text-text textarea`);
   await teacherEditor.waitFor({ timeout: timeoutMs });
   await teacherEditor.fill(scrollImageText);
   await teacherEditor.press("Control+Enter");
 
   const studentText = studentPage.locator(
-    `.playsay-annotation-layer[data-anchor-id='${scrollImageBlockId}'] .playsay-annotation-text-text`,
+    `.playsay-annotation-html-layer[data-anchor-id='${scrollImageBlockId}'] .playsay-annotation-text-text`,
   ).filter({ hasText: scrollImageText });
   await studentText.waitFor({ timeout: timeoutMs });
 
@@ -1076,7 +1084,7 @@ async function assertAnchoredTextFollowsImageScroll(page, role) {
     const scroller = document.querySelector(".playsay-material-focused-image");
     const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
     const annotations = Array.from(document.querySelectorAll(
-      `.playsay-annotation-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
+      `.playsay-annotation-html-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
     ));
     const annotation = annotations.find((element) => element.textContent?.includes(text));
     if (!(scroller instanceof HTMLElement) || !(image instanceof HTMLElement) || !(annotation instanceof HTMLElement)) {
@@ -1119,7 +1127,7 @@ async function imageTextGeometry(page) {
     const scroller = document.querySelector(".playsay-material-focused-image");
     const image = document.querySelector(`.playsay-material-focus-stack[data-active='true'] img[data-playsay-annotation-anchor-id='${blockId}']`);
     const annotations = Array.from(document.querySelectorAll(
-      `.playsay-annotation-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
+      `.playsay-annotation-html-layer[data-anchor-id='${blockId}'] .playsay-annotation-text-text`,
     ));
     const annotation = annotations.find((element) => element.textContent?.includes(text));
     if (!(scroller instanceof HTMLElement) || !(image instanceof HTMLElement) || !(annotation instanceof HTMLElement)) {

@@ -1,4 +1,5 @@
-import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject, type KeyboardEvent, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { useAppTranslation } from "../../../shared/i18n";
 import {
   annotationElementBounds,
@@ -64,6 +65,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   tool: AnnotationTool;
 }) {
   const { t } = useAppTranslation();
+  const svgRef = useRef<SVGSVGElement>(null);
+  const htmlRef = useRef<HTMLDivElement>(null);
+  const htmlSurface = useAnnotationHtmlSurface(svgRef, htmlRef, anchorBounds);
   const markerId = `playsay-arrow-${useId().split(":").join("")}`;
   const selectedElement = selectedElementId
     ? elements.find((element) => element.id === selectedElementId) ?? null
@@ -123,63 +127,81 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   }, [onDeleteSelected, onDeselect, onFinishTextEditing, onRedo, onUndo, readOnly, selectedElementId]);
 
   return (
-    <svg
-      aria-label={t("classroom.annotation.layer")}
-      className="playsay-annotation-layer"
-      data-anchor-id={anchorId}
-      data-anchor-pending={anchorPending ? "true" : "false"}
-      data-anchored={anchored ? "true" : "false"}
-      data-editing={editingElementId ? "true" : "false"}
-      data-read-only={readOnly ? "true" : "false"}
-      data-tool={tool}
-      onPointerCancel={readOnly ? undefined : onEnd}
-      onPointerDown={readOnly ? undefined : onBegin}
-      onPointerMove={readOnly ? undefined : onMove}
-      onPointerUp={readOnly ? undefined : onEnd}
-      preserveAspectRatio="none"
-      style={anchorStyle}
-      viewBox="0 0 1000 1000"
-    >
-      <defs>
-        <marker
-          id={markerId}
-          markerHeight="10"
-          markerUnits="strokeWidth"
-          markerWidth="10"
-          orient="auto"
-          refX="8"
-          refY="5"
-          viewBox="0 0 10 10"
-        >
-          <polygon fill="context-stroke" points="0,0 10,5 0,10" />
-        </marker>
-      </defs>
-      {mindMapElements.filter((element) => element.parentId).map((element) => {
-        const parent = mindMapElements.find((candidate) => candidate.id === element.parentId);
-        return parent ? <MindMapConnector child={element} key={`connector-${element.id}`} parent={parent} /> : null;
-      })}
-      {elements.map((element) => (
-        <AnnotationElementView
-          editing={editingElementId === element.id}
-          element={element}
-          key={element.id}
-          markerId={markerId}
-          onEditText={onEditText}
-          onFinishTextEditing={onFinishTextEditing}
-          onElementSizeChange={onElementSizeChange}
-          onMoveElement={onMoveElement}
-          onMindMapKey={onMindMapKey}
-          onSelectElement={onSelectElement}
-          onTextChange={onTextChange}
-          readOnly={readOnly}
-          selected={selectedElementId === element.id}
-          tool={tool}
-        />
-      ))}
-      {selectedElement && tool === "pointer" ? (
-        <SelectionOutline element={selectedElement} onAddMindMapNode={onAddMindMapNode} onDeleteSelected={onDeleteSelected} onResizeElement={onResizeElement} />
-      ) : null}
-    </svg>
+    <>
+      <svg
+        aria-label={t("classroom.annotation.layer")}
+        className="playsay-annotation-layer"
+        data-anchor-id={anchorId}
+        data-anchor-pending={anchorPending ? "true" : "false"}
+        data-anchored={anchored ? "true" : "false"}
+        data-editing={editingElementId ? "true" : "false"}
+        data-read-only={readOnly ? "true" : "false"}
+        data-tool={tool}
+        onPointerCancel={readOnly ? undefined : onEnd}
+        onPointerDown={readOnly ? undefined : onBegin}
+        onPointerMove={readOnly ? undefined : onMove}
+        onPointerUp={readOnly ? undefined : onEnd}
+        preserveAspectRatio="none"
+        ref={svgRef}
+        style={anchorStyle}
+        viewBox="0 0 1000 1000"
+      >
+        <defs>
+          <marker
+            id={markerId}
+            markerHeight="10"
+            markerUnits="strokeWidth"
+            markerWidth="10"
+            orient="auto"
+            refX="8"
+            refY="5"
+            viewBox="0 0 10 10"
+          >
+            <polygon fill="context-stroke" points="0,0 10,5 0,10" />
+          </marker>
+        </defs>
+        {mindMapElements.filter((element) => element.parentId).map((element) => {
+          const parent = mindMapElements.find((candidate) => candidate.id === element.parentId);
+          return parent ? <MindMapConnector child={element} key={`connector-${element.id}`} parent={parent} /> : null;
+        })}
+        {elements.map((element) => (
+          <AnnotationElementView
+            htmlSurface={anchorPending ? null : htmlSurface}
+            editing={editingElementId === element.id}
+            element={element}
+            key={element.id}
+            markerId={markerId}
+            onEditText={onEditText}
+            onFinishTextEditing={onFinishTextEditing}
+            onElementSizeChange={onElementSizeChange}
+            onMoveElement={onMoveElement}
+            onMindMapKey={onMindMapKey}
+            onSelectElement={onSelectElement}
+            onTextChange={onTextChange}
+            readOnly={readOnly}
+            selected={selectedElementId === element.id}
+            tool={tool}
+          />
+        ))}
+        {selectedElement && tool === "pointer" ? (
+          <SelectionOutline element={selectedElement} onAddMindMapNode={onAddMindMapNode} onDeleteSelected={onDeleteSelected} onResizeElement={onResizeElement} />
+        ) : null}
+      </svg>
+      <div
+        ref={htmlRef}
+        className="playsay-annotation-html-layer"
+        data-anchor-id={anchorId}
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 3,
+          overflow: "hidden",
+          pointerEvents: "none",
+          visibility: anchorPending ? "hidden" : undefined,
+          ...anchorStyle,
+        }}
+      />
+    </>
   );
 });
 
@@ -191,7 +213,51 @@ export type AnnotationLayerBounds = {
   width: number;
 };
 
+type AnnotationHtmlSurface = {
+  parent: HTMLElement;
+  scaleX: number;
+  scaleY: number;
+};
+
+function useAnnotationHtmlSurface(
+  svgRef: RefObject<SVGSVGElement | null>,
+  htmlRef: RefObject<HTMLDivElement | null>,
+  bounds?: AnnotationLayerBounds | null,
+): AnnotationHtmlSurface | null {
+  const [surface, setSurface] = useState<AnnotationHtmlSurface | null>(null);
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    const parent = htmlRef.current;
+    if (!svg || !parent) return;
+    const measure = () => {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        setSurface(null);
+        return;
+      }
+      const next = {
+        parent,
+        scaleX: rect.width / 1000,
+        scaleY: rect.height / 1000,
+      };
+      setSurface((current) => current && current.parent === next.parent
+        && current.scaleX === next.scaleX && current.scaleY === next.scaleY ? current : next);
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(svg);
+    observer?.observe(parent);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [svgRef, htmlRef, bounds?.left, bounds?.top, bounds?.width, bounds?.height]);
+  return surface;
+}
+
 const AnnotationElementView = memo(function AnnotationElementView({
+  htmlSurface,
   editing,
   element,
   markerId,
@@ -206,6 +272,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
   selected,
   tool,
 }: {
+  htmlSurface: AnnotationHtmlSurface | null;
   editing: boolean;
   element: AnnotationElement;
   markerId: string;
@@ -383,22 +450,10 @@ const AnnotationElementView = memo(function AnnotationElementView({
     );
   }
 
-  return (
-    <foreignObject
-      {...commonProps}
-      height={element.height}
-      onDoubleClick={(event) => {
-        if (readOnly || tool !== "pointer") {
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        onEditText(element.id);
-      }}
-      width={element.width}
-      x={element.x}
-      y={element.y}
-    >
+  // WebKit misplaces composited HTML inside foreignObject (positioned inputs and
+  // scrollable text). Keep the SVG event/coordinate owner, but paint HTML beside it.
+  // Portal events still bubble through that owner, preserving drag and keyboard tools.
+  const content = (
       <div
         className={`playsay-annotation-text playsay-annotation-text-${element.kind}`}
         data-empty={element.text ? "false" : "true"}
@@ -436,6 +491,49 @@ const AnnotationElementView = memo(function AnnotationElementView({
               : t("classroom.annotation.textPlaceholder"))}</span>
         )}
       </div>
+  );
+  return (
+    <foreignObject
+      {...commonProps}
+      aria-hidden={htmlSurface ? true : undefined}
+      height={element.height}
+      onDoubleClick={(event) => {
+        if (readOnly || tool !== "pointer") return;
+        event.preventDefault();
+        event.stopPropagation();
+        onEditText(element.id);
+      }}
+      role={htmlSurface ? undefined : commonProps.role}
+      tabIndex={htmlSurface ? -1 : commonProps.tabIndex}
+      width={element.width}
+      x={element.x}
+      y={element.y}
+    >
+      {htmlSurface ? createPortal(
+        <div
+          aria-label={label}
+          className="playsay-annotation-element playsay-annotation-html-element"
+          data-scale-x={htmlSurface.scaleX}
+          data-scale-y={htmlSurface.scaleY}
+          data-selected={selected ? "true" : "false"}
+          role={commonProps.role}
+          tabIndex={commonProps.tabIndex}
+          style={{
+            position: "absolute",
+            left: element.x * htmlSurface.scaleX,
+            top: element.y * htmlSurface.scaleY,
+            width: element.width,
+            height: element.height,
+            transform: `scale(${htmlSurface.scaleX}, ${htmlSurface.scaleY})`,
+            transformOrigin: "top left",
+            zIndex: 3,
+            pointerEvents: !readOnly && (tool === "pointer" || editing) ? "auto" : "none",
+          }}
+        >
+          {content}
+        </div>,
+        htmlSurface.parent,
+      ) : content}
     </foreignObject>
   );
 });
@@ -725,6 +823,10 @@ function clampMeasurement(value: number, min: number, max: number): number {
 }
 
 function annotationMeasurementScale(measurement: HTMLElement): { x: number; y: number } {
+  const htmlElement = measurement.closest<HTMLElement>(".playsay-annotation-html-element");
+  if (htmlElement) {
+    return { x: Number(htmlElement.dataset.scaleX) || 1, y: Number(htmlElement.dataset.scaleY) || 1 };
+  }
   const foreignObject = measurement.closest("foreignObject");
   const svg = foreignObject instanceof SVGElement ? foreignObject.ownerSVGElement : null;
   const bounds = svg?.getBoundingClientRect();

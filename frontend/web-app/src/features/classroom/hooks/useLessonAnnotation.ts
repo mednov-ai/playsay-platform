@@ -9,7 +9,6 @@ import {
   canReparentMindMapNode,
   compareAnnotationElements,
   deleteMindMapSubtree,
-  emptyAnnotationContent,
   eraseAnnotationElementsAt,
   isStrokeStyledElement,
   layoutMindMap,
@@ -19,6 +18,7 @@ import {
   resizeAnnotationElement,
   resizeMindMapNodeForText,
   svgPointFromEvent,
+  type AnnotationContent,
   type AnnotationElement,
   type AnnotationFontSize,
   type AnnotationMindMapNode,
@@ -28,6 +28,8 @@ import {
   type AnnotationStrokeWidth,
   type AnnotationTool,
 } from "../model/annotation";
+
+import { createAnnotationPersistence } from "./annotationPersistence";
 
 type LiveAnnotationSync = {
   canRedo?: boolean;
@@ -88,15 +90,15 @@ export function useLessonAnnotation({
   const [defaultAnnotationFontSize, setDefaultAnnotationFontSize] = useState<AnnotationFontSize>(18);
   const [activePageId, setActivePageId] = useState(initialPageId?.trim() || defaultAnnotationPageId);
   const [localAnnotationElements, setLocalAnnotationElements] = useState<AnnotationElement[]>([]);
-  const [annotationReady, setAnnotationReady] = useState(false);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [historyState, setHistoryState] = useState({ canRedo: false, canUndo: false });
   const [mindMapLimitReached, setMindMapLimitReached] = useState(false);
   const activeInteractionRef = useRef<ActiveInteraction | null>(null);
-  const captureTargetRef = useRef<SVGSVGElement | null>(null);
+  const captureTargetRef = useRef<SVGSVGElement | HTMLElement | null>(null);
   const elementsRef = useRef<AnnotationElement[]>([]);
-  const lastSyncedAnnotationRef = useRef("");
+  const localPersistenceRef = useRef<ReturnType<typeof createAnnotationPersistence> | null>(null);
+  const legacySeedRef = useRef<AnnotationContent | null>(null);
   const liveAnnotationRef = useRef<LiveAnnotationSync | null>(liveAnnotation ?? null);
   const liveElementCountRef = useRef(0);
   const liveSeedAttemptedRef = useRef(false);
@@ -135,121 +137,73 @@ export function useLessonAnnotation({
     }
   }, []);
 
+  const hasLiveAnnotation = Boolean(liveAnnotation);
   useEffect(() => {
-    if (controlledAnnotation) {
-      setAnnotationReady(true);
-      setActivePageId(normalizedInitialPageId);
-      lastSyncedAnnotationRef.current = "";
-      pendingInteractionPointRef.current = null;
-      cancelPointerFrame();
-      resetHistory();
-      setSelectedElementId(null);
-      setEditingElementId(null);
-      return undefined;
-    }
-    if (!materialId) {
-      setAnnotationReady(false);
-      setActivePageId(normalizedInitialPageId);
-      replaceLocalElements([]);
-      lastSyncedAnnotationRef.current = "";
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    async function loadAnnotation() {
-      try {
-        const annotation = await fetchScheduledLessonMaterialAnnotation(lessonId);
-        const content = annotationContentFromJson(annotation?.content, normalizedInitialPageId);
-        const serialized = JSON.stringify(content);
-        if (!cancelled && serialized !== lastSyncedAnnotationRef.current) {
-          lastSyncedAnnotationRef.current = serialized;
-          setActivePageId(content.activePageId);
-          const currentLiveAnnotation = liveAnnotationRef.current;
-          if (currentLiveAnnotation) {
-            if (
-              currentLiveAnnotation.ready &&
-              !liveSeedAttemptedRef.current &&
-              !localLiveMutationRef.current &&
-              liveElementCountRef.current === 0 &&
-              content.elements.length > 0
-            ) {
-              currentLiveAnnotation.setElements(() => content.elements);
-            }
-            liveSeedAttemptedRef.current = true;
-          } else {
-            replaceLocalElements(content.elements);
-          }
-        }
-      } catch {
-        const content = emptyAnnotationContent(normalizedInitialPageId);
-        const serialized = JSON.stringify(content);
-        if (!liveAnnotationRef.current && !cancelled && serialized !== lastSyncedAnnotationRef.current) {
-          lastSyncedAnnotationRef.current = serialized;
-          replaceLocalElements(content.elements);
-        }
-      } finally {
-        if (!cancelled) {
-          setAnnotationReady(true);
-        }
-      }
-    }
-
-    setAnnotationReady(false);
     setActivePageId(normalizedInitialPageId);
-    lastSyncedAnnotationRef.current = "";
-    liveSeedAttemptedRef.current = false;
-    localLiveMutationRef.current = false;
     pendingInteractionPointRef.current = null;
     cancelPointerFrame();
-    replaceLocalElements([]);
     resetHistory();
+    textEditBeforeRef.current = null;
     setSelectedElementId(null);
     setEditingElementId(null);
-    void loadAnnotation();
-
-    const intervalId = liveAnnotationRef.current
-      ? null
-      : window.setInterval(() => {
-        void loadAnnotation();
-      }, 2_000);
-
+    liveSeedAttemptedRef.current = false;
+    localLiveMutationRef.current = false;
+    legacySeedRef.current = null;
+    if (controlledAnnotation) {
+      return;
+    }
+    if (hasLiveAnnotation) setLocalAnnotationElements([]);
+    else replaceLocalElements([]);
+    if (!materialId) {
+      return;
+    }
+    if (hasLiveAnnotation) {
+      let cancelled = false;
+      void fetchScheduledLessonMaterialAnnotation(lessonId).then((annotation) => {
+        if (cancelled) return;
+        legacySeedRef.current = annotationContentFromJson(annotation?.content, normalizedInitialPageId);
+        seedLiveAnnotation();
+      }).catch(() => {
+        // The live document remains authoritative when the legacy read fails.
+      });
+      return () => { cancelled = true; };
+    }
+    const persistence = createAnnotationPersistence({
+      load: async () => {
+        const annotation = await fetchScheduledLessonMaterialAnnotation(lessonId);
+        return annotationContentFromJson(annotation?.content, normalizedInitialPageId);
+      },
+      save: (content) => saveScheduledLessonMaterialAnnotation(lessonId, { content }),
+      onLoad: (content) => {
+        setActivePageId(content.activePageId);
+        replaceLocalElements(content.elements);
+      },
+    });
+    localPersistenceRef.current = persistence;
     return () => {
-      cancelled = true;
-      if (intervalId !== null) window.clearInterval(intervalId);
+      localPersistenceRef.current = null;
+      persistence.close();
     };
-  }, [
-    controlledAnnotation?.key,
-    lessonId,
-    liveAnnotation?.ready,
-    liveAnnotation?.setElements,
-    materialId,
-    normalizedInitialPageId,
-  ]);
+  }, [controlledAnnotation?.key, hasLiveAnnotation, lessonId, liveAnnotation?.setElements, materialId, normalizedInitialPageId]);
+
+  function seedLiveAnnotation() {
+    const live = liveAnnotationRef.current;
+    const content = legacySeedRef.current;
+    if (!live?.ready || !content || liveSeedAttemptedRef.current) return;
+    if (!localLiveMutationRef.current && liveElementCountRef.current === 0 && content.elements.length > 0) {
+      live.setElements((current) => current.length === 0 ? content.elements : current);
+    }
+    liveSeedAttemptedRef.current = true;
+  }
 
   useEffect(() => {
-    if (!materialId || !annotationReady || liveAnnotationRef.current || controlledAnnotation) {
-      return undefined;
-    }
+    seedLiveAnnotation();
+  }, [liveAnnotation?.ready]);
 
-    const content = annotationContentFromElements(annotationElements, activePageId);
-    const serialized = JSON.stringify(content);
-    if (serialized === lastSyncedAnnotationRef.current) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      saveScheduledLessonMaterialAnnotation(lessonId, { content })
-        .then(() => {
-          lastSyncedAnnotationRef.current = serialized;
-        })
-        .catch(() => {
-          // The next local edit or polling cycle will retry without blocking the lesson UI.
-        });
-    }, 500);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [activePageId, annotationElements, annotationReady, controlledAnnotation, lessonId, materialId]);
+  const changeActivePageId = useCallback((pageId: string) => {
+    setActivePageId(pageId);
+    localPersistenceRef.current?.change(annotationContentFromElements(elementsRef.current, pageId));
+  }, []);
 
   function replaceLocalElements(elements: AnnotationElement[]) {
     elementsRef.current = elements;
@@ -259,6 +213,12 @@ export function useLessonAnnotation({
   function updateElements(updater: (current: AnnotationElement[]) => AnnotationElement[]) {
     if (liveAnnotationRef.current) {
       localLiveMutationRef.current = true;
+    }
+    if (!controlledAnnotation && !liveAnnotationRef.current) {
+      const next = [...updater(elementsRef.current)].sort(compareAnnotationElements);
+      replaceLocalElements(next);
+      localPersistenceRef.current?.change(annotationContentFromElements(next, activePageId));
+      return;
     }
     setAnnotationElements((current) => {
       const next = [...updater(current)].sort(compareAnnotationElements);
@@ -877,9 +837,14 @@ export function useLessonAnnotation({
   }
 
   function capturePointer(event: PointerEvent<SVGElement>) {
-    const target = event.currentTarget instanceof SVGSVGElement
+    // Capture portalled text on its HTML box so click/double-click keep their
+    // text target; SVG capture would retarget those events to the whole canvas.
+    const textTarget = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(".playsay-annotation-html-element")
+      : null;
+    const target = textTarget ?? (event.currentTarget instanceof SVGSVGElement
       ? event.currentTarget
-      : event.currentTarget.ownerSVGElement;
+      : event.currentTarget.ownerSVGElement);
     if (!target) {
       return;
     }
@@ -969,7 +934,7 @@ export function useLessonAnnotation({
     redo,
     reanchorElement,
     selectedElementId,
-    setActivePageId,
+    setActivePageId: changeActivePageId,
     setAnnotationTool,
     setSelectedElementId,
     undo,

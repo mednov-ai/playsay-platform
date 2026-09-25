@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
+import { useState } from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
-import { emptyAnnotationContent } from "../model/annotation";
+import { emptyAnnotationContent, type AnnotationContent } from "../model/annotation";
 import { ControlledAnnotationCanvas } from "./ControlledAnnotationCanvas";
 
 const apiMocks = vi.hoisted(() => ({
@@ -32,6 +33,38 @@ describe("ControlledAnnotationCanvas", () => {
     vi.clearAllMocks();
   });
 
+  it("preserves edited text through the controlled homework parent and blur", async () => {
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, toJSON: () => ({}) });
+    const naturalWidth = vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(800);
+    const naturalHeight = vi.spyOn(HTMLImageElement.prototype, "naturalHeight", "get").mockReturnValue(600);
+    const material = materialWithBlock("image");
+    function Homework() {
+      const [content, setContent] = useState<AnnotationContent>({
+        ...emptyAnnotationContent("page-1"),
+        elements: [{ id: "note", kind: "text", pageId: "page-1", text: "Before",
+          x: 10, y: 10, width: 200, height: 80, fontSize: 18, color: "#ff5c00",
+          fill: "transparent", autoWidth: true, autoHeight: true, createdAt: 1 }],
+      });
+      return <ControlledAnnotationCanvas answers={{}} content={content} material={material} onChange={setContent} />;
+    }
+    const { container, unmount } = render(<Homework />);
+    try {
+      await waitFor(() => expect(container.querySelector("foreignObject")).toBeTruthy());
+      fireEvent.doubleClick(container.querySelector("foreignObject")!);
+      const editor = container.querySelector("textarea")!;
+      fireEvent.change(editor, { target: { value: "  Homework\nПоследний символ я  " } });
+      fireEvent.blur(editor);
+      expect(container.querySelector(".playsay-annotation-text-text span")?.textContent).toBe("  Homework\nПоследний символ я  ");
+      await waitFor(() => expect(container.querySelector("foreignObject")).toBeTruthy());
+      fireEvent.doubleClick(container.querySelector("foreignObject")!);
+      expect(container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("  Homework\nПоследний символ я  ");
+    } finally {
+      unmount();
+      rectSpy.mockRestore();
+      naturalWidth.mockRestore();
+      naturalHeight.mockRestore();
+    }
+  });
   it("shows annotation tools only when the active homework page contains an image", () => {
     const { container, rerender } = render(
       <ControlledAnnotationCanvas

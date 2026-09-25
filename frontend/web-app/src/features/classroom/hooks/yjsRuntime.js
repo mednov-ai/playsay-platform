@@ -785,7 +785,7 @@ function normalizeAnnotationElement(value, index) {
     const mapId = asString(element?.mapId) || (parentId ? "" : id);
     if (!mapId) return null;
     const fontSize = normalizeFontSize(element?.fontSize, parentId === null ? 18 : 14);
-    const text = asString(element?.text).slice(0, 500);
+    const text = annotationText(element?.text).slice(0, 500);
     const size = normalizeMindMapSize(parentId, width, height);
     return {
       ...base,
@@ -819,7 +819,7 @@ function normalizeAnnotationElement(value, index) {
       fontSize: normalizeFontSize(element?.fontSize, 30),
       height: clampSize(height, 56, 320),
       kind,
-      text: asString(element?.text),
+      text: annotationText(element?.text),
       width: autoWidth ? clampSize(width, 72, 360) : Math.max(36, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
@@ -844,7 +844,7 @@ function normalizeAnnotationElement(value, index) {
       fontSize: normalizeFontSize(element?.fontSize, 30),
       height: Math.max(36, height),
       kind,
-      text: asString(element?.text),
+      text: annotationText(element?.text),
       width: Math.max(36, width),
       x: clampCoordinate(x),
       y: clampCoordinate(y),
@@ -1214,6 +1214,10 @@ function normalizeStringRecord(value) {
   return Object.fromEntries(Object.entries(record)
     .map(([key, item]) => [asString(key), asString(item)])
     .filter(([key, item]) => key && item));
+}
+
+function annotationText(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function asString(value) {

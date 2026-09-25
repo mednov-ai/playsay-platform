@@ -61,6 +61,7 @@ export function useYjsWorkspace({
   const [participants, setParticipants] = useState<CollaborationParticipant[]>([]);
   const [status, setStatus] = useState<YjsWorkspaceStatus>("idle");
   const [annotationElements, setAnnotationElementsState] = useState<AnnotationElement[]>([]);
+  const annotationElementsRef = useRef<AnnotationElement[]>([]);
   const [text, setText] = useState("");
   const [htmlGameSnapshots, setHtmlGameSnapshots] = useState<Record<string, MaterialHtmlGameSnapshot>>({});
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
@@ -88,6 +89,7 @@ export function useYjsWorkspace({
 
   useEffect(() => {
     if (!enabled || !document) {
+      annotationElementsRef.current = [];
       setAnnotationElementsState([]);
       setParticipants([]);
       setStatus("idle");
@@ -115,7 +117,10 @@ export function useYjsWorkspace({
     let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
       color,
-      onAnnotationChange: setAnnotationElementsState,
+      onAnnotationChange: (elements) => {
+        annotationElementsRef.current = elements;
+        setAnnotationElementsState(elements);
+      },
       onAnnotationUndoStateChange: setAnnotationUndoState,
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
@@ -285,6 +290,7 @@ export function useYjsWorkspace({
       externalActivityRealtime?.close();
       gameSyncControllerRef.current = null;
       runtimeRef.current = null;
+      annotationElementsRef.current = [];
       setAnnotationElementsState([]);
       setParticipants([]);
       setHtmlGameSnapshots({});
@@ -315,18 +321,24 @@ export function useYjsWorkspace({
   }, []);
 
   const setAnnotationElements = useCallback((updater: (current: AnnotationElement[]) => AnnotationElement[]) => {
-    setAnnotationElementsState((current) => {
-      const nextElements = updater(current);
-      const currentById = new Map(current.map((element) => [element.id, element]));
-      const nextIds = new Set(nextElements.map((element) => element.id));
-      const deleteIds = current.filter((element) => !nextIds.has(element.id)).map((element) => element.id);
-      const upserts = nextElements.filter((element) => (
-        JSON.stringify(currentById.get(element.id)) !== JSON.stringify(element)
-      ));
-      runtimeRef.current?.applyAnnotationChanges({ deleteIds, upserts });
-      return nextElements;
-    });
-  }, []);
+    const current = annotationElementsRef.current;
+    const nextElements = updater(current);
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      annotationElementsRef.current = nextElements;
+      setAnnotationElementsState(nextElements);
+      return;
+    }
+    const currentById = new Map(current.map((element) => [element.id, element]));
+    const nextIds = new Set(nextElements.map((element) => element.id));
+    const deleteIds = current.filter((element) => !nextIds.has(element.id)).map((element) => element.id);
+    const upserts = nextElements.filter((element) => (
+      JSON.stringify(currentById.get(element.id)) !== JSON.stringify(element)
+    ));
+    // Yjs publishes the canonical result synchronously to the observer above.
+    // Never write to the document from a React updater, which React may replay.
+    if (deleteIds.length || upserts.length) runtime.applyAnnotationChanges({ deleteIds, upserts });
+  }, [document?.id]);
 
   const undoAnnotation = useCallback(() => runtimeRef.current?.undoAnnotation(), []);
   const redoAnnotation = useCallback(() => runtimeRef.current?.redoAnnotation(), []);

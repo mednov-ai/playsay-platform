@@ -11,6 +11,16 @@ import type {
   MaterialHtmlGameSync,
 } from "../../materials/model/materialDocument";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
+import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+
+vi.mock("../hooks/useCollaborationDocument", () => {
+  const state = { document: null, invalidateDocument: () => undefined };
+  return { useCollaborationDocument: () => state };
+});
+vi.mock("../hooks/useExternalActivitySession", () => ({
+  useExternalActivitySession: () => ({ active: null, cursors: [], isHost: false, mediaStream: null,
+    open: vi.fn(), reload: vi.fn(), retry: vi.fn(), sendCursor: vi.fn(), sendInput: vi.fn(), returnToLesson: vi.fn() }),
+}));
 
 const apiMocks = vi.hoisted(() => ({
   fetchMaterialAssetText: vi.fn(),
@@ -1203,6 +1213,39 @@ describe("LessonTaskCanvas", () => {
     fireEvent.change(editor!, { target: { value: "New idea" } });
     fireEvent.blur(editor!);
     expect(container.querySelector(".playsay-annotation-text-stickyNote")?.textContent).toContain("New idea");
+  });
+
+  it("keeps newly typed JPEG text when an older poll resolves after input", async () => {
+    const rectSpy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this.classList.contains("playsay-task-document-surface")) return domRect({ height: 900, left: 0, top: 0, width: 800 });
+      if (this.getAttribute("data-playsay-annotation-anchor-id") === "image-1" || this.getAttribute("data-anchor-id") === "image-1") return domRect({ height: 400, left: 0, top: 0, width: 760 });
+      return domRect({ height: 0, left: 0, top: 0, width: 0 });
+    });
+    let resolvePoll!: (value: unknown) => void;
+    apiMocks.fetchAnnotation.mockResolvedValueOnce({ content: { activePageId: "page-static", elements: [] } })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePoll = resolve; }));
+    const jpeg = { ...staticImageMaterial, document: { pages: [{ ...staticImageMaterial.document.pages[0], blocks: [{ ...staticImageMaterial.document.pages[0].blocks[0], url: "https://example.test/worksheet.jpeg" }] }] } };
+    const { container, unmount } = render(createElement(StudentLiveWorkspace, {
+      displayName: "Synthetic participant", teacherSubject: null,
+      lessonId: "lesson-jpeg", material: jpeg, onSaveAnswers: () => undefined,
+      score: null, submission: null, submissionMessage: null, submissionSaving: false, teacherName: "Teacher",
+    }));
+    try {
+      await waitFor(() => expect(resolvePoll).toBeTypeOf("function"), { timeout: 3000 });
+      const layer = container.querySelector<SVGSVGElement>('[data-anchor-id="image-1"]')!;
+      fireEvent.click(container.querySelector('[data-testid="annotation-tool-text"]')!);
+      fireEvent.pointerDown(layer, { button: 0, clientX: 200, clientY: 150, pointerId: 1 });
+      const editor = container.querySelector<HTMLTextAreaElement>(".playsay-annotation-text-text textarea")!;
+      fireEvent.change(editor, { target: { value: "JPEG: новый текст" } });
+      await act(async () => { resolvePoll({ content: { activePageId: "page-static", elements: [{ id: "old", kind: "text", text: "old remote", anchorId: "image-1", pageId: "page-static", x: 0, y: 0, width: 72, height: 56, fontSize: 18 }] } }); });
+      expect(container.querySelector<HTMLTextAreaElement>(".playsay-annotation-text-text textarea")?.value).toBe("JPEG: новый текст");
+      fireEvent.blur(editor);
+      expect(container.querySelector(".playsay-annotation-text-text")?.textContent).toContain("JPEG: новый текст");
+      await waitFor(() => expect(apiMocks.saveAnnotation).toHaveBeenCalledWith("lesson-jpeg", expect.objectContaining({ content: expect.objectContaining({ elements: [expect.objectContaining({ text: "JPEG: новый текст", anchorId: "image-1" })] }) })));
+    } finally {
+      unmount();
+      rectSpy.mockRestore();
+    }
   });
 
   it("changes the default and selected Text font size from the toolbar", async () => {

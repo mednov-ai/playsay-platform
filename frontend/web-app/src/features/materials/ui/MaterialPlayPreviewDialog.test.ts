@@ -69,6 +69,31 @@ const gameOnlyMaterial = {
   blockCount: 1,
 } satisfies LessonMaterial;
 
+const pdfMaterial = {
+  ...material,
+  id: "preview",
+  document: {
+    schemaVersion: 1,
+    pages: [{
+      id: "page-pdf",
+      title: "PDF",
+      layout: "FLOW",
+      blocks: [{
+        id: "pdf-1",
+        type: "document",
+        title: "PDF",
+        documentAssetId: "display-asset",
+        documentFormat: "PDF",
+        documentRevision: "revision-1",
+        documentPages: [
+          { id: "page-1", index: 0, width: 595, height: 842 },
+          { id: "page-2", index: 1, width: 595, height: 842 },
+        ],
+      }],
+    }],
+  },
+} satisfies LessonMaterial;
+
 afterEach(cleanup);
 
 describe("MaterialPlayPreviewDialog", () => {
@@ -127,5 +152,18 @@ describe("MaterialPlayPreviewDialog", () => {
 
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-preview-reset']")!);
     expect(input.value).toBe("");
+  });
+
+  it("allows local PDF navigation in the standalone play preview", () => {
+    const { container } = render(createElement(MaterialPlayPreviewDialog, {
+      material: pdfMaterial,
+      onClose: () => undefined,
+      open: true,
+    }));
+    const next = container.querySelector<HTMLButtonElement>('button[aria-label="materials.document.next"]')!;
+
+    expect(next.disabled).toBe(false);
+    fireEvent.click(next);
+    expect(container.querySelector('.playsay-document-stage')?.getAttribute('data-playsay-annotation-anchor-id')).toBe('pdf-1:revision-1:1');
   });
 });

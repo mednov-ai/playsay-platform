@@ -96,6 +96,7 @@ export function MaterialPlayPreviewDialog({
           <LessonMaterialDocumentView
             allowVideoFullscreen
             answers={answers}
+            canControlDocuments
             material={material}
             mode="classroom"
             onAnswerChange={updateAnswer}

@@ -12,17 +12,32 @@ const { chromium, webkit } = require("playwright");
 const port = Number(process.env.DOCUMENT_VIEWER_SMOKE_PORT ?? 4187);
 const baseUrl = `http://127.0.0.1:${port}`;
 const evidenceDir = resolve(root, "tmp/document-viewer-browser-smoke");
+const mode = process.env.DOCUMENT_VIEWER_SMOKE_MODE ?? "dev";
+const production = mode === "production";
+const builtBundle = production || mode === "preview";
+if (!["dev", "preview", "production"].includes(mode)) throw new Error(`Unsupported document viewer smoke mode: ${mode}`);
+const containerName = `document-viewer-smoke-${process.pid}`;
 
 const generated = spawnSync("python3", ["scripts/generate-document-viewer-fixtures.py"], { cwd: webRoot, encoding: "utf8" });
 if (generated.status !== 0) throw new Error(generated.stderr || "fixture generation failed");
 await mkdir(evidenceDir, { recursive: true });
 
-const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
-  cwd: webRoot,
-  detached: true,
-  env: { ...process.env, VITE_DOCUMENT_MATERIALS_ENABLED: "true" },
-  stdio: ["ignore", "pipe", "pipe"],
-});
+const server = production
+  ? spawn("docker", [
+    "run", "--rm", "--name", containerName,
+    "-p", `127.0.0.1:${port}:80`,
+    "-v", `${resolve(webRoot, "dist")}:/usr/share/nginx/html:ro`,
+    "-v", `${resolve(webRoot, "nginx.conf")}:/etc/nginx/conf.d/default.conf:ro`,
+    process.env.DOCUMENT_VIEWER_SMOKE_NGINX_IMAGE ?? "nginx:1.27-alpine",
+  ], { cwd: webRoot, detached: true, stdio: ["ignore", "pipe", "pipe"] })
+  : spawn(builtBundle ? "node" : "npm", builtBundle
+    ? [resolve(root, "frontend/node_modules/vite/bin/vite.js"), "preview", "--host", "127.0.0.1", "--port", String(port)]
+    : ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
+    cwd: webRoot,
+    detached: true,
+    env: { ...process.env, VITE_DOCUMENT_MATERIALS_ENABLED: "true" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 let serverOutput = "";
 server.stdout.on("data", (value) => { serverOutput += value; });
 server.stderr.on("data", (value) => { serverOutput += value; });
@@ -44,9 +59,15 @@ async function verifyBrowser(name, browserType, viewport) {
   const page = await context.newPage();
   const errors = [];
   const externalRequests = [];
+  const workerResponses = [];
   let retryFixtureRequests = 0;
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   page.on("pageerror", (error) => errors.push(error.message));
+  page.on("response", (response) => {
+    if (/pdf\.worker.*\.mjs$/.test(new URL(response.url()).pathname)) {
+      workerResponses.push({ status: response.status(), contentType: response.headers()["content-type"] ?? "" });
+    }
+  });
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === "/viewer-fixtures/retry.pdf") {
@@ -71,6 +92,19 @@ async function verifyBrowser(name, browserType, viewport) {
     throw new Error(`${name}: viewer did not become ready; browser errors: ${errors.join(" | ") || "none"}; body: ${(await page.locator("body").innerText()).slice(0, 2000)}`, { cause: error });
   }
   const pdf = page.locator('[data-testid="pdf-fixture"]');
+  const firstPagePainted = await pdf.locator("canvas").first().evaluate((canvas) => {
+    const context = canvas.getContext("2d");
+    if (!context) return false;
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let offset = 0; offset < data.length; offset += 4 * 13) {
+      if (data[offset + 3] > 0 && (data[offset] < 245 || data[offset + 1] < 245 || data[offset + 2] < 245)) return true;
+    }
+    return false;
+  });
+  if (!firstPagePainted) throw new Error(`${name}: PDF canvas has no painted content`);
+  if (builtBundle && !workerResponses.some(({ status, contentType }) => status === 200 && /^(application|text)\/javascript\b/.test(contentType))) {
+    throw new Error(`${name}: PDF worker did not load as JavaScript: ${JSON.stringify(workerResponses)}`);
+  }
   await pdf.getByRole("button", { name: /two-page|spread/i }).click();
   if (await pdf.locator("canvas").count() !== 1) throw new Error(`${name}: separate cover did not remain a single page`);
   await pdf.locator('.playsay-document-cover-option input').uncheck();
@@ -129,22 +163,28 @@ async function verifyBrowser(name, browserType, viewport) {
   await retryButton.click();
   await retryPdf.locator("canvas").waitFor({ state: "visible", timeout: 30_000 });
   if (retryFixtureRequests < 2) throw new Error(`${name}: PDF retry did not request the document again`);
+  if (name.startsWith("chromium")) {
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator('[data-testid="pdf-fixture"] canvas').first().waitFor({ state: "visible", timeout: 30_000 });
+  }
   if (externalRequests.length) throw new Error(`${name}: external requests: ${externalRequests.join(", ")}`);
   const unexpectedErrors = errors.filter((message) => !message.includes("status of 503"));
   if (unexpectedErrors.length) throw new Error(`${name}: browser errors: ${unexpectedErrors.join(" | ")}`);
   await page.screenshot({ fullPage: true, path: resolve(evidenceDir, `${name}.png`) });
   await browser.close();
-  return { name, viewport, pdfSpreadCanvases: 2, pdfRetryRequests: retryFixtureRequests, pptxSlide: 2, externalRequests: 0, unexpectedConsoleErrors: 0 };
+  return { name, viewport, pdfPainted: true, pdfSpreadCanvases: 2, pdfRetryRequests: retryFixtureRequests, pptxSlide: 2, workerResponses, externalRequests: 0, unexpectedConsoleErrors: 0 };
 }
 
 try {
   await waitForServer();
   const results = [];
   results.push(await verifyBrowser("chromium-desktop", chromium, { width: 1440, height: 1000 }));
+  if (builtBundle) results.push(await verifyBrowser("chromium-mobile-390x844", chromium, { width: 390, height: 844 }));
   results.push(await verifyBrowser("webkit-desktop", webkit, { width: 1440, height: 1000 }));
   results.push(await verifyBrowser("webkit-mobile-390x844", webkit, { width: 390, height: 844 }));
   await writeFile(resolve(evidenceDir, "results.json"), `${JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2)}\n`);
   console.log(JSON.stringify(results));
 } finally {
+  if (production) spawnSync("docker", ["stop", containerName], { stdio: "ignore", timeout: 5_000 });
   if (server.pid) process.kill(-server.pid, "SIGTERM");
 }

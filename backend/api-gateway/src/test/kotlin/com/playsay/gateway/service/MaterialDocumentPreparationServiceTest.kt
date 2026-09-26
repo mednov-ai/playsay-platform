@@ -10,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
+import org.apache.pdfbox.Loader
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
 import org.springframework.mock.web.MockMultipartFile
@@ -34,6 +35,11 @@ class MaterialDocumentPreparationServiceTest {
         assertEquals(listOf("page-1", "page-2"), result.pages.map { it.id })
         assertEquals(64, result.revision.length)
         assertTrue(result.displayBytes.copyOfRange(0, 5).contentEquals("%PDF-".toByteArray()))
+        assertFalse(bytes.contentEquals(result.displayBytes))
+        Loader.loadPDF(result.displayBytes).use { display ->
+            assertEquals(2, display.numberOfPages)
+            assertFalse(display.isEncrypted)
+        }
     }
 
     @Test

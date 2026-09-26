@@ -113,6 +113,41 @@ describe("LessonMaterialDocumentView asset failures", () => {
     expect(screen.queryByText("Часть файлов материала не загрузилась.")).not.toBeInTheDocument();
   });
 
+  it("discards a late object URL after switching materials", async () => {
+    let finishOldLoad: ((url: string) => void) | undefined;
+    apiMocks.fetchMaterialAssets.mockImplementation(async (materialId: string) => [
+      { ...assets[0], id: materialId === "material-1" ? "good" : "new", materialId },
+    ]);
+    apiMocks.fetchMaterialAssetObjectUrl.mockImplementation((_materialId: string, assetId: string) => (
+      assetId === "good"
+        ? new Promise<string>((resolve) => { finishOldLoad = resolve; })
+        : Promise.resolve("blob:new")
+    ));
+    const nextMaterial = {
+      ...material,
+      id: "material-2",
+      document: {
+        schemaVersion: 1,
+        pages: [{
+          id: "page-2",
+          title: "Next",
+          layout: "FLOW",
+          blocks: [{ id: "image-new", type: "image", title: "New image", url: "material-asset:new" }],
+        }],
+      },
+    } satisfies LessonMaterial;
+    const view = render(<AppProviders><LessonMaterialDocumentView material={material} /></AppProviders>);
+    await waitFor(() => expect(finishOldLoad).toBeDefined());
+
+    view.rerender(<AppProviders><LessonMaterialDocumentView material={nextMaterial} /></AppProviders>);
+    await waitFor(() => expect(view.container.querySelector('img[src="blob:new"]')).toBeInTheDocument());
+    await act(async () => { finishOldLoad?.("blob:old"); });
+
+    expect(view.container.querySelector('img[src="blob:old"]')).not.toBeInTheDocument();
+    expect(view.container.querySelector('img[src="blob:new"]')).toBeInTheDocument();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:old");
+  });
+
   it("settles a stalled HTML game load and lets the teacher retry", async () => {
     vi.useFakeTimers();
     apiMocks.fetchMaterialAssets.mockResolvedValue([{

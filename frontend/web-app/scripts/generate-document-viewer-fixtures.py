@@ -49,5 +49,9 @@ def pptx_parts() -> dict[str, str]:
 
 
 OUT.mkdir(parents=True, exist_ok=True); (OUT / "fixture.pdf").write_bytes(make_pdf())
+# Display bytes were produced by MaterialDocumentPreparationService from make_pdf().
+(OUT / "display-sanitized.pdf").write_bytes(
+    (Path(__file__).resolve().parents[3] / "scripts/smoke/fixtures/pdf-display-sanitized.pdf").read_bytes()
+)
 with ZipFile(OUT / "fixture.pptx", "w", ZIP_DEFLATED) as archive:
     for name, value in pptx_parts().items(): archive.writestr(name, value)

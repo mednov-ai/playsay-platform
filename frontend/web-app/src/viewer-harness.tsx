@@ -38,7 +38,7 @@ function HarnessViewer({ block, src }: { block: MaterialEditorBlock; src: string
 }
 
 function Harness() {
-  return <main className="viewer-harness"><HarnessViewer block={pdfBlock} src="/viewer-fixtures/fixture.pdf" /><HarnessViewer block={pptxBlock} src="/viewer-fixtures/fixture.pptx" /><HarnessViewer block={pdfRetryBlock} src="/viewer-fixtures/retry.pdf" /></main>;
+  return <main className="viewer-harness"><HarnessViewer block={pdfBlock} src="/viewer-fixtures/display-sanitized.pdf" /><HarnessViewer block={pptxBlock} src="/viewer-fixtures/fixture.pptx" /><HarnessViewer block={pdfRetryBlock} src="/viewer-fixtures/retry.pdf" /></main>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><Harness /></React.StrictMode>);

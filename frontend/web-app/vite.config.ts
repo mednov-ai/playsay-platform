@@ -18,6 +18,9 @@ export default defineConfig({
       input: {
         app: resolve(projectRoot, "index.html"),
         chatServiceWorker: resolve(projectRoot, "src/service-worker/chatServiceWorker.ts"),
+        ...(process.env.DOCUMENT_VIEWER_SMOKE_BUILD === "true"
+          ? { viewerHarness: resolve(projectRoot, "viewer-harness.html") }
+          : {}),
       },
       output: {
         entryFileNames: (chunk) => chunk.name === "chatServiceWorker"

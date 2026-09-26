@@ -40,6 +40,7 @@ export function MaterialReaderPreview({
         data-presentation-mode={presentationMode}
       >
         <LessonMaterialDocumentView
+          canControlDocuments
           material={materialPreviewFromForm(form)}
           mode="teacherPreview"
           onAssetTagsChange={onUpdateAssetTags}

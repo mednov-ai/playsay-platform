@@ -104,4 +104,52 @@ describe("MaterialReaderPreview", () => {
     expect(preview?.getAttribute("data-presentation-mode")).toBe("html-game-focus");
     expect(container.querySelector(".playsay-html-game iframe")).toBe(iframe);
   });
+
+  it("lets the teacher navigate a PDF locally in the library reader", () => {
+    apiMocks.fetchMaterialAssets.mockResolvedValue([]);
+    const pdfForm: MaterialFormState = {
+      ...form,
+      id: "material-preview-pdf",
+      document: {
+        schemaVersion: 1,
+        pages: [{
+          id: "page-pdf",
+          title: "PDF",
+          layout: "FLOW",
+          blocks: [{
+            id: "pdf-1",
+            type: "document",
+            title: "PDF",
+            documentAssetId: "display-asset",
+            documentFormat: "PDF",
+            documentRevision: "revision-1",
+            documentPages: [
+              { id: "page-1", index: 0, width: 595, height: 842 },
+              { id: "page-2", index: 1, width: 595, height: 842 },
+            ],
+            documentPdfLayout: "SINGLE",
+            documentPdfSeparateCover: true,
+          }],
+        }],
+      },
+    };
+    const { container } = render(
+      <MaterialReaderPreview
+        form={pdfForm}
+        imageGenerationProgress={null}
+        message={null}
+        onBlockPatch={() => undefined}
+        onBlockPatchCommit={() => undefined}
+        onUpdateAssetTags={async () => null}
+      />,
+    );
+    const next = container.querySelector<HTMLButtonElement>('button[aria-label="materials.document.next"]')!;
+    const previous = container.querySelector<HTMLButtonElement>('button[aria-label="materials.document.previous"]')!;
+
+    expect(next.disabled).toBe(false);
+    expect(previous.disabled).toBe(true);
+    fireEvent.click(next);
+    expect(previous.disabled).toBe(false);
+    expect(container.querySelector('.playsay-document-stage')?.getAttribute('data-playsay-annotation-anchor-id')).toBe('pdf-1:revision-1:1');
+  });
 });

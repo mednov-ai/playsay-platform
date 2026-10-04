@@ -39,6 +39,7 @@ private typealias StoredLessonMaterial = LessonMaterialRow
 private typealias ScheduledMaterialLookup = ScheduledMaterialLookupRow
 
 @Component
+@Suppress("LongParameterList")
 class LessonMaterialStore(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,

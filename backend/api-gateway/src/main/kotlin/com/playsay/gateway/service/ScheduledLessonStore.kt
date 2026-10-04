@@ -165,10 +165,7 @@ class ScheduledLessonStore(
         lesson.lessonTemplateId = values.lessonTemplateId
         lesson.materialId = values.sharedMaterialId()
         lesson.inheritTemplateMaterial = values.inheritTemplateMaterial
-        if (lesson.scheduledStart != values.scheduledStart || lesson.scheduledEnd != values.scheduledEnd) {
-            lesson.accessExtensionSeconds = 0
-        }
-        lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
+        advanceAccessPolicy(lesson, values)
         lesson.scheduledStart = values.scheduledStart
         lesson.scheduledEnd = values.scheduledEnd
         lesson.status = values.status
@@ -438,6 +435,13 @@ class ScheduledLessonStore(
         if (!exists) {
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ID_NOT_FOUND)
         }
+    }
+
+    private fun advanceAccessPolicy(lesson: LessonEntity, values: ValidatedScheduledLessonRequest) {
+        if (lesson.scheduledStart != values.scheduledStart || lesson.scheduledEnd != values.scheduledEnd) {
+            lesson.accessExtensionSeconds = 0
+        }
+        lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
     }
 
     private fun requireCreateStatus(status: String) {

@@ -12,6 +12,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "lesson")
+@Suppress("LongParameterList")
 class LessonEntity(
     @Id
     @Column(name = "id", nullable = false)

@@ -2387,25 +2387,11 @@ export const getUpdateStudentConnectionRoutePreferenceUrl = (subject: string,) =
 export const updateStudentConnectionRoutePreference = async (subject: string,
     updateConnectionRoutePreferenceRequest: UpdateConnectionRoutePreferenceRequest, options?: RequestInit): Promise<updateStudentConnectionRoutePreferenceResponse> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getUpdateStudentConnectionRoutePreferenceUrl(subject),
+  const res = await fetch(getUpdateStudentConnectionRoutePreferenceUrl(subject),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(updateConnectionRoutePreferenceRequest)
   }
 )
@@ -5310,25 +5296,11 @@ export const getExtendLessonAccessUrl = (lessonId: string,) => {
 export const extendLessonAccess = async (lessonId: string,
     lessonAccessExtensionRequest: LessonAccessExtensionRequest, options?: RequestInit): Promise<extendLessonAccessResponse> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getExtendLessonAccessUrl(lessonId),
+  const res = await fetch(getExtendLessonAccessUrl(lessonId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(lessonAccessExtensionRequest)
   }
 )
@@ -7319,25 +7291,11 @@ export const getRecordRegionalRouteDiagnosticUrl = () => {
  */
 export const recordRegionalRouteDiagnostic = async (regionalRouteDiagnosticEventRequest: RegionalRouteDiagnosticEventRequest, options?: RequestInit): Promise<recordRegionalRouteDiagnosticResponse> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-const res = await fetch(getRecordRegionalRouteDiagnosticUrl(),
+  const res = await fetch(getRecordRegionalRouteDiagnosticUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(regionalRouteDiagnosticEventRequest)
   }
 )

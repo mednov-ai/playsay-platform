@@ -1,5 +1,6 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.entity.LessonEntity
 import com.playsay.gateway.dto.ScheduledLessonResponse
 import com.playsay.gateway.dto.ScheduledLessonScheduleUpdateRequest
 import com.playsay.gateway.error.ProjectResponseException
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Suppress("LongParameterList")
 class ScheduledLessonRescheduleService(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -53,18 +55,7 @@ class ScheduledLessonRescheduleService(
         val scheduleChanged = previousStart != request.scheduledStart || previousEnd != request.scheduledEnd
         val now = clock.instant()
 
-        if (scheduleChanged) {
-            lesson.accessExtensionSeconds = 0
-            lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
-        }
-        lesson.scheduledStart = request.scheduledStart
-        lesson.scheduledEnd = request.scheduledEnd
-        if (lesson.status == MetaData.LessonStatuses.IN_PROGRESS && !lesson.isInsideAccessWindow(now)) {
-            if (!scheduleChanged) lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
-            lesson.status = MetaData.LessonStatuses.SCHEDULED
-            lesson.actualStart = null
-            lesson.actualEnd = null
-        }
+        applySchedulePolicy(lesson, request, now, scheduleChanged)
         lesson.updatedAt = now
         lessonRepo.saveAndFlush(lesson)
 
@@ -104,6 +95,26 @@ class ScheduledLessonRescheduleService(
 
     private fun com.playsay.gateway.entity.LessonEntity.isInsideAccessWindow(now: Instant): Boolean =
         isLessonInsideAccessWindow(status, scheduledStart, scheduledEnd, now, closedRescheduleStatuses, accessExtensionSeconds)
+
+    private fun applySchedulePolicy(
+        lesson: LessonEntity,
+        request: ScheduledLessonScheduleUpdateRequest,
+        now: Instant,
+        scheduleChanged: Boolean,
+    ) {
+        if (scheduleChanged) {
+            lesson.accessExtensionSeconds = 0
+            lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
+        }
+        lesson.scheduledStart = request.scheduledStart
+        lesson.scheduledEnd = request.scheduledEnd
+        if (lesson.status == MetaData.LessonStatuses.IN_PROGRESS && !lesson.isInsideAccessWindow(now)) {
+            if (!scheduleChanged) lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
+            lesson.status = MetaData.LessonStatuses.SCHEDULED
+            lesson.actualStart = null
+            lesson.actualEnd = null
+        }
+    }
 
     private fun validateInterval(scheduledStart: Instant, scheduledEnd: Instant) {
         if (!scheduledEnd.isAfter(scheduledStart)) {

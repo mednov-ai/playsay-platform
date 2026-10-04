@@ -27,7 +27,6 @@ import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
 import java.time.Clock
-import java.time.Instant
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -405,7 +404,7 @@ class LessonMaterialStore(
         val lookup = scheduledMaterialLookup(authentication, lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isVisibleToParticipant(clock.instant())) {
+        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isMaterialVisibleToParticipant(clock.instant())) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
@@ -437,15 +436,3 @@ class LessonMaterialStore(
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0
 }
-
-private fun ScheduledMaterialLookup.isVisibleToParticipant(now: Instant): Boolean =
-    isLessonInsideAccessWindow(
-        status = status,
-        scheduledStart = scheduledStart,
-        scheduledEnd = scheduledEnd,
-        accessExtensionSeconds = accessExtensionSeconds,
-        now = now,
-        closedStatuses = expiredMaterialParticipantStatuses,
-    )
-
-private val expiredMaterialParticipantStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)

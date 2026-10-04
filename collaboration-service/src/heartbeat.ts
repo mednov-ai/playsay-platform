@@ -9,6 +9,7 @@ export interface CollaborationConnectionObserver {
     closeClass: CollaborationCloseClass,
     ageSeconds: number,
   ): void;
+  recordConnectionError?(channel: CollaborationChannel): void;
   recordConnectionOpened(channel: CollaborationChannel): void;
   recordHeartbeatTermination(channel: CollaborationChannel): void;
 }
@@ -59,6 +60,7 @@ export class CollaborationHeartbeat {
       current.alive = true;
       current.missedPongs = 0;
     });
+    socket.once("error", () => this.observer.recordConnectionError?.(channel));
     socket.once("close", (code) => {
       const current = this.states.get(socket);
       if (!current) return;

@@ -1,3 +1,4 @@
+import { ConnectionDiagnostics } from "./connectionDiagnostics.js";
 import {
   collectDefaultMetrics,
   Counter,
@@ -168,7 +169,17 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     registers: [this.registry],
   });
 
-  constructor() {
+  private readonly diagnosticSuppressed = new Counter({
+    help: "Connection diagnostic events suppressed by the logging budget.",
+    name: "playsay_collaboration_connection_diagnostics_suppressed_total",
+    registers: [this.registry],
+  });
+  private readonly diagnostics: ConnectionDiagnostics;
+
+  constructor(diagnostics?: ConnectionDiagnostics) {
+    this.diagnostics = diagnostics ?? new ConnectionDiagnostics(
+      undefined, undefined, undefined, undefined, () => this.diagnosticSuppressed.inc(),
+    );
     collectDefaultMetrics({
       prefix: "playsay_collaboration_",
       register: this.registry,
@@ -231,6 +242,7 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
 
   recordConnectionOpened(channel: CollaborationChannel): void {
     this.connectionOpens.inc({ channel });
+    this.diagnostics.record("connection_opened", channel);
   }
 
   recordConnectionClosed(
@@ -238,12 +250,18 @@ export class CollaborationMetrics implements CollaborationBackpressureObserver, 
     closeClass: CollaborationCloseClass,
     ageSeconds: number,
   ): void {
+    this.diagnostics.record("connection_closed", channel, closeClass, ageSeconds);
     this.connectionCloses.inc({ channel, close_class: closeClass });
     this.connectionAge.observe({ channel, close_class: closeClass }, ageSeconds);
   }
 
   recordHeartbeatTermination(channel: CollaborationChannel): void {
+    this.diagnostics.record("heartbeat_termination", channel);
     this.heartbeatTerminations.inc({ channel });
+  }
+
+  recordConnectionError(channel: CollaborationChannel): void {
+    this.diagnostics.record("connection_error", channel);
   }
 
   async render(snapshot: RealtimeMetricSnapshot): Promise<string> {

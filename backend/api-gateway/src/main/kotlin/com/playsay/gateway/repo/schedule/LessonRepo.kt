@@ -71,6 +71,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             coalesce(teacher.displayName, teacher.name, teacher.username),
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.status,
             l.type,
             l.workMode,
@@ -120,6 +122,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             coalesce(teacher.displayName, teacher.name, teacher.username),
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.status,
             l.type,
             l.workMode,
@@ -146,7 +150,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
           left join AppUserEntity teacher on teacher.id = l.teacherUserId
          where currentStudent.keycloakSubject = :subject
            and l.status not in :excludedStatuses
-           and (l.scheduledEnd is null or l.scheduledEnd >= :visibleUntil)
+           and (l.scheduledEnd is null or timestampadd(second, l.accessExtensionSeconds, l.scheduledEnd) > :visibleUntil)
          order by case when l.scheduledStart is null then 1 else 0 end,
                   l.scheduledStart,
                   l.createdAt
@@ -177,6 +181,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             coalesce(teacher.displayName, teacher.name, teacher.username),
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.status,
             l.type,
             l.workMode,
@@ -224,6 +230,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             coalesce(teacher.displayName, teacher.name, teacher.username),
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.status,
             l.type,
             l.workMode,
@@ -263,7 +271,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
            and l.scheduledStart is not null
            and l.scheduledStart <= :accessStartsBy
            and l.scheduledEnd is not null
-           and l.scheduledEnd >= :accessEndsAfter
+           and timestampadd(second, l.accessExtensionSeconds, l.scheduledEnd) > :accessEndsAfter
         """,
     )
     fun findJoinableForManager(
@@ -282,7 +290,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
            and l.scheduledStart is not null
            and l.scheduledStart <= :accessStartsBy
            and l.scheduledEnd is not null
-           and l.scheduledEnd >= :accessEndsAfter
+           and timestampadd(second, l.accessExtensionSeconds, l.scheduledEnd) > :accessEndsAfter
            and exists (
                select 1
                  from LessonParticipantEntity lp
@@ -316,6 +324,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.workMode,
             case
                 when l.workMode = 'PARALLEL' then null
@@ -338,6 +348,8 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
             l.status,
             l.scheduledStart,
             l.scheduledEnd,
+            l.accessExtensionSeconds,
+            l.accessRevision,
             l.workMode,
             coalesce(
                 lpCurrent.materialId,
@@ -378,7 +390,7 @@ interface LessonRepo : JpaRepository<LessonEntity, UUID> {
            and l.scheduledStart is not null
            and l.scheduledStart <= :accessStartsBy
            and l.scheduledEnd is not null
-           and l.scheduledEnd >= :accessEndsAfter
+           and timestampadd(second, l.accessExtensionSeconds, l.scheduledEnd) > :accessEndsAfter
         """,
     )
     fun countActiveMaterialParticipant(

@@ -1537,6 +1537,43 @@ paths:
           description: Scheduled lesson or material not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/extend-access:
+    post:
+      tags:
+      - Schedule
+      summary: Extend active lesson access by ten minutes
+      operationId: extendLessonAccess
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonAccessExtensionRequest"
+        required: true
+      responses:
+        "200":
+          description: Committed lesson access policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledLessonResponse"
+        "401":
+          description: Missing or invalid bearer token
+        "403":
+          description: Actor cannot manage this lesson
+        "404":
+          description: Lesson not found
+        "409":
+          description: Stale revision or extension unavailable; fetch current lesson
+            policy
+      security:
+      - bearerAuth: []
   /schedule/lessons/{lessonId}/complete:
     post:
       tags:
@@ -4880,11 +4917,31 @@ components:
         updatedAt:
           type: string
           format: date-time
+        serverNow:
+          type: string
+          format: date-time
+        accessEndsAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        accessRevision:
+          type: integer
+          format: int64
+        accessAllowed:
+          type: boolean
+        canExtend:
+          type:
+          - boolean
+          - "null"
       required:
+      - accessAllowed
+      - accessRevision
       - createdAt
       - id
       - inheritTemplateMaterial
       - participants
+      - serverNow
       - status
       - type
       - updatedAt
@@ -6404,6 +6461,14 @@ components:
       - distinctGradedPrompts
       - masteryPercent
       - policyVersion
+    LessonAccessExtensionRequest:
+      type: object
+      properties:
+        expectedAccessRevision:
+          type: integer
+          format: int64
+      required:
+      - expectedAccessRevision
     CollaborationTokenResponse:
       type: object
       properties:

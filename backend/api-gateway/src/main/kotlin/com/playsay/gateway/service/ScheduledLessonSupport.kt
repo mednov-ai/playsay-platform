@@ -31,7 +31,7 @@ internal fun JwtAuthenticationToken.canManageSchedule(): Boolean =
 internal fun JwtAuthenticationToken.isScheduleAdmin(): Boolean =
     authorities.any { authority -> authority.authority == MetaData.Authorities.ADMIN }
 
-internal fun ScheduledLessonRow.toResponse(participants: List<LessonParticipantRow>): ScheduledLessonResponse =
+internal fun ScheduledLessonRow.toResponse(participants: List<LessonParticipantRow>, now: Instant = Instant.now()): ScheduledLessonResponse =
     ScheduledLessonResponse(
         id = id,
         lessonTemplateId = lessonTemplateId,
@@ -55,10 +55,14 @@ internal fun ScheduledLessonRow.toResponse(participants: List<LessonParticipantR
         participants = participants.map { participant -> participant.toResponse() },
         createdAt = createdAt,
         updatedAt = updatedAt,
+        serverNow = now,
+        accessEndsAt = lessonAccessDeadline(scheduledEnd, accessExtensionSeconds),
+        accessRevision = accessRevision,
+        accessAllowed = isLessonInsideAccessWindow(status, scheduledStart, scheduledEnd, now, expiredParticipantStatuses, accessExtensionSeconds),
     )
 
 internal fun ScheduledLessonRow.isVisibleToParticipant(now: Instant): Boolean =
-    status !in expiredParticipantStatuses && (scheduledEnd == null || !scheduledEnd.isBefore(lessonAccessEndsAfter(now)))
+    status !in expiredParticipantStatuses && (scheduledEnd == null || now.isBefore(lessonAccessDeadline(scheduledEnd, accessExtensionSeconds)))
 
 private fun LessonParticipantRow.toResponse(): ScheduledLessonParticipantResponse =
     ScheduledLessonParticipantResponse(

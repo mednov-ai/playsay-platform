@@ -3348,3 +3348,8 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 .dark .playsay-translation-button {
   color: #ffffff;
 }
+
+.lesson-extension-offer { flex-shrink:0; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.5rem .75rem; border:1px solid hsl(var(--border)); background:hsl(var(--background)); color:hsl(var(--foreground)); }
+.lesson-extension-offer button { border:1px solid hsl(var(--border)); border-radius:.5rem; padding:.4rem .6rem; }
+.lesson-extension-offer button:focus-visible { outline:2px solid hsl(var(--primary)); outline-offset:2px; }
+.lesson-extension-offer button:disabled { opacity:.6; }

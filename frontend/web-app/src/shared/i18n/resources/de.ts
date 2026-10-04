@@ -4,6 +4,7 @@ export const deChatPushNotification = {
 };
 
 export const de = {
+  lessonExtension: {"title": "Stunde verlängern", "ending": "Die Stunde endet um {{time}}. Verlängern?", "extend": "Um 10 Minuten verlängern", "decline": "Nicht verlängern", "pending": "Wird verlängert…", "failed": "Verlängerung nicht bestätigt. Versuchen Sie es erneut.", "syncFailed": "Die Unterrichtszeit konnte nicht synchronisiert werden."},
   routeDiagnostics: {
     geoProvider: "GeoIP-Anbieter: IPinfo Lite · CC BY-SA 4.0",
     configured: "API-Antwort",

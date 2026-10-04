@@ -14,6 +14,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
@@ -101,6 +102,7 @@ class LiveKitRoomStore(
     private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: LiveKitTokenService,
     private val regionalMediaRoutingService: RegionalMediaRoutingService,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID, origin: String? = null): LiveKitRoomTokenResponse {
@@ -129,14 +131,14 @@ class LiveKitRoomStore(
     }
 
     private fun findJoinableLesson(authentication: JwtAuthenticationToken, lessonId: UUID): LessonEntity? {
-        val now = Instant.now()
+        val now = clock.instant()
         return if (authentication.canJoinAnyLiveKitLesson()) {
             val lesson = lessonRepo.findById(lessonId).orElse(null)
                 ?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
                 ?: return null
             if (
                 lesson.status != MetaData.LessonStatuses.IN_PROGRESS ||
-                !isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, expiredLiveKitStatuses)
+                !isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, expiredLiveKitStatuses, lesson.accessExtensionSeconds)
             ) {
                 throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_OUTSIDE_ACCESS_WINDOW)
             }
@@ -155,7 +157,7 @@ class LiveKitRoomStore(
     private fun ensureRoomName(lesson: LessonEntity): String {
         val roomName = "lesson-${lesson.id}"
         lesson.livekitRoomName = roomName
-        lesson.updatedAt = Instant.now()
+        lesson.updatedAt = clock.instant()
         lessonRepo.save(lesson)
         return roomName
     }

@@ -116,12 +116,12 @@ class LessonAccessLinkService(
     ): LessonAccessAttemptResponse {
         val now = Instant.now(clock)
         val lesson = lessonRepo.findById(lessonId).orElse(null) ?: throw invalidLink()
-        if (lesson.status in closedStatuses || lesson.scheduledEnd?.isBefore(lessonAccessEndsAfter(now)) != false) {
+        if (lesson.status in closedStatuses || lessonAccessDeadline(lesson.scheduledEnd, lesson.accessExtensionSeconds)?.let { !now.isBefore(it) } != false) {
             throw ProjectResponseException.localized(HttpStatus.GONE, MetaData.ErrorCodes.LESSON_ACCESS_CLOSED)
         }
 
         val browserSecret = randomSecret()
-        val expiry = minOf(now.plusSeconds(attemptTtlSeconds), lesson.scheduledEnd!!.plusSeconds(LESSON_ACCESS_GRACE_SECONDS))
+        val expiry = minOf(now.plusSeconds(attemptTtlSeconds), requireNotNull(lessonAccessDeadline(lesson.scheduledEnd, lesson.accessExtensionSeconds)))
         val attempt = attemptRepo.save(
             LessonEntryAttemptEntity(
                 lessonId = lessonId,

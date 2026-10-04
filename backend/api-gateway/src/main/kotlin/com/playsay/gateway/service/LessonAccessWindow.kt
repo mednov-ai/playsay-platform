@@ -16,9 +16,13 @@ fun isLessonInsideAccessWindow(
     scheduledEnd: Instant?,
     now: Instant,
     closedStatuses: Set<String>,
+    accessExtensionSeconds: Int = 0,
 ): Boolean =
     status !in closedStatuses &&
         scheduledStart != null &&
         scheduledEnd != null &&
         !scheduledStart.isAfter(lessonAccessStartsBy(now)) &&
-        !scheduledEnd.isBefore(lessonAccessEndsAfter(now))
+        now.isBefore(lessonAccessDeadline(scheduledEnd, accessExtensionSeconds))
+
+fun lessonAccessDeadline(scheduledEnd: Instant?, accessExtensionSeconds: Int = 0): Instant? =
+    scheduledEnd?.plusSeconds(LESSON_ACCESS_GRACE_SECONDS + accessExtensionSeconds.toLong())

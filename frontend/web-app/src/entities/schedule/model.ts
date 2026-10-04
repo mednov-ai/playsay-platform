@@ -1,3 +1,4 @@
+import { serverNowMs } from "../../shared/lib/serverClock";
 import type { Course, CourseLesson, ScheduledLesson, ScheduledLessonInput, ScheduledLessonMaterialAssignmentInput } from "../../shared/api/playsay";
 
 export type CourseLessonMap = Record<string, CourseLesson[]>;
@@ -210,12 +211,12 @@ export function dateValueMs(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function isScheduleExpired(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
-  const endMs = dateValueMs(lesson.scheduledEnd);
-  return endMs !== null && endMs + LESSON_ACCESS_GRACE_MS < nowMs;
+export function isScheduleExpired(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
+  const endMs = dateValueMs(lesson.accessEndsAt) ?? (dateValueMs(lesson.scheduledEnd) === null ? null : dateValueMs(lesson.scheduledEnd)! + LESSON_ACCESS_GRACE_MS);
+  return endMs !== null && endMs <= nowMs;
 }
 
-export function isArchivedScheduleLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isArchivedScheduleLesson(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
   return isClosedScheduleStatus(lesson.status) || isScheduleExpired(lesson, nowMs);
 }
 
@@ -227,27 +228,27 @@ export function isLessonCurrent(lesson: ScheduledLesson, nowMs: number): boolean
   return (startMs === null || startMs <= nowMs) && (endMs === null || endMs > nowMs);
 }
 
-export function isLessonInAccessWindow(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isLessonInAccessWindow(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
   const startMs = dateValueMs(lesson.scheduledStart);
   const endMs = dateValueMs(lesson.scheduledEnd);
   return startMs !== null &&
     endMs !== null &&
     startMs - LESSON_ACCESS_GRACE_MS <= nowMs &&
-    endMs + LESSON_ACCESS_GRACE_MS >= nowMs;
+    (dateValueMs(lesson.accessEndsAt) ?? endMs + LESSON_ACCESS_GRACE_MS) > nowMs;
 }
 
-export function isScheduledLessonReadyToStart(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isScheduledLessonReadyToStart(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
   return lesson.status === "SCHEDULED" && isLessonInAccessWindow(lesson, nowMs);
 }
 
-export function isTeacherLessonActionable(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isTeacherLessonActionable(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
   if (isArchivedScheduleLesson(lesson, nowMs)) {
     return false;
   }
   return isJoinableScheduledLesson(lesson, nowMs) || isScheduledLessonReadyToStart(lesson, nowMs);
 }
 
-export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = Date.now()): boolean {
+export function isJoinableScheduledLesson(lesson: ScheduledLesson, nowMs = serverNowMs()): boolean {
   return lesson.status === "IN_PROGRESS" && isLessonInAccessWindow(lesson, nowMs);
 }
 

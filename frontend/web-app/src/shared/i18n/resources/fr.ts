@@ -4,6 +4,7 @@ export const frChatPushNotification = {
 };
 
 export const fr = {
+  lessonExtension: {"title": "Prolonger le cours", "ending": "Le cours se termine à {{time}}. Prolonger ?", "extend": "Prolonger de 10 minutes", "decline": "Ne pas prolonger", "pending": "Prolongation…", "failed": "Prolongation non confirmée. Réessayez.", "syncFailed": "Impossible de synchroniser l’heure du cours."},
   routeDiagnostics: {
     geoProvider: "Fournisseur GeoIP : IPinfo Lite · CC BY-SA 4.0",
     configured: "Réponse API",

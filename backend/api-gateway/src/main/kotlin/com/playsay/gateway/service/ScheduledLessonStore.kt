@@ -32,25 +32,26 @@ class ScheduledLessonStore(
     private val lessonAccessLinkService: LessonAccessLinkService,
     private val materialAssignmentService: ScheduledLessonMaterialAssignmentService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val clock: java.time.Clock = java.time.Clock.systemUTC(),
 ) {
     @Transactional(readOnly = true)
     fun list(authentication: JwtAuthenticationToken): List<ScheduledLessonResponse> {
         val rows = if (authentication.canManageSchedule()) {
             lessonRepo.findScheduleRowsForManager().filter { row -> authorizationService.canManageLesson(authentication, row.id) }
         } else {
-            val now = Instant.now()
+            val now = clock.instant()
             lessonRepo.findScheduleRowsForStudent(
                 subject = authentication.token.subject,
                 visibleUntil = lessonAccessEndsAfter(now),
                 excludedStatuses = expiredParticipantStatuses,
             )
         }
-        return rows.withParticipants()
+        return rows.withParticipants().map { it.copy(canExtend = authentication.canManageSchedule() && it.status == MetaData.LessonStatuses.IN_PROGRESS && it.accessAllowed) }
     }
 
     @Transactional(readOnly = true)
     fun get(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse =
-        findVisible(authentication, lessonId)?.withParticipants()
+        findVisible(authentication, lessonId)?.withParticipants()?.withAccessPermission(authentication)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
     @Transactional
@@ -64,7 +65,7 @@ class ScheduledLessonStore(
         values.participantAssignments.forEach { assignment -> validateMaterialId(authentication, assignment.materialId) }
         val participants = participants(values.participantSubjects)
         val materialAssignments = participantMaterialAssignments(values, participants)
-        val now = Instant.now()
+        val now = clock.instant()
         val occurrences = values.occurrences()
         val recurrenceSeriesId = values.recurrence?.let { UUID.randomUUID() }
         val recurrenceTotal = values.recurrence?.let { occurrences.size }
@@ -165,6 +166,10 @@ class ScheduledLessonStore(
         lesson.lessonTemplateId = values.lessonTemplateId
         lesson.materialId = values.sharedMaterialId()
         lesson.inheritTemplateMaterial = values.inheritTemplateMaterial
+        if (lesson.scheduledStart != values.scheduledStart || lesson.scheduledEnd != values.scheduledEnd) {
+            lesson.accessExtensionSeconds = 0
+        }
+        lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
         lesson.scheduledStart = values.scheduledStart
         lesson.scheduledEnd = values.scheduledEnd
         lesson.status = values.status
@@ -232,10 +237,11 @@ class ScheduledLessonStore(
     @Transactional
     fun complete(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse {
         authentication.requireScheduleManager()
-        val lesson = lessonRepo.findById(lessonId).orElse(null)
+        val lesson = lessonRepo.lockById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         requireLessonManagement(authentication, lessonId)
-        val now = Instant.now()
+        val now = clock.instant()
+        lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
         lesson.status = MetaData.LessonStatuses.COMPLETED
         lesson.actualEnd = now
         lesson.updatedAt = now
@@ -279,6 +285,10 @@ class ScheduledLessonStore(
         return lesson.takeIf { isParticipant }
     }
 
+    private fun ScheduledLessonResponse.withAccessPermission(authentication: JwtAuthenticationToken): ScheduledLessonResponse =
+        copy(canExtend = status == MetaData.LessonStatuses.IN_PROGRESS && accessAllowed &&
+            authentication.canManageSchedule() && authorizationService.canManageLesson(authentication, id))
+
     private fun find(lessonId: UUID): ScheduledLessonRow? =
         lessonRepo.findScheduleRowById(lessonId)
 
@@ -288,11 +298,12 @@ class ScheduledLessonStore(
         }
 
         val participantsByLesson = participantsFor(map { lesson -> lesson.id }).groupBy { participant -> participant.lessonId }
-        return map { lesson -> lesson.toResponse(participantsByLesson[lesson.id].orEmpty()) }
+        val now = clock.instant()
+        return map { lesson -> lesson.toResponse(participantsByLesson[lesson.id].orEmpty(), now) }
     }
 
     private fun ScheduledLessonRow.withParticipants(): ScheduledLessonResponse =
-        toResponse(participantsFor(listOf(id)))
+        toResponse(participantsFor(listOf(id)), clock.instant())
 
     private fun participantsFor(lessonIds: List<UUID>): List<LessonParticipantRow> {
         if (lessonIds.isEmpty()) {

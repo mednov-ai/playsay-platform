@@ -16,6 +16,8 @@ data class ScheduledLessonRow(
     val teacherName: String?,
     val scheduledStart: Instant?,
     val scheduledEnd: Instant?,
+    val accessExtensionSeconds: Int = 0,
+    val accessRevision: Long = 0,
     val status: String,
     val type: String,
     val workMode: String,
@@ -43,6 +45,8 @@ data class ScheduledMaterialLookupRow(
     val status: String,
     val scheduledStart: Instant?,
     val scheduledEnd: Instant?,
+    val accessExtensionSeconds: Int = 0,
+    val accessRevision: Long = 0,
     val workMode: String,
     val materialId: UUID?,
 )

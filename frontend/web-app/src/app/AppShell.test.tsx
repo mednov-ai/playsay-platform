@@ -83,6 +83,7 @@ function appShellProps(): AppShellProps {
     assignMaterialToScheduledLesson: vi.fn(),
     cancelScheduledLesson: vi.fn(),
     classroomLesson: null,
+    extendLessonAccess: async () => undefined,
     completeScheduledLesson: vi.fn(),
     confirmScheduledLessonJoin: vi.fn(),
     copyScheduledLessonLinks: vi.fn(),

@@ -37,6 +37,10 @@ class LessonEntity(
     var scheduledStart: Instant? = null,
     @Column(name = "scheduled_end")
     var scheduledEnd: Instant? = null,
+    @Column(name = "access_extension_seconds", nullable = false)
+    var accessExtensionSeconds: Int = 0,
+    @Column(name = "access_revision", nullable = false)
+    var accessRevision: Long = 0,
     @Column(name = "actual_start")
     var actualStart: Instant? = null,
     @Column(name = "actual_end")

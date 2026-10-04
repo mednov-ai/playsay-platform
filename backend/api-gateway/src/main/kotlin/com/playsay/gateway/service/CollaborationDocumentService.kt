@@ -20,6 +20,7 @@ import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
@@ -90,6 +91,7 @@ class CollaborationDocumentService(
     private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun createCurrent(
@@ -112,7 +114,7 @@ class CollaborationDocumentService(
             return existing.toResponse(existing.studentUser())
         }
 
-        val now = Instant.now()
+        val now = clock.instant()
         val document = collaborationDocumentRepo.saveAndFlush(
             CollaborationDocumentEntity(
                 id = UUID.randomUUID(),
@@ -230,7 +232,7 @@ class CollaborationDocumentService(
         if (lookup.materialId != materialId) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
-        if (!lookup.isVisibleToParticipant(Instant.now()) || !isLessonParticipant(lessonId, authentication.token.subject)) {
+        if (!lookup.isVisibleToParticipant(clock.instant()) || !isLessonParticipant(lessonId, authentication.token.subject)) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
         return lookup
@@ -385,6 +387,7 @@ private fun ScheduledMaterialLookupRow.isVisibleToParticipant(now: Instant): Boo
         status = status,
         scheduledStart = scheduledStart,
         scheduledEnd = scheduledEnd,
+        accessExtensionSeconds = accessExtensionSeconds,
         now = now,
         closedStatuses = expiredCollaborationLessonStatuses,
     )

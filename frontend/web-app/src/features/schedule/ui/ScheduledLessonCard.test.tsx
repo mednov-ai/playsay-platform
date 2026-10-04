@@ -120,6 +120,9 @@ describe("ScheduledLessonCard", () => {
 
 function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {
   return {
+    serverNow: "2026-01-01T00:00:00.000Z",
+    accessRevision: 0,
+    accessAllowed: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     id: "lesson-1",
     inheritTemplateMaterial: false,

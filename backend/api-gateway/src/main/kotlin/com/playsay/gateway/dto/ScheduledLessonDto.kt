@@ -72,6 +72,11 @@ data class ScheduledLessonResponse(
     val participants: List<ScheduledLessonParticipantResponse>,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val serverNow: Instant = Instant.now(),
+    val accessEndsAt: Instant? = null,
+    val accessRevision: Long = 0,
+    val accessAllowed: Boolean = false,
+    val canExtend: Boolean? = null,
 )
 
 data class ScheduledLessonParticipantLinkResponse(
@@ -88,3 +93,5 @@ data class ScheduledLessonParticipantLinksResponse(
     val lessonId: UUID,
     val links: List<ScheduledLessonParticipantLinkResponse>,
 )
+
+data class LessonAccessExtensionRequest(val expectedAccessRevision: Long)

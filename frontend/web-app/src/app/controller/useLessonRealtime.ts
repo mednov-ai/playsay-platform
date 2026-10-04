@@ -1,3 +1,4 @@
+import { serverNowMs, invalidateServerClock, serverClockSynchronized } from "../../shared/lib/serverClock";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { isArchivedScheduleLesson, isJoinableScheduledLesson } from "../../entities/schedule/model";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../features/classroom";
 import {
   fetchScheduledLessons,
+  fetchScheduledLesson,
   getValidAccessToken,
   type MeProfile,
   type ScheduledLesson,
@@ -131,11 +133,12 @@ export function useLessonRealtime({
 
     const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
     if (!canManageSchedule) {
-      setScheduledLessons((current) => current.filter((lesson) => isJoinableScheduledLesson(lesson, nowMs)));
+      if (serverClockSynchronized()) setScheduledLessons((current) => current.filter((lesson) => isJoinableScheduledLesson(lesson, nowMs)));
     }
 
     if (roomSession && isRoomSessionExpired(roomSession, nowMs)) {
-      closeClassroom(t("schedule.messages.finished"));
+      if (document.visibilityState === "visible") void reconcileExpiry(roomSession);
+
     }
   }, [nowMs, profile?.roles, roomSession, status]);
 
@@ -271,15 +274,44 @@ export function useLessonRealtime({
     if (status !== "authenticated" || !activeLessonId) return undefined;
 
     const reconcileActiveLesson = () => {
+      invalidateServerClock();
       void syncScheduleFromServerRef.current();
     };
-    const intervalId = window.setInterval(reconcileActiveLesson, 15_000);
+    const pollActiveLesson = () => { void syncScheduleFromServerRef.current(); };
+    const handleResume = () => { if (document.visibilityState === "visible") reconcileActiveLesson(); };
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("pageshow", reconcileActiveLesson);
+    window.addEventListener("online", reconcileActiveLesson);
+    window.addEventListener("offline", invalidateServerClock);
+    const intervalId = window.setInterval(pollActiveLesson, 15_000);
     window.addEventListener("focus", reconcileActiveLesson);
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", reconcileActiveLesson);
+      window.removeEventListener("pageshow", reconcileActiveLesson);
+      window.removeEventListener("online", reconcileActiveLesson);
+      window.removeEventListener("offline", invalidateServerClock);
+      document.removeEventListener("visibilitychange", handleResume);
     };
   }, [activeLessonId, status]);
+
+  const expiryInFlightRef = useRef(false);
+  async function reconcileExpiry(session: LessonRoomSession) {
+    if (expiryInFlightRef.current) return;
+    expiryInFlightRef.current = true;
+    try {
+      const lesson = await fetchScheduledLesson(session.lessonId);
+      if (roomSessionRef.current?.lessonId !== session.lessonId) return;
+      if (lesson.accessRevision < (roomSessionRef.current?.accessRevision ?? 0)) return;
+      applyRealtimeLessonSnapshot(lesson);
+      if (lesson.accessAllowed === false) closeClassroom(t("schedule.messages.finished"));
+    } catch {
+      setScheduleMessage(t("lessonExtension.syncFailed"));
+      if (roomSessionRef.current?.lessonId === session.lessonId && isRoomSessionExpired(roomSessionRef.current, serverNowMs())) {
+        closeClassroom(t("schedule.messages.finished"));
+      }
+    } finally { expiryInFlightRef.current = false; }
+  }
 
   async function syncScheduleFromServer(options: { message?: string } = {}) {
     if (scheduleSyncInFlightRef.current) {
@@ -293,13 +325,18 @@ export function useLessonRealtime({
         scheduleSyncPendingRef.current = false;
         try {
           const freshSchedule = await fetchScheduledLessons();
-          setScheduledLessons(freshSchedule);
+          setScheduledLessons((current) => freshSchedule.map((lesson) => {
+            const previous = current.find((item) => item.id === lesson.id);
+            return previous && previous.accessRevision > lesson.accessRevision ? previous : lesson;
+          }));
           const activeSession = roomSessionRef.current;
           const activeLesson = activeSession
             ? freshSchedule.find((lesson) => lesson.id === activeSession.lessonId)
             : null;
           if (activeLesson) {
             applyRealtimeLessonSnapshot(activeLesson);
+          } else if (activeSession) {
+            await reconcileExpiry(activeSession);
           }
           if (options.message) {
             setScheduleMessage(options.message);
@@ -385,7 +422,8 @@ export function useLessonRealtime({
   }
 
   function applyRealtimeLessonSnapshot(lesson: ScheduledLesson) {
-    const currentTimeMs = Date.now();
+    const currentTimeMs = serverNowMs();
+    if ((lesson.accessRevision ?? 0) < (roomSessionRef.current?.accessRevision ?? 0) && roomSessionRef.current?.lessonId === lesson.id) return;
     const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
     const canKeepInSchedule = canManageSchedule || !isArchivedScheduleLesson(lesson, currentTimeMs);
 
@@ -399,7 +437,7 @@ export function useLessonRealtime({
       return;
     }
 
-    if (!isJoinableScheduledLesson(lesson, currentTimeMs)) {
+    if (lesson.status !== "IN_PROGRESS" || (serverClockSynchronized() && lesson.accessAllowed === false)) {
       const currentSession = roomSessionRef.current;
       closeClassroom(t(realtimeClassroomClosureMessageKey(lesson, currentSession?.lessonStatus)));
       return;

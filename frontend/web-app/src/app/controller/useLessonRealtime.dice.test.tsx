@@ -1,21 +1,25 @@
 // @vitest-environment jsdom
 // @vitest-environment-options { "url": "http://localhost/" }
 
+import { useState } from "react";
+import { observeServerTime, resetServerClock } from "../../shared/lib/serverClock";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonRoomSession } from "../../features/classroom";
-import type { MeProfile } from "../../shared/api/playsay";
+import type { MeProfile, ScheduledLesson } from "../../shared/api/playsay";
 import { useLessonRealtime } from "./useLessonRealtime";
 
 const apiMocks = vi.hoisted(() => ({
   fetchScheduledLessons: vi.fn(),
   getValidAccessToken: vi.fn(),
+  fetchScheduledLesson: vi.fn(),
 }));
 
 vi.mock("../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/playsay")>()),
   fetchScheduledLessons: apiMocks.fetchScheduledLessons,
   getValidAccessToken: apiMocks.getValidAccessToken,
+  fetchScheduledLesson: apiMocks.fetchScheduledLesson,
 }));
 
 vi.mock("../../shared/i18n", () => ({
@@ -62,6 +66,8 @@ class FakeWebSocket {
 
 describe("useLessonRealtime dice delivery", () => {
   beforeEach(() => {
+    resetServerClock();
+    apiMocks.fetchScheduledLesson.mockReset();
     sockets.length = 0;
     vi.useFakeTimers();
     vi.stubGlobal("WebSocket", FakeWebSocket);
@@ -71,9 +77,59 @@ describe("useLessonRealtime dice delivery", () => {
   });
 
   afterEach(() => {
+    resetServerClock();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+
+  it("reconciles a missed extension at the old cutoff and keeps the parent room open", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-10-04T07:25:00Z");
+    observeServerTime({serverNow: new Date(now).toISOString()});
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-10-04T07:25:00Z", accessRevision: 1 };
+    const extended = {id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: "2026-10-04T07:35:00Z", accessRevision: 2} as ScheduledLesson;
+    apiMocks.fetchScheduledLesson.mockResolvedValue(extended);
+    const { result, unmount } = renderHook(() => {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({...props, nowMs: now, roomSession, setRoomSession});
+      return roomSession;
+    });
+    await act(async () => Promise.resolve());
+    expect(apiMocks.fetchScheduledLesson).toHaveBeenCalledWith("lesson-1");
+    expect(result.current?.accessEndsAt).toBe(extended.accessEndsAt);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("closes after an unavailable expiry reconciliation using the last server anchor", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-10-04T07:25:00Z");
+    observeServerTime({serverNow: new Date(now).toISOString()});
+    apiMocks.fetchScheduledLesson.mockRejectedValue(new Error("offline"));
+    const rendered = renderHook(() => useLessonRealtime({...props, nowMs: now, roomSession: {
+      ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: new Date(now).toISOString(), accessRevision: 1,
+    }}));
+    await act(async () => Promise.resolve());
+    expect(props.closeClassroom).toHaveBeenCalledWith("schedule.messages.finished");
+    rendered.unmount();
+  });
+
+  it("ignores a stale closed realtime policy and refreshes on pageshow", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-10-04T07:25:00Z");
+    observeServerTime({serverNow: new Date(now).toISOString()});
+    const current = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-10-04T07:35:00Z", accessRevision: 2 };
+    const policy = {id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: current.accessEndsAt, accessRevision: 2} as ScheduledLesson;
+    apiMocks.fetchScheduledLessons.mockResolvedValue([policy]);
+    const rendered = renderHook(() => useLessonRealtime({...props, nowMs: now, roomSession: current}));
+    await act(async () => Promise.resolve());
+    act(() => sockets[0].receive({type: "lesson.updated", lesson: {...policy, accessRevision: 1, accessAllowed: false}}));
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    await act(async () => { window.dispatchEvent(new Event("pageshow")); });
+    expect(apiMocks.fetchScheduledLessons).toHaveBeenCalled();
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    rendered.unmount();
   });
 
   it("sends one request for repeated taps and clears pending on the matching result", async () => {

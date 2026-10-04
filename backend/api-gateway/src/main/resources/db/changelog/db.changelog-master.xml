@@ -37,4 +37,5 @@
     <include file="2026-08-30-001-add-compact-lesson-access.xml" relativeToChangelogFile="true"/>
     <include file="2026-09-05-001-add-connection-route-preference.xml" relativeToChangelogFile="true"/>
     <include file="2026-09-06-001-user-deletion-checkpoints.xml" relativeToChangelogFile="true"/>
+    <include file="2026-10-04-001-lesson-access-extension.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

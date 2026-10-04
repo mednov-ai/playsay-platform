@@ -1,3 +1,4 @@
+import { serverNowMs, subscribeServerClock } from "../shared/lib/serverClock";
 import { useEffect, useState } from "react";
 import { workspaceTabsForProfile } from "../entities/workspace/model";
 import { compareJoinableLessons, isArchivedScheduleLesson, isJoinableScheduledLesson } from "../entities/schedule/model";
@@ -86,7 +87,7 @@ export function useAppController(): AppShellProps {
   const [roomLoadingLessonId, setRoomLoadingLessonId] = useState<string | null>(null);
   const [roomMessage, setRoomMessage] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => serverNowMs());
   const classroomMediaRecovery = useClassroomMediaRecovery({ roomSession, setRoomSession });
   const routeLessonId = classroomLessonIdFromPath(currentPath);
   const preparationLessonId = lessonPreparationIdFromPath(currentPath);
@@ -290,6 +291,7 @@ export function useAppController(): AppShellProps {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    extendLessonAccess,
     confirmScheduledLessonJoin,
     closeClassroom,
     copyScheduledLessonLinks,
@@ -335,8 +337,10 @@ export function useAppController(): AppShellProps {
   });
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
+    const update = () => setNowMs(serverNowMs());
+    const unsubscribe = subscribeServerClock(update);
+    const timer = window.setInterval(update, 1000);
+    return () => { unsubscribe(); window.clearInterval(timer); };
   }, []);
 
   useEffect(() => {
@@ -454,6 +458,7 @@ export function useAppController(): AppShellProps {
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    extendLessonAccess,
     copyScheduledLessonLinks,
     courseLessons,
     courseLoading,

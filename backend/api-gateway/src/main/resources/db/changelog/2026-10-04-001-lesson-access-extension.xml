@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+    <changeSet id="2026-10-04-001-lesson-access-extension" author="playsay">
+        <addColumn tableName="lesson">
+            <column name="access_extension_seconds" type="int" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="access_revision" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+        </addColumn>
+        <sql>ALTER TABLE lesson ADD CONSTRAINT chk_lesson_access_extension_nonnegative CHECK (access_extension_seconds &gt;= 0 AND access_revision &gt;= 0)</sql>
+    </changeSet>
+</databaseChangeLog>

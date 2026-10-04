@@ -256,6 +256,13 @@ export interface ScheduledLessonResponse {
   participants: ScheduledLessonParticipantResponse[];
   createdAt: string;
   updatedAt: string;
+  serverNow: string;
+  /** @nullable */
+  accessEndsAt?: string | null;
+  accessRevision: number;
+  accessAllowed: boolean;
+  /** @nullable */
+  canExtend?: boolean | null;
 }
 
 export interface MaterialSubmissionRequest {
@@ -1061,6 +1068,10 @@ export interface AssignmentSummaryResponse {
 export interface TeacherAssignmentDetailResponse {
   assignment: AssignmentSummaryResponse;
   recipients: AssignmentRecipientProgressResponse[];
+}
+
+export interface LessonAccessExtensionRequest {
+  expectedAccessRevision: number;
 }
 
 export interface CollaborationTokenResponse {
@@ -2413,11 +2424,25 @@ export const getUpdateStudentConnectionRoutePreferenceUrl = (subject: string,) =
 export const updateStudentConnectionRoutePreference = async (subject: string,
     updateConnectionRoutePreferenceRequest: UpdateConnectionRoutePreferenceRequest, options?: RequestInit): Promise<updateStudentConnectionRoutePreferenceResponse> => {
 
-  const res = await fetch(getUpdateStudentConnectionRoutePreferenceUrl(subject),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateStudentConnectionRoutePreferenceUrl(subject),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateConnectionRoutePreferenceRequest)
   }
 )
@@ -5610,6 +5635,86 @@ const res = await fetch(getCreateHomeworkFromScheduledLessonUrl(lessonId),
 
 
 
+export type extendLessonAccessResponse200 = {
+  data: ScheduledLessonResponse
+  status: 200
+}
+
+export type extendLessonAccessResponse401 = {
+  data: void
+  status: 401
+}
+
+export type extendLessonAccessResponse403 = {
+  data: void
+  status: 403
+}
+
+export type extendLessonAccessResponse404 = {
+  data: void
+  status: 404
+}
+
+export type extendLessonAccessResponse409 = {
+  data: void
+  status: 409
+}
+
+export type extendLessonAccessResponseSuccess = (extendLessonAccessResponse200) & {
+  headers: Headers;
+};
+export type extendLessonAccessResponseError = (extendLessonAccessResponse401 | extendLessonAccessResponse403 | extendLessonAccessResponse404 | extendLessonAccessResponse409) & {
+  headers: Headers;
+};
+
+export type extendLessonAccessResponse = (extendLessonAccessResponseSuccess | extendLessonAccessResponseError)
+
+export const getExtendLessonAccessUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/extend-access`
+}
+
+/**
+ * @summary Extend active lesson access by ten minutes
+ */
+export const extendLessonAccess = async (lessonId: string,
+    lessonAccessExtensionRequest: LessonAccessExtensionRequest, options?: RequestInit): Promise<extendLessonAccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getExtendLessonAccessUrl(lessonId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(lessonAccessExtensionRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: extendLessonAccessResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as extendLessonAccessResponse
+}
+
+
+
 export type completeScheduledLessonResponse200 = {
   data: ScheduledLessonResponse
   status: 200
@@ -7930,11 +8035,25 @@ export const getRecordRegionalRouteDiagnosticUrl = () => {
  */
 export const recordRegionalRouteDiagnostic = async (regionalRouteDiagnosticEventRequest: RegionalRouteDiagnosticEventRequest, options?: RequestInit): Promise<recordRegionalRouteDiagnosticResponse> => {
 
-  const res = await fetch(getRecordRegionalRouteDiagnosticUrl(),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRecordRegionalRouteDiagnosticUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(regionalRouteDiagnosticEventRequest)
   }
 )

@@ -37,7 +37,7 @@ class LessonAssertionHandoffService(
         val admission = admissionService.find(attempt.lessonId, subject)
         if (admission?.status == LessonAdmissionStatus.KICKED.name) return response(attempt, "WAITING_FOR_TEACHER")
         if (admission?.status != LessonAdmissionStatus.ADMITTED.name) return response(attempt, "WAITING_FOR_TEACHER")
-        if (!isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, closedStatuses)) {
+        if (!isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, closedStatuses, lesson.accessExtensionSeconds)) {
             return LessonAccessAttemptResponse(
                 attempt.id,
                 status = "WAITING_FOR_WINDOW",

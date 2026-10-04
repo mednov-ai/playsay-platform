@@ -28,6 +28,9 @@ function lesson(patch: Partial<ScheduledLesson>): ScheduledLesson {
     createdAt: "2026-01-01T00:00:00.000Z",
     id: patch.id ?? "lesson-1",
     inheritTemplateMaterial: false,
+    serverNow: "2026-07-17T09:00:00Z",
+    accessRevision: 0,
+    accessAllowed: true,
     participants: [],
     scheduledEnd: null,
     scheduledStart: null,
@@ -69,7 +72,7 @@ describe("schedule model", () => {
     expect(isJoinableScheduledLesson(lesson({
       status: "IN_PROGRESS",
       scheduledStart: "2026-05-28T09:05:00.000Z",
-      scheduledEnd: "2026-05-28T09:50:00.000Z",
+      scheduledEnd: "2026-05-28T09:50:00.001Z",
     }), nowMs)).toBe(true);
     expect(isJoinableScheduledLesson(lesson({
       status: "IN_PROGRESS",
@@ -95,7 +98,7 @@ describe("schedule model", () => {
     });
     const stillRecoverable = lesson({
       scheduledStart: "2026-05-28T09:05:00.000Z",
-      scheduledEnd: "2026-05-28T09:50:00.000Z",
+      scheduledEnd: "2026-05-28T09:50:00.001Z",
     });
 
     expect(isScheduledLessonReadyToStart(tooEarly, nowMs)).toBe(false);
@@ -178,6 +181,9 @@ describe("schedule model", () => {
       defaultParallelMaterialId: "",
       durationMinutes: "45",
       inheritTemplateMaterial: false,
+    serverNow: "2026-07-17T09:00:00Z",
+    accessRevision: 0,
+    accessAllowed: true,
       lessonTemplateId: "lesson-template-1",
       materialId: "material-1",
       participantMaterialIds: {},

@@ -5,6 +5,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.realtime.LessonChangedEvent
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import org.springframework.context.ApplicationEventPublisher
@@ -20,6 +21,7 @@ class ScheduledLessonLifecycleService(
     private val scheduledLessonStore: ScheduledLessonStore,
     private val authorizationService: ScheduledLessonAuthorizationService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun start(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse {
@@ -34,12 +36,13 @@ class ScheduledLessonLifecycleService(
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_CANNOT_START)
         }
 
-        val now = Instant.now()
-        if (!isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, closedLessonStatuses)) {
+        val now = clock.instant()
+        if (!isLessonInsideAccessWindow(lesson.status, lesson.scheduledStart, lesson.scheduledEnd, now, closedLessonStatuses, lesson.accessExtensionSeconds)) {
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.SCHEDULED_LESSON_OUTSIDE_ACCESS_WINDOW)
         }
 
         if (lesson.status != MetaData.LessonStatuses.IN_PROGRESS) {
+            lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
             lesson.status = MetaData.LessonStatuses.IN_PROGRESS
             lesson.actualStart = lesson.actualStart ?: now
             lesson.updatedAt = now

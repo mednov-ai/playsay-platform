@@ -8,6 +8,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import java.time.Duration
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import org.springframework.context.ApplicationEventPublisher
@@ -26,6 +27,7 @@ class ScheduledLessonRescheduleService(
     private val studentAccessService: ScheduledLessonStudentAccessService,
     private val lessonReminderService: LessonReminderService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun reschedule(
@@ -49,11 +51,16 @@ class ScheduledLessonRescheduleService(
         val previousStart = lesson.scheduledStart
         val previousEnd = lesson.scheduledEnd
         val scheduleChanged = previousStart != request.scheduledStart || previousEnd != request.scheduledEnd
-        val now = Instant.now()
+        val now = clock.instant()
 
+        if (scheduleChanged) {
+            lesson.accessExtensionSeconds = 0
+            lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
+        }
         lesson.scheduledStart = request.scheduledStart
         lesson.scheduledEnd = request.scheduledEnd
         if (lesson.status == MetaData.LessonStatuses.IN_PROGRESS && !lesson.isInsideAccessWindow(now)) {
+            if (!scheduleChanged) lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
             lesson.status = MetaData.LessonStatuses.SCHEDULED
             lesson.actualStart = null
             lesson.actualEnd = null
@@ -96,7 +103,7 @@ class ScheduledLessonRescheduleService(
     }
 
     private fun com.playsay.gateway.entity.LessonEntity.isInsideAccessWindow(now: Instant): Boolean =
-        isLessonInsideAccessWindow(status, scheduledStart, scheduledEnd, now, closedRescheduleStatuses)
+        isLessonInsideAccessWindow(status, scheduledStart, scheduledEnd, now, closedRescheduleStatuses, accessExtensionSeconds)
 
     private fun validateInterval(scheduledStart: Instant, scheduledEnd: Instant) {
         if (!scheduledEnd.isAfter(scheduledStart)) {

@@ -37,7 +37,21 @@ class ScheduledLessonController(
     private val store: ScheduledLessonStore,
     private val lifecycleService: ScheduledLessonLifecycleService,
     private val rescheduleService: ScheduledLessonRescheduleService,
+    private val extensionService: LessonAccessExtensionService,
 ) {
+    @PostMapping("/schedule/lessons/{lessonId}/extend-access", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(operationId = "extendLessonAccess", summary = "Extend active lesson access by ten minutes", security = [SecurityRequirement(name = "bearerAuth")])
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Committed lesson access policy"),
+        ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
+        ApiResponse(responseCode = "403", description = "Actor cannot manage this lesson", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Lesson not found", content = [Content()]),
+        ApiResponse(responseCode = "409", description = "Stale revision or extension unavailable; fetch current lesson policy", content = [Content()]),
+    ])
+    fun extendAccess(authentication: JwtAuthenticationToken, @PathVariable lessonId: UUID,
+        @RequestBody request: LessonAccessExtensionRequest): ScheduledLessonResponse =
+        extensionService.extend(authentication, lessonId, request)
+
     @GetMapping("/schedule/lessons", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "listScheduledLessons",

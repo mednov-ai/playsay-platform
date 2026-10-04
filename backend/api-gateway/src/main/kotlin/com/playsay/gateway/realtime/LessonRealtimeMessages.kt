@@ -60,7 +60,7 @@ data class LessonRealtimePrincipal(
 
         val isParticipant = lesson.participants.any { participant -> participant.subject == subject }
         val isStillAvailable = lesson.status !in expiredParticipantStatuses &&
-            (lesson.scheduledEnd == null || !lesson.scheduledEnd.isBefore(lessonAccessEndsAfter(now)))
+            (lesson.accessEndsAt == null || now.isBefore(lesson.accessEndsAt))
         return isParticipant && isStillAvailable
     }
 }

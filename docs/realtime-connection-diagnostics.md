@@ -1,0 +1,13 @@
+# Collaboration connection diagnostics
+
+Connection diagnostics are opt-in through `CONNECTION_DIAGNOSTICS_ENABLED=true`. The default is disabled. Infra Helm exposes `collaboration.connectionDiagnostics.enabled`; dev/prod desired values enable it for the scoped observability hotfix, with the affected collaboration image rebuilt through the normal release flow.
+
+Existing heartbeat observers emit JSON events `connection_opened`, `connection_closed`, `heartbeat_termination` and `connection_error`. Fields are source timestamp, bounded channel (`yjs`, `game`, `external-activity`), severity, optional close class (`normal`, `transport`, `heartbeat`) and finite connection age clamped to seven days. Socket error text and close reasons are never logged. There are no socket/user/room/participant identifiers, addresses, payloads or tokens.
+
+Output is bounded to 100 events per second and skips additional writes once stdout backlog reaches 16KiB. Skips/write failures increase `playsay_collaboration_connection_diagnostics_suppressed_total`. Heartbeat decisions, socket termination and existing metrics remain unchanged. A single coarse error is emitted per socket; detail from arbitrary exceptions is intentionally unavailable. Cross-connection identity correlation is not provided.
+
+Tests exercise the real heartbeat with its metrics observer, assert open/error/heartbeat/close ordering and absence of secret close/error strings, and verify burst, stdout backlog and disable behavior. Central collection is governed by the infra production classroom logging contract; local tests do not prove dev/production ingestion. Changing this flag/image causes a normal collaboration rollout and must follow the approved zero-lesson window. Collector/storage rollback can leave the application running.
+
+The scoped test toolchain pins Vitest 4.1.11 and updates compatible transitive packages to remove the findings encountered while preparing this image. All 55 tests and the TypeScript build pass after this update. Retained [before audit](security/production-logs-hotfix-npm-audit-before.json) and [after audit](security/production-logs-hotfix-npm-audit-after.json) show six toolchain findings resolved and zero final full npm audit findings. This does not replace remote CI or container security checks.
+
+Delivery source is cut from production release/01.007.10, excluding unrelated develop-only collaboration authorization/viewport changes. The exact scoped source passes 47 tests and the TypeScript build (the earlier develop-based check passed 55 tests). Accept this source on dev and pass its full SHA explicitly as ACCEPTED_DEV_COMMIT for the numeric release; merge the fix into develop with existing develop behavior preserved.

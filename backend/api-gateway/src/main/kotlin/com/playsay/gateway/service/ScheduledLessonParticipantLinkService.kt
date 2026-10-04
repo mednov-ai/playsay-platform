@@ -27,7 +27,7 @@ class ScheduledLessonParticipantLinkService(
                     displayName = displayName,
                     email = user?.email,
                     url = sharedUrl,
-                    expiresAt = lesson.scheduledEnd?.plusSeconds(LESSON_ACCESS_GRACE_SECONDS),
+                    expiresAt = lessonAccessDeadline(lesson.scheduledEnd, lesson.accessExtensionSeconds),
                     mode = participantLinkModeShared,
                 )
             },

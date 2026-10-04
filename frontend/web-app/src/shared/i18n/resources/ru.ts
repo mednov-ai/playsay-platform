@@ -4,6 +4,7 @@ export const ruChatPushNotification = {
 };
 
 export const ru = {
+  lessonExtension: {"title": "Продление урока", "ending": "Урок закончится в {{time}}. Продлить?", "extend": "Продлить на 10 минут", "decline": "Не продлевать", "pending": "Продлеваем…", "failed": "Не удалось подтвердить продление. Попробуйте снова.", "syncFailed": "Не удалось синхронизировать время урока."},
   routeDiagnostics: {
     geoProvider: "Источник GeoIP: IPinfo Lite · CC BY-SA 4.0",
     configured: "Ответ API",

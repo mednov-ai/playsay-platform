@@ -26,6 +26,28 @@ class LessonRealtimeHubTest {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     @Test
+    fun `extension is delivered to both subscribed participants without managing actor capability`() {
+        val hub = LessonRealtimeHub(objectMapper)
+        val active = lesson(id = UUID.randomUUID(), status = "IN_PROGRESS", participantSubjects = listOf("student-1"))
+            .copy(accessEndsAt = Instant.now().plusSeconds(600), accessRevision = 1, accessAllowed = true, canExtend = true)
+        val teacherSession = RecordingWebSocketSession()
+        val studentSession = RecordingWebSocketSession()
+        hub.register(teacherSession, LessonRealtimePrincipal("teacher-1", setOf("TEACHER")))
+        hub.register(studentSession, LessonRealtimePrincipal("student-1", setOf("STUDENT")))
+        hub.subscribe(teacherSession, active)
+        hub.subscribe(studentSession, active)
+        val extended = active.copy(accessEndsAt = active.accessEndsAt!!.plusSeconds(600), accessRevision = 2)
+        hub.publishLessonUpdated(extended)
+        listOf(teacherSession, studentSession).forEach { session ->
+            val message = session.sentMessages.map { objectMapper.readTree(it) }.last { it["type"].asText() == "lesson.updated" }
+            assertEquals("lesson.updated", message["type"].asText())
+            assertEquals(extended.accessEndsAt.toString(), message["lesson"]["accessEndsAt"].asText())
+            assertEquals(2, message["lesson"]["accessRevision"].asInt())
+            assertTrue(message["lesson"]["canExtend"] == null || message["lesson"]["canExtend"].isNull)
+        }
+    }
+
+    @Test
     fun `completed lesson update closes subscribed student session`() {
         val hub = LessonRealtimeHub(objectMapper)
         val lessonId = UUID.randomUUID()

@@ -4,6 +4,7 @@ export const enChatPushNotification = {
 };
 
 export const en = {
+  lessonExtension: {"title": "Extend lesson", "ending": "The lesson will end at {{time}}. Extend?", "extend": "Extend by 10 minutes", "decline": "Do not extend", "pending": "Extending…", "failed": "Could not confirm the extension. Try again.", "syncFailed": "Could not synchronize lesson time."},
   routeDiagnostics: {
     geoProvider: "GeoIP provider: IPinfo Lite · CC BY-SA 4.0",
     configured: "API response",

@@ -1,5 +1,7 @@
+import { observeServerTime } from "../lib/serverClock";
 import {
   createScheduledLesson,
+  extendLessonAccess as extendLessonAccessGenerated,
   createScheduledLessonRoomToken,
   createLessonTranslationSession as createLessonTranslationSessionGenerated,
   completeScheduledLesson as completeScheduledLessonGenerated,
@@ -27,6 +29,7 @@ export async function fetchScheduledLessons(config = authConfig): Promise<Schedu
     throw apiErrorFromData(response.status, response.data as unknown, `Schedule request failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -34,7 +37,7 @@ export async function fetchScheduledLesson(
   lessonId: string,
   config = authConfig,
 ): Promise<ScheduledLesson> {
-  const response = await getScheduledLesson(lessonId, await authorizedOptions(config));
+  const response = await getScheduledLesson(lessonId, { ...await authorizedOptions(config), signal: AbortSignal.timeout(5000) });
 
   if (response.status === 401) {
     clearTokens();
@@ -44,6 +47,7 @@ export async function fetchScheduledLesson(
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson request failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -61,6 +65,7 @@ export async function saveScheduledLesson(
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson create failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -79,6 +84,7 @@ export async function editScheduledLesson(
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson update failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -97,6 +103,7 @@ export async function rescheduleScheduledLesson(
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson reschedule failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -123,6 +130,7 @@ export async function completeScheduledLesson(lessonId: string, config = authCon
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson complete failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -146,6 +154,7 @@ export async function enterScheduledLessonRoom(lessonId: string, config = authCo
     throw apiErrorFromData(response.status, response.data as unknown, `Video room token request failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -163,6 +172,7 @@ export async function createLessonTranslationSession(
     throw apiErrorFromData(response.status, response.data as unknown, `Translation session request failed with HTTP ${response.status}.`);
   }
 
+  observeServerTime(response.data);
   return response.data;
 }
 
@@ -184,4 +194,14 @@ export async function fetchLessonAccessLink(lessonId: string, config = authConfi
     { method: "GET" },
     config,
   );
+}
+
+export async function extendScheduledLessonAccess(lessonId: string, expectedAccessRevision: number, config = authConfig): Promise<ScheduledLesson> {
+  const response = await extendLessonAccessGenerated(lessonId, { expectedAccessRevision }, {
+    ...await authorizedOptions(config), signal: AbortSignal.timeout(5000),
+  });
+  if (response.status === 401) clearTokens();
+  if (response.status !== 200) throw apiErrorFromData(response.status, response.data);
+  observeServerTime(response.data);
+  return response.data;
 }

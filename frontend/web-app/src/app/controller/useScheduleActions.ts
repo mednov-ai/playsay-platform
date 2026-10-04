@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
 import { classroomLessonIdFromPath, classroomPath } from "../routes";
 import {
+  roomSessionFromScheduledLesson,
+  upsertScheduledLesson,
   type ClassroomMediaChoices,
   type LessonRoomSession,
 } from "../../features/classroom";
@@ -13,6 +15,8 @@ import {
   completeScheduledLesson as completeScheduledLessonRequest,
   enterScheduledLessonRoom,
   fetchScheduledLessons,
+  fetchScheduledLesson,
+  extendScheduledLessonAccess,
   fetchStudentProfiles,
   removeScheduledLesson,
   rescheduleScheduledLesson as rescheduleScheduledLessonRequest,
@@ -170,22 +174,7 @@ export function useScheduleActions({
         participantAssignments: participantAssignmentsFromLesson(lesson),
       });
       setScheduledLessons((current) => current.map((item) => (item.id === lessonId ? updated : item)));
-      setRoomSession((current) => (
-        current?.lessonId === lessonId
-          ? {
-              ...current,
-              lessonEndsAt: updated.scheduledEnd ?? current.lessonEndsAt,
-              lessonStartsAt: updated.scheduledStart ?? current.lessonStartsAt,
-              lessonStatus: updated.status,
-              lessonUpdatedAt: updated.updatedAt,
-              lessonTitle: updated.lessonTitle ?? current.lessonTitle,
-              lessonType: updated.type,
-              workMode: updated.workMode,
-              materialId: updated.materialId ?? null,
-              participants: updated.participants,
-            }
-          : current
-      ));
+      setRoomSession((current) => current?.lessonId === lessonId ? roomSessionFromScheduledLesson(current, updated) : current);
       setRoomMessage(materialId ? t("classroom.messages.materialAssigned") : t("classroom.messages.materialUnassigned"));
       return updated;
     } catch (caught) {
@@ -292,8 +281,12 @@ export function useScheduleActions({
     setRoomMessage(null);
     try {
       const token = await enterScheduledLessonRoom(lesson.id);
+      lesson = await fetchScheduledLesson(lesson.id);
       setRoomSession({
         ...token,
+        accessEndsAt: lesson.accessEndsAt,
+        accessRevision: lesson.accessRevision,
+        canExtend: lesson.canExtend,
         courseTitle: lesson.courseTitle ?? null,
         lessonId: lesson.id,
         lessonEndsAt: lesson.scheduledEnd ?? null,
@@ -319,6 +312,28 @@ export function useScheduleActions({
     }
   }
 
+  async function extendLessonAccess(lessonId: string, revision: number): Promise<void> {
+    const before = scheduledLessons.find((lesson) => lesson.id === lessonId);
+    let updated: ScheduledLesson;
+    let failure: unknown;
+    try {
+      updated = await extendScheduledLessonAccess(lessonId, revision);
+    } catch (caught) {
+      updated = await fetchScheduledLesson(lessonId);
+      // A newer revision can also mean completion or rescheduling. Only a
+      // committed extension of this deadline counts as a recovered success.
+      const recovered = before?.accessEndsAt && updated.accessEndsAt &&
+        updated.status === "IN_PROGRESS" && updated.accessAllowed &&
+        updated.scheduledStart === before.scheduledStart && updated.scheduledEnd === before.scheduledEnd &&
+        updated.accessRevision > revision &&
+        Date.parse(updated.accessEndsAt) >= Date.parse(before.accessEndsAt) + 600_000;
+      if (!recovered) failure = caught;
+    }
+    setScheduledLessons((current) => upsertScheduledLesson(current, updated));
+    setRoomSession((current) => current?.lessonId === lessonId ? roomSessionFromScheduledLesson(current, updated) : current);
+    if (failure) throw failure;
+  }
+
   function leaveScheduledLessonRoom() {
     closeClassroom(null);
   }
@@ -335,6 +350,7 @@ export function useScheduleActions({
     assignMaterialToScheduledLesson,
     cancelScheduledLesson,
     completeScheduledLesson,
+    extendLessonAccess,
     confirmScheduledLessonJoin,
     closeClassroom,
     copyScheduledLessonLinks,

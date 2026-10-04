@@ -10,12 +10,16 @@ import { useScheduleActions } from "./useScheduleActions";
 const apiMocks = vi.hoisted(() => ({
   fetchLessonAccessLink: vi.fn(),
   enterScheduledLessonRoom: vi.fn(),
+  fetchScheduledLesson: vi.fn(),
+  extendScheduledLessonAccess: vi.fn(),
 }));
 
 vi.mock("../../shared/api/playsay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/playsay")>()),
   fetchLessonAccessLink: apiMocks.fetchLessonAccessLink,
   enterScheduledLessonRoom: apiMocks.enterScheduledLessonRoom,
+  fetchScheduledLesson: apiMocks.fetchScheduledLesson,
+  extendScheduledLessonAccess: apiMocks.extendScheduledLessonAccess,
 }));
 
 vi.mock("../../shared/i18n", () => ({
@@ -68,6 +72,31 @@ describe("useScheduleActions", () => {
       mediaChoices,
       token: "token",
     }));
+  });
+
+  it("recovers a lost extension response from committed policy and preserves newer state", async () => {
+    const input = setup();
+    apiMocks.extendScheduledLessonAccess.mockRejectedValue(new Error("lost response"));
+    const updated = { ...input.lesson, accessRevision: 2, accessEndsAt: "2026-07-17T11:20:00Z" };
+    apiMocks.fetchScheduledLesson.mockResolvedValue(updated);
+    const { result } = renderHook(() => useScheduleActions(input.props));
+    await act(() => result.current.extendLessonAccess(input.lesson.id, 1));
+    const apply = input.props.setScheduledLessons.mock.calls.at(-1)![0];
+    expect(apply([input.lesson])[0]).toEqual(updated);
+    const newer = { ...updated, accessRevision: 3, accessEndsAt: "2026-07-17T11:30:00Z" };
+    expect(apply([newer])[0]).toEqual(newer);
+  });
+
+  it("reconciles completion without mistaking a new revision for extension success", async () => {
+    const input = setup();
+    const error = new Error("conflict");
+    apiMocks.extendScheduledLessonAccess.mockRejectedValue(error);
+    const completed = { ...input.lesson, accessRevision: 2, status: "COMPLETED", accessAllowed: false };
+    apiMocks.fetchScheduledLesson.mockResolvedValue(completed);
+    const { result } = renderHook(() => useScheduleActions(input.props));
+    await act(async () => { await expect(result.current.extendLessonAccess(input.lesson.id, 1)).rejects.toBe(error); });
+    const apply = input.props.setScheduledLessons.mock.calls.at(-1)![0];
+    expect(apply([input.lesson])[0]).toEqual(completed);
   });
 
   it("starts copying the shared lesson link while the click still has clipboard permission", async () => {
@@ -156,6 +185,11 @@ const mediaChoices: ClassroomMediaChoices = {
 
 function setup() {
   const lesson = {
+    serverNow: "2026-07-17T11:08:00Z",
+    accessEndsAt: "2026-07-17T11:10:00Z",
+    accessRevision: 1,
+    accessAllowed: true,
+    canExtend: true,
     courseTitle: "Starter",
     createdAt: "2026-07-17T09:00:00Z",
     id: "lesson-1",
@@ -168,6 +202,7 @@ function setup() {
     updatedAt: "2026-07-17T09:00:00Z",
     workMode: "SHARED",
   } as ScheduledLesson;
+  apiMocks.fetchScheduledLesson.mockResolvedValue(lesson);
   const navigateToPath = vi.fn();
   const setRoomSession = vi.fn();
   return {

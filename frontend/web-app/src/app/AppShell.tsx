@@ -1,3 +1,4 @@
+import { LessonExtensionOffer } from "../features/classroom/ui/LessonExtensionOffer";
 import { lazy, Suspense, useCallback, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
 import { CalendarPlus, Loader2, LogIn, LogOut, Play, User, UserPlus, Video } from "lucide-react";
@@ -86,6 +87,7 @@ export type AppShellProps = {
   classroomLesson: ScheduledLesson | null;
   classroomMediaRecoveryPhase?: ClassroomMediaRecoveryPhase;
   completeScheduledLesson: (lessonId: string) => Promise<void>;
+  extendLessonAccess: (lessonId: string, revision: number) => Promise<void>;
   confirmScheduledLessonJoin: (lesson: ScheduledLesson, mediaChoices: ClassroomMediaChoices) => Promise<void>;
   copyScheduledLessonLinks: (lesson: ScheduledLesson, origin?: LessonAccessOrigin) => Promise<boolean>;
   courseLessons: CourseLessonMap;
@@ -178,6 +180,7 @@ export function AppShell(props: AppShellProps) {
     classroomLesson,
     classroomMediaRecoveryPhase = "idle",
     completeScheduledLesson,
+    extendLessonAccess,
     confirmScheduledLessonJoin,
     copyScheduledLessonLinks,
     courseLessons,
@@ -395,6 +398,7 @@ export function AppShell(props: AppShellProps) {
 
         {roomSession ? (
           <Suspense fallback={<PanelFallback />}>
+            <LessonExtensionOffer session={roomSession} nowMs={nowMs} onExtend={extendLessonAccess} />
             <LiveLessonExperience
               materials={materials}
               onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}

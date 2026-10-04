@@ -90,6 +90,7 @@ function props(): AppShellProps {
     assignMaterialToScheduledLesson: async () => null,
     cancelScheduledLesson: async () => undefined,
     classroomLesson: null,
+    extendLessonAccess: async () => undefined,
     completeScheduledLesson: async () => undefined,
     confirmScheduledLessonJoin: async () => undefined,
     copyScheduledLessonLinks: async () => true,

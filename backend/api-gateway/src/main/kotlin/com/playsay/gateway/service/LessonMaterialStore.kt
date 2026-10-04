@@ -25,6 +25,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
+import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -49,6 +50,7 @@ class LessonMaterialStore(
     private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> =
@@ -367,7 +369,7 @@ class LessonMaterialStore(
         val lookup = scheduledMaterialLookup(authentication, lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isVisibleToParticipant(Instant.now())) {
+        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isVisibleToParticipant(clock.instant())) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
@@ -405,6 +407,7 @@ private fun ScheduledMaterialLookup.isVisibleToParticipant(now: Instant): Boolea
         status = status,
         scheduledStart = scheduledStart,
         scheduledEnd = scheduledEnd,
+        accessExtensionSeconds = accessExtensionSeconds,
         now = now,
         closedStatuses = expiredMaterialParticipantStatuses,
     )

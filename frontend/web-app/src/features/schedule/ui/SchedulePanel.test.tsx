@@ -49,6 +49,9 @@ const teacherProfile = {
 } as MeProfile;
 
 const expiredLesson = {
+  serverNow: "2026-06-25T11:00:00.000Z",
+  accessRevision: 0,
+  accessAllowed: false,
   courseTitle: "Demo course",
   createdAt: "2026-06-01T00:00:00.000Z",
   id: "lesson-expired",

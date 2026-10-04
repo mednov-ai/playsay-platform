@@ -87,7 +87,7 @@ class LessonRealtimeHub(
     }
 
     fun sendLessonSnapshot(session: WebSocketSession, lesson: ScheduledLessonResponse) {
-        sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.updated", lesson = lesson))
+        sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.updated", lesson = lesson.copy(canExtend = null)))
     }
 
     fun rollDice(
@@ -104,7 +104,7 @@ class LessonRealtimeHub(
             !isLessonInsideAccessWindow(
                 status = lesson.status,
                 scheduledStart = lesson.scheduledStart,
-                scheduledEnd = lesson.scheduledEnd,
+                scheduledEnd = lesson.accessEndsAt?.minusSeconds(600) ?: lesson.scheduledEnd,
                 now = now,
                 closedStatuses = diceClosedLessonStatuses,
             ) ||
@@ -185,7 +185,7 @@ class LessonRealtimeHub(
             val session = sessions[sessionId] ?: return@forEach
             val principal = principals[sessionId] ?: return@forEach
             val message = if (principal.canSee(lesson)) {
-                LessonRealtimeOutboundMessage(type = "lesson.updated", lesson = lesson)
+                LessonRealtimeOutboundMessage(type = "lesson.updated", lesson = lesson.copy(canExtend = null))
             } else {
                 LessonRealtimeOutboundMessage(type = "lesson.deleted", lessonId = lesson.id)
             }

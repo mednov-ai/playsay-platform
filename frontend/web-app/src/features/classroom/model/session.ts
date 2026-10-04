@@ -1,3 +1,4 @@
+import { serverNowMs } from "../../../shared/lib/serverClock";
 import { LESSON_ACCESS_GRACE_MS, dateValueMs, isClosedScheduleStatus } from "../../../entities/schedule/model";
 import type { LiveKitRoomToken, ScheduledLesson } from "../../../shared/api/playsay";
 
@@ -48,6 +49,9 @@ export type LessonRoomSession = LiveKitRoomToken & {
   courseTitle: string | null;
   lessonId: string;
   lessonEndsAt: string | null;
+  accessEndsAt?: string | null;
+  accessRevision?: number;
+  canExtend?: boolean | null;
   lessonTemplateId: string | null;
   lessonStartsAt: string | null;
   lessonStatus: string;
@@ -65,7 +69,7 @@ export type LessonRoomSession = LiveKitRoomToken & {
 
 export function upsertScheduledLesson(current: ScheduledLesson[], lesson: ScheduledLesson): ScheduledLesson[] {
   if (current.some((item) => item.id === lesson.id)) {
-    return current.map((item) => (item.id === lesson.id ? lesson : item));
+    return current.map((item) => (item.id === lesson.id && (lesson.accessRevision ?? 0) >= (item.accessRevision ?? 0) ? lesson : item));
   }
 
   return [lesson, ...current];
@@ -75,8 +79,12 @@ export function roomSessionFromScheduledLesson(
   session: LessonRoomSession,
   lesson: ScheduledLesson,
 ): LessonRoomSession {
+  if ((lesson.accessRevision ?? 0) < (session.accessRevision ?? 0)) return session;
   return {
     ...session,
+    accessEndsAt: lesson.accessEndsAt,
+    accessRevision: lesson.accessRevision,
+    canExtend: lesson.canExtend ?? session.canExtend,
     courseTitle: lesson.courseTitle ?? session.courseTitle,
     lessonEndsAt: lesson.scheduledEnd ?? null,
     lessonStartsAt: lesson.scheduledStart ?? null,
@@ -98,11 +106,11 @@ export function buildLessonRealtimeUrl(): string {
   return `${protocol}//${window.location.host}/api/ws/lessons`;
 }
 
-export function isRoomSessionExpired(session: LessonRoomSession, nowMs = Date.now()): boolean {
+export function isRoomSessionExpired(session: LessonRoomSession, nowMs = serverNowMs()): boolean {
   if (isClosedScheduleStatus(session.lessonStatus)) {
     return true;
   }
 
-  const endMs = dateValueMs(session.lessonEndsAt);
-  return endMs !== null && endMs + LESSON_ACCESS_GRACE_MS < nowMs;
+  const endMs = dateValueMs(session.accessEndsAt) ?? (dateValueMs(session.lessonEndsAt) === null ? null : dateValueMs(session.lessonEndsAt)! + LESSON_ACCESS_GRACE_MS);
+  return endMs !== null && endMs <= nowMs;
 }

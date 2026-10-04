@@ -51,7 +51,7 @@ class ScheduledLessonStore(
 
     @Transactional(readOnly = true)
     fun get(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse =
-        findVisible(authentication, lessonId)?.withParticipants()?.withAccessPermission(authentication)
+        findVisible(authentication, lessonId)?.withParticipants()?.withAccessPermission(authentication, authorizationService)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
     @Transactional
@@ -122,7 +122,7 @@ class ScheduledLessonStore(
             allowNewScheduleDelegations = authentication.isScheduleAdmin(),
             auditAction = SCHEDULE_CREATE_AUDIT,
         )
-        val createdLessons = lessonIds.map { id -> requireNotNull(find(id)).withParticipants() }
+        val createdLessons = lessonIds.map { id -> requireNotNull(lessonRepo.findScheduleRowById(id)).withParticipants() }
 
         createdLessons.forEach { created -> eventPublisher.publishEvent(LessonChangedEvent(created)) }
         return createdLessons.first()
@@ -190,7 +190,7 @@ class ScheduledLessonStore(
             allowNewScheduleDelegations = authentication.isScheduleAdmin(),
             auditAction = SCHEDULE_UPDATE_AUDIT,
         )
-        val updated = requireNotNull(find(lessonId)).withParticipants()
+        val updated = requireNotNull(lessonRepo.findScheduleRowById(lessonId)).withParticipants()
         eventPublisher.publishEvent(LessonChangedEvent(updated))
         return updated
     }
@@ -245,7 +245,7 @@ class ScheduledLessonStore(
         lessonRepo.save(lesson)
         lessonReminderService.cancelPendingReminders(lessonId)
 
-        val completed = requireNotNull(find(lessonId)).withParticipants()
+        val completed = requireNotNull(lessonRepo.findScheduleRowById(lessonId)).withParticipants()
         eventPublisher.publishEvent(LessonChangedEvent(completed))
         return completed
     }
@@ -254,7 +254,7 @@ class ScheduledLessonStore(
     fun createParticipantLinks(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonParticipantLinksResponse {
         authentication.requireScheduleManager()
         requireLessonManagement(authentication, lessonId)
-        val lesson = find(lessonId)
+        val lesson = lessonRepo.findScheduleRowById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         val sharedLink = lessonAccessLinkService.getOrCreate(authentication, lessonId)
         return participantLinkService.createLinks(lesson, participantsFor(listOf(lessonId)), sharedLink.url)
@@ -262,7 +262,7 @@ class ScheduledLessonStore(
 
     private fun findVisible(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonRow? {
         val lesson = if (authentication.canManageSchedule()) {
-            find(lessonId)?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
+            lessonRepo.findScheduleRowById(lessonId)?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
         } else {
             lessonRepo.findScheduleRowByIdForStudent(lessonId, authentication.token.subject)
         } ?: return null
@@ -281,13 +281,6 @@ class ScheduledLessonStore(
 
         return lesson.takeIf { isParticipant }
     }
-
-    private fun ScheduledLessonResponse.withAccessPermission(authentication: JwtAuthenticationToken): ScheduledLessonResponse =
-        copy(canExtend = status == MetaData.LessonStatuses.IN_PROGRESS && accessAllowed &&
-            authentication.canManageSchedule() && authorizationService.canManageLesson(authentication, id))
-
-    private fun find(lessonId: UUID): ScheduledLessonRow? =
-        lessonRepo.findScheduleRowById(lessonId)
 
     private fun List<ScheduledLessonRow>.withParticipants(): List<ScheduledLessonResponse> {
         if (isEmpty()) {
@@ -423,13 +416,6 @@ class ScheduledLessonStore(
         if (!exists) {
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.MATERIAL_ID_NOT_FOUND)
         }
-    }
-
-    private fun advanceAccessPolicy(lesson: LessonEntity, values: ValidatedScheduledLessonRequest) {
-        if (lesson.scheduledStart != values.scheduledStart || lesson.scheduledEnd != values.scheduledEnd) {
-            lesson.accessExtensionSeconds = 0
-        }
-        lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
     }
 
     private fun requireCreateStatus(status: String) {

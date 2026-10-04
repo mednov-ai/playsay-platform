@@ -62,6 +62,19 @@ class LessonRealtimePrincipalTest {
         )
     }
 
+    @Test
+    fun `student visibility follows the server effective deadline`() {
+        val principal = LessonRealtimePrincipal(subject = "student-1", roles = setOf("STUDENT"))
+        val deadline = Instant.parse("2026-05-25T10:10:00Z")
+        val extended = lesson(
+            status = "IN_PROGRESS",
+            scheduledEnd = Instant.parse("2026-05-25T09:40:00Z"),
+            participantSubjects = listOf("student-1"),
+        ).copy(accessEndsAt = deadline)
+        assertTrue(principal.canSee(extended, deadline.minusSeconds(1)))
+        assertFalse(principal.canSee(extended, deadline))
+    }
+
     private fun lesson(
         status: String = "SCHEDULED",
         scheduledEnd: Instant? = Instant.parse("2026-05-25T10:45:00Z"),
@@ -80,6 +93,7 @@ class LessonRealtimePrincipalTest {
             teacherName = "Teacher Demo",
             scheduledStart = Instant.parse("2026-05-25T10:00:00Z"),
             scheduledEnd = scheduledEnd,
+            accessEndsAt = scheduledEnd?.plusSeconds(600),
             status = status,
             type = "GROUP",
             livekitRoomName = null,

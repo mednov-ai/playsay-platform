@@ -107,7 +107,8 @@ class LessonAccessExtensionControllerTest : ScheduledLessonControllerTestFixture
     fun `reschedule resets the extension and invalidates stale requests`() {
         val initial = activeLesson()
         val updated = scheduleController.extendAccess(teacher(), initial.id, LessonAccessExtensionRequest(initial.accessRevision))
-        val start = Instant.now().plusSeconds(3600)
+        // Use a value exactly representable by the database timestamp column.
+        val start = Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MICROS)
         val moved = scheduleController.reschedule(teacher(), initial.id, com.playsay.gateway.dto.ScheduledLessonScheduleUpdateRequest(start, start.plusSeconds(2700)))
         assertEquals(0, lessonRepo.findById(initial.id).orElseThrow().accessExtensionSeconds)
         assertEquals(updated.accessRevision + 1, moved.accessRevision)

@@ -1,6 +1,7 @@
 package com.playsay.gateway.service
 
 import com.playsay.gateway.entity.LessonEntity
+import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 
 import java.time.Instant
 
@@ -36,3 +37,12 @@ internal fun advanceAccessPolicy(lesson: LessonEntity, values: ValidatedSchedule
     lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
 }
 
+internal fun ScheduledMaterialLookupRow.isMaterialVisibleToParticipant(now: Instant): Boolean =
+    isLessonInsideAccessWindow(
+        status = status,
+        scheduledStart = scheduledStart,
+        scheduledEnd = scheduledEnd,
+        accessExtensionSeconds = accessExtensionSeconds,
+        now = now,
+        closedStatuses = expiredParticipantStatuses,
+    )

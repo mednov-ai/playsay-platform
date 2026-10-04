@@ -77,3 +77,8 @@ private fun LessonParticipantRow.toResponse(): ScheduledLessonParticipantRespons
 internal val expiredParticipantStatuses = setOf(MetaData.LessonStatuses.COMPLETED, MetaData.LessonStatuses.CANCELLED)
 internal const val SCHEDULE_CREATE_AUDIT = "SCHEDULE_CREATE"
 internal const val SCHEDULE_UPDATE_AUDIT = "SCHEDULE_UPDATE"
+
+internal fun ScheduledLessonResponse.withAccessPermission(authentication: JwtAuthenticationToken, authorizationService: ScheduledLessonAuthorizationService): ScheduledLessonResponse =
+    copy(canExtend = status == MetaData.LessonStatuses.IN_PROGRESS && accessAllowed &&
+        authentication.canManageSchedule() && authorizationService.canManageLesson(authentication, id))
+

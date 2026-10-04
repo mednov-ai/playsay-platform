@@ -1,5 +1,7 @@
 package com.playsay.gateway.service
 
+import com.playsay.gateway.entity.LessonEntity
+
 import java.time.Instant
 
 const val LESSON_ACCESS_GRACE_SECONDS: Long = 10 * 60
@@ -26,3 +28,11 @@ fun isLessonInsideAccessWindow(
 
 fun lessonAccessDeadline(scheduledEnd: Instant?, accessExtensionSeconds: Int = 0): Instant? =
     scheduledEnd?.plusSeconds(LESSON_ACCESS_GRACE_SECONDS + accessExtensionSeconds.toLong())
+
+internal fun advanceAccessPolicy(lesson: LessonEntity, values: ValidatedScheduledLessonRequest) {
+    if (lesson.scheduledStart != values.scheduledStart || lesson.scheduledEnd != values.scheduledEnd) {
+        lesson.accessExtensionSeconds = 0
+    }
+    lesson.accessRevision = Math.incrementExact(lesson.accessRevision)
+}
+

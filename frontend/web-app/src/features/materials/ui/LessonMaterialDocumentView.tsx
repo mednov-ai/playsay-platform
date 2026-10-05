@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw, X } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
 import {
   MaterialAnswerBlock,
@@ -130,6 +130,12 @@ export function LessonMaterialDocumentView({
   const [documentViewerStates, setDocumentViewerStates] = useState<Record<string, DocumentViewerState>>({});
   const onPresentationModeChangeRef = useRef(onPresentationModeChange);
   const [launchedGameIds, setLaunchedGameIds] = useState<Set<string>>(() => new Set());
+  const knownGameRunsRef = useRef<Record<string, string>>({});
+  const minimizedGamesRef = useRef(new Set<string>());
+  const locallyStoppedGamesRef = useRef(new Set<string>());
+  const gameLaunchId = htmlGameSync?.launchId ?? null;
+  const gameLifecycle = htmlGameSync?.lifecycle;
+  const launchKey = (blockId: string) => gameLaunchId ?? blockId;
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
   const pagePickerVisible = document.pages.length > 1;
@@ -144,10 +150,17 @@ export function LessonMaterialDocumentView({
   onPresentationModeChangeRef.current = onPresentationModeChange;
 
   useEffect(() => {
+    Object.assign(knownGameRunsRef.current, htmlGameSync?.authorityRuns ?? {});
+  }, [htmlGameSync?.authorityRuns]);
+
+  useEffect(() => {
     setInternalActivePageId(null);
     setFocusedBlock(null);
     setLaunchedGameIds(new Set());
     setDocumentViewerStates({});
+    knownGameRunsRef.current = {};
+    minimizedGamesRef.current.clear();
+    locallyStoppedGamesRef.current.clear();
   }, [material.id]);
 
   useEffect(() => {
@@ -168,13 +181,27 @@ export function LessonMaterialDocumentView({
     if (!presentedBlock) {
       return;
     }
-    setLaunchedGameIds((current) => current.has(presentedHtmlGameBlockId)
+    const key = gameLaunchId ?? presentedHtmlGameBlockId;
+    if (gameLifecycle?.stoppedRuns[key] || locallyStoppedGamesRef.current.has(key)) {
+      setLaunchedGameIds(new Set());
+      setFocusedBlock((current) => current?.kind === "htmlGame" ? null : current);
+      return;
+    }
+    if (gameLaunchId) setLaunchedGameIds((current) => current.size === 1 && current.has(presentedHtmlGameBlockId) ? current : new Set([presentedHtmlGameBlockId]));
+    else setLaunchedGameIds((current) => current.has(presentedHtmlGameBlockId)
       ? current
       : new Set(current).add(presentedHtmlGameBlockId));
+    if (minimizedGamesRef.current.has(key)) return;
     setFocusedBlock((current) => current?.kind === "htmlGame" && current.blockId === presentedHtmlGameBlockId
       ? current
       : { kind: "htmlGame", blockId: presentedHtmlGameBlockId });
-  }, [allBlocks, hasHtmlGameSync, presentedHtmlGameBlockId]);
+  }, [allBlocks, hasHtmlGameSync, presentedHtmlGameBlockId, gameLaunchId, gameLifecycle]);
+
+  useEffect(() => {
+    if (!gameLaunchId || !gameLifecycle?.stoppedRuns[gameLaunchId]) return;
+    setLaunchedGameIds(new Set());
+    setFocusedBlock((current) => current?.kind === "htmlGame" ? null : current);
+  }, [gameLaunchId, gameLifecycle]);
 
   useEffect(() => {
     if (!presentedExternalActivityBlockId) {
@@ -340,8 +367,12 @@ export function LessonMaterialDocumentView({
       const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "htmlGame");
       const assetId = block?.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
       if (!assetId || !htmlAssets[assetId]) return;
+      if (gameLifecycle?.requests[blockId]) return;
+      minimizedGamesRef.current.delete(launchKey(blockId));
+      locallyStoppedGamesRef.current.delete(launchKey(blockId));
       setLaunchedGameIds((current) => new Set(current).add(blockId));
-      htmlGameSync?.setPresentedBlock(blockId);
+      // Reopening a minimized game preserves its run; a fresh launch gets a new identity.
+      if (!htmlGameSync || htmlGameSync.presentedBlockId !== blockId) htmlGameSync?.setPresentedBlock(blockId);
     }
     if (kind === "externalActivity") {
       const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "externalActivity");
@@ -355,10 +386,27 @@ export function LessonMaterialDocumentView({
     setFocusedBlock({ kind, blockId });
   }
 
+  function stopGame(blockId: string, retry = false) {
+    if (htmlGameSync) {
+      const pending = retry ? gameLifecycle?.requests[blockId] : undefined;
+      const runId = pending?.runId ?? htmlGameSync.authorityRuns[blockId] ?? knownGameRunsRef.current[blockId] ?? htmlGameSync.snapshots[blockId]?.runId ?? gameLaunchId;
+      if (!runId || !htmlGameSync.stopRun) return;
+      htmlGameSync.stopRun(blockId, runId, pending?.launchId ?? gameLaunchId ?? undefined);
+      if (pending?.launchId && pending.launchId !== gameLaunchId) return;
+    }
+    locallyStoppedGamesRef.current.add(launchKey(blockId));
+    setLaunchedGameIds((current) => { const next = new Set(current); next.delete(blockId); return next; });
+    setFocusedBlock((current) => current?.blockId === blockId ? null : current);
+    window.requestAnimationFrame(() => {
+      Array.from(globalThis.document.querySelectorAll<HTMLElement>("[data-playsay-launcher-for]"))
+        .find((element) => element.dataset.playsayLauncherFor === blockId)?.focus();
+    });
+  }
+
   function closeBlockFocus() {
     const blockId = focusedBlock?.blockId;
     if (focusedBlock?.kind === "htmlGame") {
-      htmlGameSync?.setPresentedBlock(null);
+      if (blockId) minimizedGamesRef.current.add(launchKey(blockId));
     }
     if (focusedBlock?.kind === "externalActivity") {
       if (!externalActivitySync) return;
@@ -502,12 +550,34 @@ export function LessonMaterialDocumentView({
           />;
         })}
       </div>
+      {allBlocks.filter((block) => launchedGameIds.has(block.id) && focusedBlock?.blockId !== block.id).map((block) => (
+        <button key={`stop-${block.id}`} className="playsay-material-minimized-stop" onClick={() => stopGame(block.id)} type="button"
+          disabled={Boolean(htmlGameSync && !htmlGameSync.stopRun)}
+          aria-label={t("materials.renderer.stopGame")}><X className="h-4 w-4" />{t("materials.renderer.stopGame")}</button>
+      ))}
+      {Object.values(gameLifecycle?.requests ?? {}).map((request) => (
+        <div key={request.runId} role="status" className="playsay-material-game-stop-status">
+          {t(request.phase === "incompatible" ? "materials.renderer.gameStopUpdateRequired" : "materials.renderer.gameStopPending")}
+          <button onClick={() => stopGame(request.blockId, true)} type="button">{t("materials.renderer.gameStopRetry")}</button>
+        </div>
+      ))}
       <div
         aria-hidden={focusedBlock === null ? "true" : undefined}
         className="playsay-material-focus-stack"
         data-active={focusedBlock === null ? "false" : "true"}
         data-kind={focusedBlock?.kind}
       >
+        {focusedBlock?.kind === "htmlGame" ? (
+          <button
+            aria-label={t("materials.renderer.stopGame")}
+            title={t("materials.renderer.stopGame")}
+            className="playsay-material-focus-close playsay-material-game-stop"
+            data-testid="material-game-stop"
+            onClick={() => stopGame(focusedBlock.blockId)}
+            disabled={Boolean(htmlGameSync && !htmlGameSync.stopRun)}
+            type="button"
+          ><X className="h-5 w-5" /></button>
+        ) : null}
         {focusedBlock && focusedBlock.kind !== "externalActivity" ? (
           <button
             aria-label={focusedBlock.kind === "htmlGame"
@@ -515,7 +585,7 @@ export function LessonMaterialDocumentView({
               : focusedBlock.kind === "document"
                 ? t("materials.document.restorePanel")
                 : t("materials.renderer.closeImage")}
-            className="playsay-material-focus-close"
+            className={`playsay-material-focus-close${focusedBlock.kind === "htmlGame" ? " playsay-material-game-minimize" : ""}`}
             data-testid="material-focus-close"
             onClick={closeBlockFocus}
             title={focusedBlock.kind === "htmlGame"
@@ -540,7 +610,7 @@ export function LessonMaterialDocumentView({
                 ? "loading" as const
                 : "unavailable" as const;
           return (
-            <div className="playsay-material-focused-game" data-active={active ? "true" : "false"} key={block.id}>
+            <div className="playsay-material-focused-game" data-active={active ? "true" : "false"} key={`${block.id}:${gameLaunchId ?? "local"}`}>
               <HtmlGameFrame
                 blockId={block.id}
                 fillAvailable={active}

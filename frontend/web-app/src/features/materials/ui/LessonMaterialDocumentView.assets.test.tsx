@@ -202,4 +202,50 @@ describe("LessonMaterialDocumentView asset failures", () => {
     resolveGame?.("<html><body>stale</body></html>");
     vi.useRealTimers();
   });
+  function setupGame() {
+    apiMocks.fetchMaterialAssets.mockResolvedValue([{ ...assets[0], id: "game-asset", kind: "HTML_GAME" }]);
+    apiMocks.fetchMaterialAssetText.mockResolvedValue("<html><body>running</body></html>");
+    return { ...material, document: { schemaVersion: 1, pages: [{ id: "page-game", title: "Game", layout: "FLOW", blocks: [{ id: "game", type: "htmlGame", title: "Word race", url: "material-asset:game-asset" }] }] } } satisfies LessonMaterial;
+  }
+
+  it("explicit exit destroys the local game iframe instead of hiding it", async () => {
+    const gameMaterial = setupGame();
+    const view = render(<AppProviders><LessonMaterialDocumentView material={gameMaterial} /></AppProviders>);
+    fireEvent.click(await screen.findByTestId("html-game-launch-game"));
+    expect(view.container.querySelector("iframe")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Завершить игру" }));
+    expect(view.container.querySelector("iframe")).not.toBeInTheDocument();
+  });
+
+  it("keeps shared minimize local when parent material and shared state refresh", async () => {
+    const gameMaterial = setupGame();
+    const sync = {
+      authorityRuns: { game: "run-a" }, clientId: 1, effects: [], inputs: [], isAuthority: true,
+      presentedBlockId: "game", ready: true, publishEffect: vi.fn(), publishInput: vi.fn(),
+      publishSnapshot: vi.fn(), setAuthorityRun: vi.fn(), setPresentedBlock: vi.fn(), snapshots: {},
+    };
+    const view = render(<AppProviders><LessonMaterialDocumentView material={gameMaterial} htmlGameSync={sync} /></AppProviders>);
+    await screen.findByTestId("html-game-launch-game");
+    fireEvent.click(screen.getByTestId("material-focus-close"));
+    expect(sync.setPresentedBlock).not.toHaveBeenCalled();
+    view.rerender(<AppProviders><LessonMaterialDocumentView material={{ ...gameMaterial, document: structuredClone(gameMaterial.document) }} htmlGameSync={{ ...sync }} /></AppProviders>);
+    expect(view.container.querySelector('.playsay-material-focus-stack[data-active="true"]')).not.toBeInTheDocument();
+    expect(view.container.querySelector("iframe")).toBeInTheDocument();
+  });
+
+  it.each(["ru", "en", "de", "fr"])("provides distinct accessible minimize and exit in %s", async (locale) => {
+    await i18n.changeLanguage(locale);
+    try {
+      const gameMaterial = setupGame();
+      const view = render(<AppProviders><LessonMaterialDocumentView material={gameMaterial} /></AppProviders>);
+      fireEvent.click(await screen.findByTestId("html-game-launch-game"));
+      const stopName = i18n.t("materials.renderer.stopGame");
+      expect(stopName).not.toBe("materials.renderer.stopGame");
+      expect(screen.getByRole("button", { name: stopName })).toBeInTheDocument();
+      expect(screen.getByTestId("material-focus-close")).toHaveAttribute("aria-label", i18n.t("materials.renderer.closeGame"));
+      fireEvent.click(screen.getByRole("button", { name: stopName }));
+      expect(view.container.querySelector("iframe")).not.toBeInTheDocument();
+    } finally { await i18n.changeLanguage("ru"); }
+  });
+
 });

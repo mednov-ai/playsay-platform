@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "owner": "Honey School project owner",
+  "approvedAt": "2026-10-05",
+  "expiresAt": "2026-12-05T10:46:15Z",
+  "approval": "Owner clarification in release-text-annotation-fix-only chat: vulnerability is non-blocking for two months",
+  "scope": "release-text-annotation-fix-only candidate and develop merge-back; frontend build toolchain only",
+  "advisory": "GHSA-vfj7-8cjw-p6xm",
+  "cve": "CVE-2026-93687",
+  "packages": {
+    "braces": "3.0.3",
+    "chokidar": "3.6.0",
+    "fast-glob": "3.3.3",
+    "micromatch": "4.0.8",
+    "tailwindcss": "3.4.19"
+  },
+  "reason": "No patched braces version. Stack exhaustion in controlled source/build processing; Node build tools not included in static nginx runtime. Unresolved accepted risk.",
+  "requirements": [
+    "fresh full audit and raw report retention",
+    "exact listed advisory/package/version/build scope only",
+    "block all unlisted findings, audit errors and expiry",
+    "check official upstream fixes at expiry; never automatically renew"
+  ]
+}

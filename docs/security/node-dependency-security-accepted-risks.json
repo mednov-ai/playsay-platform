@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "owner": "Honey School project owner",
-  "approvedAt": "2026-10-05",
+  "approvedAt": "2026-10-05T10:46:15Z",
   "expiresAt": "2026-12-05T10:46:15Z",
-  "approval": "Owner clarification in release-text-annotation-fix-only chat: vulnerability is non-blocking for two months",
-  "scope": "release-text-annotation-fix-only candidate and develop merge-back; frontend build toolchain only",
+  "approval": "Separate owner approvals retained in approvals; no additional package, version, expiry or release scope accepted.",
+  "scope": "html-game-explicit-stop numeric candidate and release-text-annotation-fix-only candidate; their develop merge-back; frontend build toolchain only",
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "cve": "CVE-2026-93687",
   "packages": {
@@ -14,11 +14,24 @@
     "micromatch": "4.0.8",
     "tailwindcss": "3.4.19"
   },
-  "reason": "No patched braces version. Stack exhaustion in controlled source/build processing; Node build tools not included in static nginx runtime. Unresolved accepted risk.",
+  "reason": "No patched braces version; stack exhaustion in controlled source/build brace parsing. Not shipped as Node tools in static nginx runtime.",
   "requirements": [
     "fresh full audit and raw report retention",
-    "exact listed advisory/package/version/build scope only",
-    "block all unlisted findings, audit errors and expiry",
-    "check official upstream fixes at expiry; never automatically renew"
+    "exact versions and advisory only",
+    "block new findings/version changes/scan errors/expiry",
+    "check official updates at expiry; no automatic renewal"
+  ],
+  "followupAutomationId": "braces",
+  "approvals": [
+    {
+      "approvedAt": "2026-10-05T10:46:15Z",
+      "approval": "Explicit user instruction in this task on 2026-10-05",
+      "scope": "html-game-explicit-stop numeric candidate and its develop merge-back; frontend build toolchain only"
+    },
+    {
+      "approvedAt": "2026-10-05",
+      "approval": "Owner clarification in release-text-annotation-fix-only chat: vulnerability is non-blocking for two months",
+      "scope": "release-text-annotation-fix-only candidate and develop merge-back; frontend build toolchain only"
+    }
   ]
 }

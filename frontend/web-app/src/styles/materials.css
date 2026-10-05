@@ -3649,3 +3649,20 @@
 @media (prefers-reduced-motion:reduce) { .worksheet-import-workspace *,.playsay-interactive-worksheet-shell * { scroll-behavior:auto!important; transition:none!important; animation-duration:.001ms!important; } }
 @media (max-width:900px) { .worksheet-pair-editor { grid-template-columns:1fr 1fr; } .worksheet-choice-editor > div { grid-template-columns:auto minmax(0,1fr); } .worksheet-flashcard-editor > div { grid-template-columns:1fr; } }
 @media (max-width:560px) { .worksheet-group-editors label { grid-template-columns:1fr; } .worksheet-pair-editor { grid-template-columns:1fr; } .worksheet-choice-editor > div { grid-template-columns:auto minmax(0,1fr); } .playsay-worksheet-overlay > input,.playsay-worksheet-overlay > select,.playsay-worksheet-overlay > button,.worksheet-match-hotspot,.worksheet-choice-hotspot,.worksheet-choice-check { min-width:2.75rem; min-height:2.75rem; } }
+
+/* The independent stop control remains above the sandbox on touch and desktop. */
+.playsay-material-game-minimize { right: 4rem; }
+.playsay-material-game-stop:disabled { opacity: 0.5; cursor: wait; }
+.playsay-material-minimized-stop,
+.playsay-material-game-stop-status button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.playsay-material-game-stop-status { padding: 0.5rem; }

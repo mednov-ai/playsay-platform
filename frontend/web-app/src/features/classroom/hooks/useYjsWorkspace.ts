@@ -16,6 +16,7 @@ import {
 } from "./yjsRuntime";
 import type {
   MaterialHtmlGameEffect,
+  MaterialHtmlGameLifecycle,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
   MaterialHtmlGameSdkCheckpoint,
@@ -67,6 +68,9 @@ export function useYjsWorkspace({
   const [htmlGameInputs, setHtmlGameInputs] = useState<MaterialHtmlGameInputEvent[]>([]);
   const [htmlGameEffects, setHtmlGameEffects] = useState<MaterialHtmlGameEffect[]>([]);
   const [htmlGamePatches, setHtmlGamePatches] = useState<MaterialHtmlGamePatch[]>([]);
+  const [localHtmlGameAuthorityRuns, setLocalHtmlGameAuthorityRuns] = useState<Record<string, string>>({});
+  const [htmlGameLifecycle, setHtmlGameLifecycle] = useState<MaterialHtmlGameLifecycle>({ stoppedRuns: {}, requests: {} });
+  const [htmlGameLaunchId, setHtmlGameLaunchId] = useState<string | null>(null);
   const [presentedHtmlGameBlockId, setPresentedHtmlGameBlockId] = useState<string | null>(null);
   const [materialAnswers, setMaterialAnswers] = useState<MaterialAnswerState>({});
   const [materialViewport, setMaterialViewportState] = useState<MaterialViewportState | null>(null);
@@ -99,6 +103,8 @@ export function useYjsWorkspace({
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
       setPresentedHtmlGameBlockId(null);
+      setHtmlGameLifecycle({ stoppedRuns: {}, requests: {} });
+      setLocalHtmlGameAuthorityRuns({});
       setMaterialAnswers({});
       setMaterialViewportState(null);
       setVideoPlaybackStates({});
@@ -125,7 +131,8 @@ export function useYjsWorkspace({
       onHtmlGameEffectsChange: setHtmlGameEffects,
       onHtmlGameInputsChange: setHtmlGameInputs,
       onHtmlGamePatchesChange: setHtmlGamePatches,
-      onHtmlGamePresentationChange: setPresentedHtmlGameBlockId,
+      onHtmlGamePresentationChange: (blockId, launchId) => { setPresentedHtmlGameBlockId(blockId); setHtmlGameLaunchId(launchId ?? null); },
+      onHtmlGameLifecycleChange: setHtmlGameLifecycle,
       onHtmlGameSdkCheckpointsChange: (checkpoints) => {
         latestHtmlGameSdkCheckpoints = checkpoints;
         gameSyncController?.replaceCheckpoints(checkpoints);
@@ -298,6 +305,8 @@ export function useYjsWorkspace({
       setHtmlGameEffects([]);
       setHtmlGamePatches([]);
       setPresentedHtmlGameBlockId(null);
+      setHtmlGameLifecycle({ stoppedRuns: {}, requests: {} });
+      setLocalHtmlGameAuthorityRuns({});
       setMaterialAnswers({});
       setMaterialViewportState(null);
       setVideoPlaybackStates({});
@@ -369,6 +378,11 @@ export function useYjsWorkspace({
 
   const setHtmlGameAuthorityRun = useCallback((blockId: string, runId: string | null) => {
     runtimeRef.current?.updateHtmlGameAuthority(blockId, runId);
+    setLocalHtmlGameAuthorityRuns((current) => {
+      const next = { ...current };
+      if (runId) next[blockId] = runId; else delete next[blockId];
+      return next;
+    });
   }, []);
 
   const setPresentedHtmlGameBlock = useCallback((blockId: string | null) => {
@@ -406,10 +420,17 @@ export function useYjsWorkspace({
     runtimeRef.current?.setVideoPlayback(blockId, state, options);
   }, []);
 
+  const stopHtmlGameRun = useCallback((blockId: string, runId: string, launchId?: string) => {
+    runtimeRef.current?.stopHtmlGameRun(blockId, runId, launchId);
+  }, []);
+
   const htmlGameSyncByRole = useMemo(() => {
     const shared = {
-      authorityRuns: Object.fromEntries(participants
-        .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))),
+      lifecycle: htmlGameLifecycle,
+      launchId: htmlGameLaunchId,
+      stopRun: stopHtmlGameRun,
+      authorityRuns: { ...Object.fromEntries(participants
+        .flatMap((participant) => Object.entries(participant.htmlGameAuthorityRuns))), ...localHtmlGameAuthorityRuns },
       clientId: workspaceClientId,
       effects: htmlGameEffects,
       inputs: htmlGameInputs,
@@ -429,7 +450,7 @@ export function useYjsWorkspace({
       authority: { ...shared, isAuthority: true } satisfies MaterialHtmlGameSync,
       replica: { ...shared, isAuthority: false } satisfies MaterialHtmlGameSync,
     };
-  }, [htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
+  }, [localHtmlGameAuthorityRuns, htmlGameLaunchId, htmlGameLifecycle, stopHtmlGameRun, htmlGameEffects, htmlGameInputs, htmlGamePatches, htmlGameSnapshots, participants, presentedHtmlGameBlockId, publishHtmlGameEffect, publishHtmlGameInput, publishHtmlGamePatch, publishHtmlGameSnapshot, setHtmlGameAuthorityRun, setPresentedHtmlGameBlock, status, workspaceClientId]);
   const htmlGameSync = useCallback(
     (isAuthority: boolean): MaterialHtmlGameSync => (
       isAuthority ? htmlGameSyncByRole.authority : htmlGameSyncByRole.replica

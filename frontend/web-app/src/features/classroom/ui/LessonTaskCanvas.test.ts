@@ -757,7 +757,7 @@ describe("LessonTaskCanvas", () => {
     expect(container.querySelectorAll(".playsay-material-focused-game")[1]?.getAttribute("data-active")).toBe("true");
   });
 
-  it("opens and closes an HTML game from shared presentation state without echoing open", async () => {
+  it("opens and locally minimizes an HTML game without changing shared presentation", async () => {
     const setPresentedBlock = vi.fn();
     const sync = htmlGameSync({ presentedBlockId: null, setPresentedBlock });
     const props = {
@@ -783,7 +783,9 @@ describe("LessonTaskCanvas", () => {
     expect(setPresentedBlock).not.toHaveBeenCalledWith("game-1");
 
     fireEvent.click(container.querySelector<HTMLButtonElement>("[data-testid='material-focus-close']")!);
-    expect(setPresentedBlock).toHaveBeenCalledWith(null);
+    expect(setPresentedBlock).not.toHaveBeenCalled();
+    expect(container.querySelector(".playsay-html-game iframe")).not.toBeNull();
+    expect(container.querySelector(".playsay-material-focus-stack")?.getAttribute("data-active")).toBe("false");
   });
 
   it("keeps a locally reopened game focused while the shared presentation echo is pending", async () => {

@@ -27,6 +27,8 @@ import { disconnectLessonSubject } from "./disconnect.js";
 import { externalActivityRealtimeSubprotocol } from "./externalActivityProtocol.js";
 import { relayExternalActivityFrame } from "./externalActivityRelay.js";
 
+import { assertGameLifecycleUpdate, encodeGameLifecycle, messageHtmlGameLifecycle, stopHtmlGameRun } from "./htmlGameLifecycle.js";
+
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
@@ -376,6 +378,7 @@ function bindWebSocket(
       metrics,
     );
   } else if (!isExternalActivitySocket(ws)) {
+    sendWithBackpressure(ws, encodeGameLifecycle({ type: "hello", version: 1 }), "sync", backpressurePolicy, metrics);
     sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
     sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
   }
@@ -427,7 +430,23 @@ function handleMessage(
   const decoder = decoding.createDecoder(bytes);
   const messageType = decoding.readVarUint(decoder);
 
+  if (messageType === messageHtmlGameLifecycle) {
+    if (!connectionClaims.has(ws) || !room.connections.has(ws)) throw new Error("unauthorized game stop");
+    const payload = decoding.readVarString(decoder);
+    if (payload.length > 1024 || decoding.hasContent(decoder)) throw new Error("invalid game stop size");
+    const result = stopHtmlGameRun(room.doc, Array.from(room.awareness.getStates()).filter(([id]) => id !== room.doc.clientID).map(([, state]) => state), JSON.parse(payload));
+    sendWithBackpressure(ws, encodeGameLifecycle({ type: "result", ...result }), "sync", backpressurePolicy, metrics);
+    return;
+  }
+
   if (messageType === messageSync) {
+    // Validate terminal-state ownership before applying an incoming sync step 2/update.
+    const validationDecoder = decoding.createDecoder(bytes);
+    decoding.readVarUint(validationDecoder);
+    const syncType = decoding.readVarUint(validationDecoder);
+    if (syncType === syncProtocol.messageYjsSyncStep2 || syncType === syncProtocol.messageYjsUpdate) {
+      assertGameLifecycleUpdate(room.doc, decoding.readVarUint8Array(validationDecoder));
+    }
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);
     syncProtocol.readSyncMessage(decoder, encoder, room.doc, ws);

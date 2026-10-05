@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "owner": "Honey School project owner",
+  "approvedAt": "2026-10-05T10:46:15Z",
+  "expiresAt": "2026-12-05T10:46:15Z",
+  "approval": "Explicit user instruction in this task on 2026-10-05",
+  "scope": "html-game-explicit-stop numeric candidate and its develop merge-back; frontend build toolchain only",
+  "advisory": "GHSA-vfj7-8cjw-p6xm",
+  "cve": "CVE-2026-93687",
+  "packages": {
+    "braces": "3.0.3",
+    "chokidar": "3.6.0",
+    "fast-glob": "3.3.3",
+    "micromatch": "4.0.8",
+    "tailwindcss": "3.4.19"
+  },
+  "reason": "No patched braces version; stack exhaustion in controlled source/build brace parsing. Not shipped as Node tools in static nginx runtime.",
+  "requirements": [
+    "fresh full audit and raw report retention",
+    "exact versions and advisory only",
+    "block new findings/version changes/scan errors/expiry",
+    "check official updates at expiry; no automatic renewal"
+  ],
+  "followupAutomationId": "braces"
+}

@@ -14,6 +14,7 @@ import { isMaterialViewportNewer } from "../model/materialViewport";
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
+const messageHtmlGameLifecycle = 3;
 const annotationElementKinds = new Set([
   "arrow",
   "ellipse",
@@ -32,6 +33,7 @@ export function createYjsWorkspaceRuntime({
   onHtmlGameInputsChange,
   onHtmlGamePatchesChange = () => undefined,
   onHtmlGamePresentationChange = () => undefined,
+  onHtmlGameLifecycleChange = () => undefined,
   onHtmlGameSdkMessage = () => undefined,
   onHtmlGameSdkActionsChange = () => undefined,
   onHtmlGameSdkCheckpointsChange = () => undefined,
@@ -57,6 +59,9 @@ export function createYjsWorkspaceRuntime({
   const yhtmlGameEffects = ydoc.getArray("htmlGameEffects");
   const yhtmlGameSdkCheckpoints = ydoc.getMap("htmlGameSdkCheckpoints");
   const yhtmlGamePresentation = ydoc.getMap("htmlGamePresentation");
+  const yhtmlGameStoppedRuns = ydoc.getMap("htmlGameStoppedRuns");
+  const pendingGameStops = new Map();
+  let gameStopSupported = false;
   const ymaterialAnswerFields = ydoc.getMap("materialAnswerFields");
   const ymaterialViewport = ydoc.getMap("materialViewport");
   const awareness = new awarenessProtocol.Awareness(ydoc);
@@ -95,8 +100,38 @@ export function createYjsWorkspaceRuntime({
       onAnnotationChange(annotationElementsFromMap(yannotations));
     }
   };
+  const updateHtmlGameLifecycle = () => {
+    if (disposed) return;
+    pendingGameStops.forEach((request, blockId) => {
+      if (yhtmlGameStoppedRuns.get(request.runId) === blockId) pendingGameStops.delete(blockId);
+    });
+    onHtmlGameLifecycleChange({
+      stoppedRuns: Object.fromEntries(yhtmlGameStoppedRuns.entries()),
+      requests: Object.fromEntries(pendingGameStops.entries()),
+    });
+  };
+  const sendGameStop = (request) => {
+    if (!gameStopSupported || !isSocketOpen(socket)) return;
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, messageHtmlGameLifecycle);
+    encoding.writeVarString(encoder, JSON.stringify({ type: "stop", blockId: request.blockId, runId: request.runId, launchId: request.launchId }));
+    socket.send(encoding.toUint8Array(encoder));
+  };
+  const receiveGameLifecycle = (message) => {
+    if (message?.type === "hello" && message.version === 1) {
+      gameStopSupported = true;
+      pendingGameStops.forEach(sendGameStop);
+    } else if (message?.type === "result") {
+      const pending = pendingGameStops.get(message.blockId);
+      if (pending?.runId === message.runId) {
+        if (message.result === "stopped" || (message.result === "stale" && yhtmlGamePresentation.get("launchId") !== pending.launchId)) pendingGameStops.delete(message.blockId);
+        else if (message.result === "incompatible") pendingGameStops.set(message.blockId, { ...pending, phase: "incompatible" });
+      }
+    }
+    updateHtmlGameLifecycle();
+  };
   const updateHtmlGameSnapshots = () => {
-    if (!disposed) onHtmlGameSnapshotsChange(Object.fromEntries(yhtmlGameSnapshots.entries()));
+    if (!disposed) onHtmlGameSnapshotsChange(Object.fromEntries(Array.from(yhtmlGameSnapshots.entries()).filter(([, value]) => !yhtmlGameStoppedRuns.has(value?.runId))));
   };
   const updateHtmlGameInputs = () => {
     if (!disposed) {
@@ -120,12 +155,12 @@ export function createYjsWorkspaceRuntime({
   };
   const updateHtmlGameSdkCheckpoints = () => {
     if (!disposed) {
-      onHtmlGameSdkCheckpointsChange(Object.fromEntries(yhtmlGameSdkCheckpoints.entries()));
+      onHtmlGameSdkCheckpointsChange(Object.fromEntries(Array.from(yhtmlGameSdkCheckpoints.entries()).filter(([, value]) => !yhtmlGameStoppedRuns.has(value?.runId))));
     }
   };
   const applyEphemeralMessage = (message) => {
     const id = asString(message?.payload?.id);
-    if (!id || seenEphemeralIds.has(id)) return;
+    if (!id || seenEphemeralIds.has(id) || yhtmlGameStoppedRuns.has(message?.payload?.runId)) return;
     seenEphemeralIds.add(id);
     if (seenEphemeralIds.size > 500) {
       const oldest = seenEphemeralIds.values().next().value;
@@ -165,7 +200,7 @@ export function createYjsWorkspaceRuntime({
     sendEphemeralMessage(socket, { kind, payload });
   };
   const updateHtmlGamePresentation = () => {
-    if (!disposed) onHtmlGamePresentationChange(asString(yhtmlGamePresentation.get("activeBlockId")) || null);
+    if (!disposed) onHtmlGamePresentationChange(asString(yhtmlGamePresentation.get("activeBlockId")) || null, asString(yhtmlGamePresentation.get("launchId")) || null);
   };
   const updateMaterialAnswers = () => {
     if (!disposed) onMaterialAnswersChange(materialAnswersFromFields(ymaterialAnswerFields));
@@ -226,6 +261,7 @@ export function createYjsWorkspaceRuntime({
   yhtmlGameEffects.observe(updateHtmlGameEffects);
   yhtmlGameSdkCheckpoints.observe(updateHtmlGameSdkCheckpoints);
   yhtmlGamePresentation.observe(updateHtmlGamePresentation);
+  yhtmlGameStoppedRuns.observe(updateHtmlGameLifecycle);
   ymaterialAnswerFields.observe(updateMaterialAnswers);
   ymaterialViewport.observe(updateMaterialViewport);
   ydoc.on("update", syncUpdateHandler);
@@ -238,12 +274,14 @@ export function createYjsWorkspaceRuntime({
     cursor: null,
     exerciseInteraction: null,
     htmlGameAuthorities: {},
+    htmlGameStopVersion: 1,
     materialViewport: materialViewportState,
     videoPlayback: {},
     user: { color, name: participantName },
   });
   updateLocalText();
   updateLocalAnnotations();
+  updateHtmlGameLifecycle();
   updateHtmlGameSnapshots();
   updateHtmlGameInputs();
   updateHtmlGameEffects();
@@ -278,6 +316,7 @@ export function createYjsWorkspaceRuntime({
       yhtmlGameEffects.unobserve(updateHtmlGameEffects);
       yhtmlGameSdkCheckpoints.unobserve(updateHtmlGameSdkCheckpoints);
       yhtmlGamePresentation.unobserve(updateHtmlGamePresentation);
+      yhtmlGameStoppedRuns.unobserve(updateHtmlGameLifecycle);
       ymaterialAnswerFields.unobserve(updateMaterialAnswers);
       ymaterialViewport.unobserve(updateMaterialViewport);
       ydoc.off("update", syncUpdateHandler);
@@ -312,10 +351,11 @@ export function createYjsWorkspaceRuntime({
       annotationUndoManager.redo();
     },
     handleSocketMessage(data) {
-      handleMessage(ydoc, awareness, socket, data, applyEphemeralMessage);
+      handleMessage(ydoc, awareness, socket, data, applyEphemeralMessage, receiveGameLifecycle);
     },
     setSocket(nextSocket) {
       socket = nextSocket;
+      if (!nextSocket) gameStopSupported = false;
     },
     setAnnotationElements(elements) {
       const nextElements = normalizeAnnotationElements(elements);
@@ -331,16 +371,28 @@ export function createYjsWorkspaceRuntime({
         });
       }, localAnnotationOrigin);
     },
+    stopHtmlGameRun(blockId, runId, launchId) {
+      if (!blockId || !runId) return;
+      const request = { blockId, runId, launchId, phase: gameStopSupported || !isSocketOpen(socket) ? "pending" : "incompatible" };
+      pendingGameStops.set(blockId, request);
+      sendGameStop(request);
+      updateHtmlGameLifecycle();
+    },
     setHtmlGameSnapshot(blockId, snapshot) {
+      if (yhtmlGameStoppedRuns.has(snapshot?.runId)) return;
       yhtmlGameSnapshots.set(blockId, fitHtmlGameSnapshot(snapshot));
     },
     setHtmlGameSdkCheckpoint(blockId, checkpoint) {
+      if (yhtmlGameStoppedRuns.has(checkpoint?.runId)) return;
       yhtmlGameSdkCheckpoints.set(blockId, checkpoint);
     },
     setHtmlGamePresentedBlock(blockId) {
       const cleanBlockId = asString(blockId);
       if (cleanBlockId) {
-        yhtmlGamePresentation.set("activeBlockId", cleanBlockId);
+        ydoc.transact(() => {
+          yhtmlGamePresentation.set("activeBlockId", cleanBlockId);
+          yhtmlGamePresentation.set("launchId", globalThis.crypto.randomUUID());
+        });
       } else {
         yhtmlGamePresentation.delete("activeBlockId");
       }
@@ -425,7 +477,7 @@ export function createYjsWorkspaceRuntime({
       pendingEphemeralMessages.forEach((message, id) => {
         const age = now - finiteNumberOr(message?.payload?.at, 0);
         const maxAge = message.kind === "html-game-effect" ? 5_000 : 15_000;
-        if (age >= 0 && age <= maxAge) sendEphemeralMessage(nextSocket, message);
+        if (age >= 0 && age <= maxAge && !yhtmlGameStoppedRuns.has(message?.payload?.runId)) sendEphemeralMessage(nextSocket, message);
         else pendingEphemeralMessages.delete(id);
       });
     },
@@ -1007,9 +1059,13 @@ function clampCoordinate(value) {
   return Math.max(0, Math.min(1000, value));
 }
 
-function handleMessage(ydoc, awareness, socket, data, onEphemeralMessage) {
+function handleMessage(ydoc, awareness, socket, data, onEphemeralMessage, onGameLifecycle) {
   const decoder = decoding.createDecoder(rawMessageToUint8Array(data));
   const messageType = decoding.readVarUint(decoder);
+  if (messageType === messageHtmlGameLifecycle) {
+    onGameLifecycle(JSON.parse(decoding.readVarString(decoder)));
+    return;
+  }
   if (messageType === messageSync) {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);

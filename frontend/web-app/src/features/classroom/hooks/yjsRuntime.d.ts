@@ -10,6 +10,7 @@ import type {
   MaterialAnswerState,
   MaterialExerciseInteraction,
   MaterialHtmlGameEffect,
+  MaterialHtmlGameLifecycle,
   MaterialHtmlGameInputEvent,
   MaterialHtmlGamePatch,
   MaterialHtmlGameRealtimeMessage,
@@ -55,6 +56,7 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGameSdkRequest: (request: MaterialHtmlGameSdkActionRequest) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
   setHtmlGameSdkCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;
+  stopHtmlGameRun: (blockId: string, runId: string, launchId?: string) => void;
   setHtmlGamePresentedBlock: (blockId: string | null) => void;
   seedMaterialAnswers: (answers: MaterialAnswerState) => void;
   setMaterialAnswer: (blockId: string, answer: MaterialAnswerBlock) => void;
@@ -87,7 +89,8 @@ export function createYjsWorkspaceRuntime(options: {
   onHtmlGameEffectsChange: (effects: MaterialHtmlGameEffect[]) => void;
   onHtmlGameInputsChange: (events: MaterialHtmlGameInputEvent[]) => void;
   onHtmlGamePatchesChange?: (patches: MaterialHtmlGamePatch[]) => void;
-  onHtmlGamePresentationChange?: (blockId: string | null) => void;
+  onHtmlGameLifecycleChange?: (state: MaterialHtmlGameLifecycle) => void;
+  onHtmlGamePresentationChange?: (blockId: string | null, launchId?: string | null) => void;
   onHtmlGameSdkMessage?: (message: MaterialHtmlGameRealtimeMessage) => void;
   onHtmlGameSdkActionsChange?: (actions: MaterialHtmlGameSdkOrderedAction[]) => void;
   onHtmlGameSdkCheckpointsChange?: (

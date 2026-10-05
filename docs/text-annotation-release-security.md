@@ -1,0 +1,7 @@
+# Text annotation release security
+
+The owner explicitly authorized compatible dependency updates and confirmed on 2026-10-05 that CVE-2026-93687 remains non-blocking for two calendar months, through 2026-12-05 10:46:15 UTC. The exact Text candidate and develop merge-back exception is recorded in `security/node-dependency-security-accepted-risks.json`. It is an unresolved accepted risk, not a vulnerability fix or false positive. Other findings and scan errors block publication.
+
+Full audit after compatible updates reports only this advisory via the five exact listed package nodes. All other findings, including Orval critical findings, were removed. API clients were regenerated using project scripts after the Orval update. Label the security gate `passed-with-accepted-risks`, retain raw full reports, and verify exact scope and expiry each time. Runtime-only audit is not full clearance; the actual web Dockerfile ships built static assets into nginx, not these Node build tools.
+
+Checks and raw reports are retained outside source in the Text release evidence packet. Source Text commit is 0845de23cd5bb2da5f1ae981283e2c556cc6b742; Text is the sole new product fix relative to the live .13 baseline; the previously deployed HTML-game explicit-stop fix is preserved. JVM exceptions remain independent and expire 2026-10-08 00:00 UTC. The existing 2026-12-05 13:47 MSK upstream-check follow-up also applies to this same advisory; no automatic renewal is authorized.

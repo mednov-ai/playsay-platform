@@ -3,8 +3,8 @@
   "owner": "Honey School project owner",
   "approvedAt": "2026-10-05T10:46:15Z",
   "expiresAt": "2026-12-05T10:46:15Z",
-  "approval": "Explicit user instruction in this task on 2026-10-05",
-  "scope": "html-game-explicit-stop numeric candidate and its develop merge-back; frontend build toolchain only",
+  "approval": "Owner acceptance 2026-10-05 and explicit confirmation that the same two-month exception applies to Text release",
+  "scope": "html-game-explicit-stop and release-text-annotation-fix-only numeric candidates and their develop merge-backs; frontend build toolchain only",
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "cve": "CVE-2026-93687",
   "packages": {

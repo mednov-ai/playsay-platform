@@ -231,7 +231,15 @@ export type MaterialHtmlGameSdkChannel = {
   publish: (message: MaterialHtmlGameRealtimeMessage) => void;
 };
 
+export type MaterialHtmlGameLifecycle = {
+  stoppedRuns: Record<string, string>;
+  requests: Record<string, { blockId: string; runId: string; launchId?: string; phase: "pending" | "incompatible" }>;
+};
+
 export type MaterialHtmlGameSync = {
+  launchId?: string | null;
+  lifecycle?: MaterialHtmlGameLifecycle;
+  stopRun?: (blockId: string, runId: string, launchId?: string) => void;
   authorityRuns: Record<string, string>;
   clientId: number | null;
   effects: MaterialHtmlGameEffect[];

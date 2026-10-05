@@ -36,6 +36,8 @@ import {
   assertSyncMessageDoesNotModifyMaterialViewport,
 } from "./materialViewportAuthorization.js";
 
+import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, messageHtmlGameLifecycle, stopHtmlGameRun } from "./htmlGameLifecycle.js";
+
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
@@ -386,6 +388,7 @@ function bindWebSocket(
       metrics,
     );
   } else if (!isExternalActivitySocket(ws)) {
+    sendWithBackpressure(ws, encodeGameLifecycle({ type: "hello", version: 1 }), "sync", backpressurePolicy, metrics);
     sendSyncStep1(ws, room.doc, backpressurePolicy, metrics);
     sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
   }
@@ -437,6 +440,15 @@ function handleMessage(
   const decoder = decoding.createDecoder(bytes);
   const messageType = decoding.readVarUint(decoder);
 
+  if (messageType === messageHtmlGameLifecycle && isHtmlGameStopMessage(bytes)) {
+    if (!connectionClaims.has(ws) || !room.connections.has(ws)) throw new Error("unauthorized game stop");
+    const payload = decoding.readVarString(decoder);
+    if (payload.length > 1024 || decoding.hasContent(decoder)) throw new Error("invalid game stop size");
+    const result = stopHtmlGameRun(room.doc, Array.from(room.awareness.getStates()).filter(([id]) => id !== room.doc.clientID).map(([, state]) => state), JSON.parse(payload));
+    sendWithBackpressure(ws, encodeGameLifecycle({ type: "result", ...result }), "sync", backpressurePolicy, metrics);
+    return;
+  }
+
   if (messageType === messageSync) {
     const claims = connectionClaims.get(ws);
     if (!claims) {
@@ -444,6 +456,12 @@ function handleMessage(
     }
     if (!claims.canPublishMaterialViewport) {
       assertSyncMessageDoesNotModifyMaterialViewport(room.doc, bytes);
+    }
+    const validationDecoder = decoding.createDecoder(bytes);
+    decoding.readVarUint(validationDecoder);
+    const syncType = decoding.readVarUint(validationDecoder);
+    if (syncType === syncProtocol.messageYjsSyncStep2 || syncType === syncProtocol.messageYjsUpdate) {
+      assertGameLifecycleUpdate(room.doc, decoding.readVarUint8Array(validationDecoder));
     }
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);

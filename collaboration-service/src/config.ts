@@ -7,6 +7,7 @@ export interface CollaborationServiceConfig {
   collaborationServiceToken: string;
   collaborationTokenSecret: string;
   snapshotIntervalMs: number;
+  recoveryProbesEnabled: boolean;
   websocketHardLimitBytes: number;
   websocketMaxPayloadBytes: number;
   websocketSoftLimitBytes: number;
@@ -27,6 +28,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CollaborationS
     collaborationServiceToken: requiredEnv(env, "COLLABORATION_SERVICE_TOKEN"),
     collaborationTokenSecret: requiredEnv(env, "COLLABORATION_TOKEN_SECRET"),
     snapshotIntervalMs: numberEnv(env.SNAPSHOT_INTERVAL_MS, 10_000),
+    recoveryProbesEnabled: booleanEnv(env.COLLABORATION_RECOVERY_PROBES_ENABLED, false),
     websocketHardLimitBytes: numberEnv(env.WEBSOCKET_HARD_LIMIT_BYTES, 4 * 1024 * 1024),
     websocketMaxPayloadBytes: numberEnv(env.WEBSOCKET_MAX_PAYLOAD_BYTES, 4 * 1024 * 1024),
     websocketSoftLimitBytes: numberEnv(env.WEBSOCKET_SOFT_LIMIT_BYTES, 1024 * 1024),

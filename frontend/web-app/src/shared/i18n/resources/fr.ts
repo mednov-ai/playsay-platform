@@ -1596,6 +1596,7 @@ export const fr = {
         reconnecting: "Rétablissement",
       },
     },
+    collaborationRecovery: { unsaved: "Synchronisation indisponible. Les dernières modifications ne sont peut-être pas enregistrées.", retry: "Reconnecter" },
     activityRail: { aria: "Supports et exercices individuels", title: "Activités du cours", open: "Ouvrir les activités", materials: "Supports", personal: "Individuel" },
     presence: {
       offline: "Pas encore connecté",

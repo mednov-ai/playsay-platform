@@ -3,8 +3,8 @@
   "owner": "Honey School project owner",
   "approvedAt": "2026-10-05T10:46:15Z",
   "expiresAt": "2026-12-05T10:46:15Z",
-  "approval": "Separate owner approvals retained in approvals; no additional package, version, expiry or release scope accepted.",
-  "scope": "html-game-explicit-stop numeric candidate and release-text-annotation-fix-only candidate; their develop merge-back; frontend build toolchain only",
+  "approval": "Owner approvals retained below; exact package versions and original expiry are unchanged.",
+  "scope": "html-game-explicit-stop numeric candidate and release-text-annotation-fix-only candidate; their develop merge-back; frontend build toolchain only; hotfix-classroom-collaboration-recovery candidate and develop merge-back",
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "cve": "CVE-2026-93687",
   "packages": {
@@ -32,6 +32,11 @@
       "approvedAt": "2026-10-05",
       "approval": "Owner clarification in release-text-annotation-fix-only chat: vulnerability is non-blocking for two months",
       "scope": "release-text-annotation-fix-only candidate and develop merge-back; frontend build toolchain only"
+    },
+    {
+      "approvedAt": "2026-10-06",
+      "approval": "Owner clarification in this hotfix task: «Не заблокирован почитай agents.md»; existing exception is non-blocking for this hotfix.",
+      "scope": "hotfix-classroom-collaboration-recovery numeric candidate and develop merge-back; frontend build toolchain only"
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { decodeRecoveryControl, encodeRecoveryProbe } from "../model/collaborationRecoveryProtocol";
 import { observeConnection } from "../../../shared/routing/connectionDiagnostics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -78,6 +79,8 @@ export function useYjsWorkspace({
   const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
   const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
   const [reconnectCount, setReconnectCount] = useState(0);
+  const retryConnectionRef = useRef<(() => void) | null>(null);
+  const retryConnection = useCallback(() => retryConnectionRef.current?.(), []);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -119,6 +122,20 @@ export function useYjsWorkspace({
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
     let connectInFlight = false;
+    let generation = 0;
+    let terminal = false;
+    let recoveryDeadline: number | null = null;
+    let probeTimer: number | null = null;
+    let probeNonce: string | null = null;
+    let probeSupported = false;
+    const clearProbe = () => {
+      if (probeTimer !== null) window.clearTimeout(probeTimer);
+      probeTimer = null; probeNonce = null;
+    };
+    const clearDeadline = () => {
+      if (recoveryDeadline !== null) window.clearTimeout(recoveryDeadline);
+      recoveryDeadline = null;
+    };
     let gameSyncController: ReturnType<typeof createGameSyncSessionController> | null = null;
     let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
@@ -181,8 +198,19 @@ export function useYjsWorkspace({
         reconnectTimer = null;
       }
     };
+    const armRecoveryDeadline = () => {
+      if (recoveryDeadline === null && navigator.onLine && globalThis.document.visibilityState === "visible") {
+        recoveryDeadline = window.setTimeout(() => {
+          terminal = true; generation += 1; connectInFlight = false;
+          clearReconnectTimer(); clearProbe();
+          retireSocket(socketRef.current); socketRef.current = null; runtime.setSocket(null);
+          setStatus("error");
+        }, 30_000);
+      }
+    };
     const scheduleReconnect = () => {
-      if (disposed || reconnectTimer !== null) return;
+      if (disposed || terminal || reconnectTimer !== null) return;
+      armRecoveryDeadline();
       setStatus("reconnecting");
       setReconnectCount((current) => current + 1);
       const delay = realtimeReconnectDelayMs(reconnectAttempt);
@@ -206,17 +234,28 @@ export function useYjsWorkspace({
       }
     };
     const connect = async () => {
-      if (connectInFlight) return;
+      if (connectInFlight || terminal) return;
       if (disposed || !navigator.onLine) {
         scheduleReconnect();
         return;
       }
       connectInFlight = true;
+      const attemptGeneration = ++generation;
+      let tokenTimer: number | null = null;
       clearReconnectTimer();
       setStatus(reconnectAttempt === 0 ? "connecting" : "reconnecting");
       try {
-        const tokenResponse = await createCollaborationDocumentToken(document.lessonId, document.id);
-        if (disposed) return;
+        const tokenResponse = await Promise.race([
+          createCollaborationDocumentToken(document.lessonId, document.id),
+          new Promise<never>((_resolve, reject) => {
+            tokenTimer = window.setTimeout(() => reject(new Error("collaboration token timeout")), 5_000);
+          }),
+        ]);
+        if (disposed || generation !== attemptGeneration || terminal) return;
+        if (tokenResponse.documentId !== document.id) {
+          terminal = true; setStatus("error"); onDocumentInvalid?.(document.id); return;
+        }
+        probeSupported = false; clearProbe();
         const socket = new WebSocket(collaborationWebSocketUrl(tokenResponse));
         socket.binaryType = "arraybuffer";
         const previous = socketRef.current;
@@ -225,23 +264,37 @@ export function useYjsWorkspace({
         }
         socketRef.current = socket;
         socket.onopen = () => {
-          if (disposed || socketRef.current !== socket) {
+          if (disposed || generation !== attemptGeneration || socketRef.current !== socket) {
             socket.close();
             return;
           }
           observeConnection("collaboration", socket.url, true);
-          reconnectAttempt = 0;
-          setStatus("connected");
           runtime.startSocketSync(socket);
         };
         socket.onmessage = (event) => {
           if (socketRef.current === socket) {
             observeConnection("collaboration", socket.url, true);
-            runtime.handleSocketMessage(event.data);
+            try {
+              const control = decodeRecoveryControl(event.data);
+              if (control?.type === "hello") { probeSupported = true; return; }
+              if (control?.type === "ack") {
+                if (control.nonce === probeNonce) { clearProbe(); clearDeadline(); }
+                return;
+              }
+              runtime.handleSocketMessage(event.data);
+              if (event.data instanceof ArrayBuffer && new Uint8Array(event.data)[0] === 0) {
+                reconnectAttempt = 0; clearDeadline(); setStatus("connected");
+              }
+            } catch { socket.close(); }
           }
         };
-        socket.onclose = () => {
+        socket.onclose = (event) => {
           if (socketRef.current !== socket) return;
+          clearProbe();
+          if (event.code === 4404 || event.code === 4409 || event.code === 1008) {
+            terminal = true; clearDeadline(); clearReconnectTimer(); setStatus("error");
+            if (event.code === 4404) onDocumentInvalid?.(document.id);
+          }
           observeConnection("collaboration", socket.url, false);
           socketRef.current = null;
           runtime.setSocket(null);
@@ -252,8 +305,9 @@ export function useYjsWorkspace({
           socket.close();
         };
       } catch (caught) {
-        if (!disposed) {
-          if (isInvalidCollaborationDocumentError(caught)) {
+        if (!disposed && generation === attemptGeneration) {
+          if (isInvalidCollaborationDocumentError(caught) || isApiStatus(caught, 403) || isApiStatus(caught, 401)) {
+            terminal = true; clearDeadline();
             setStatus("error");
             onDocumentInvalid?.(document.id);
             return;
@@ -262,29 +316,60 @@ export function useYjsWorkspace({
           scheduleReconnect();
         }
       } finally {
-        connectInFlight = false;
+        if (tokenTimer !== null) window.clearTimeout(tokenTimer);
+        if (generation === attemptGeneration) connectInFlight = false;
       }
     };
+    let lastProbeAt = -Infinity;
     const reconnectNow = () => {
-      if (disposed) return;
+      if (disposed || terminal || !navigator.onLine || globalThis.document.visibilityState !== "visible") return;
       const current = socketRef.current;
-      if (
-        connectInFlight ||
-        current?.readyState === WebSocket.OPEN ||
-        current?.readyState === WebSocket.CONNECTING
-      ) return;
+      if (connectInFlight) return;
+      if (current?.readyState === WebSocket.OPEN && !probeSupported) return;
+      if (current?.readyState === WebSocket.OPEN || current?.readyState === WebSocket.CONNECTING) {
+        if (probeTimer !== null) return;
+        armRecoveryDeadline();
+        const remaining = 5_000 - (performance.now() - lastProbeAt);
+        if (remaining > 0) {
+          probeTimer = window.setTimeout(() => { probeTimer = null; reconnectNow(); }, remaining);
+          return;
+        }
+        lastProbeAt = performance.now();
+        if (current.readyState === WebSocket.OPEN) {
+          const nonce = window.crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+          probeNonce = nonce;
+          current.send(encodeRecoveryProbe(nonce));
+        }
+        probeTimer = window.setTimeout(() => {
+          clearProbe();
+          if (disposed || terminal || socketRef.current !== current || globalThis.document.visibilityState !== "visible" || !navigator.onLine) return;
+          retireSocket(current); socketRef.current = null; runtime.setSocket(null);
+          scheduleReconnect();
+        }, 5_000);
+        return;
+      }
       clearReconnectTimer();
       void connect();
     };
     const handleVisibilityChange = () => {
       if (globalThis.document.visibilityState === "visible") reconnectNow();
+      else { clearProbe(); clearDeadline(); }
+    };
+    retryConnectionRef.current = () => {
+      if (disposed) return;
+      terminal = false; generation += 1; connectInFlight = false;
+      clearProbe(); clearDeadline(); clearReconnectTimer();
+      retireSocket(socketRef.current); socketRef.current = null; runtime.setSocket(null);
+      void connect();
     };
     window.addEventListener("online", reconnectNow);
     globalThis.document.addEventListener("visibilitychange", handleVisibilityChange);
     void connect();
 
     return () => {
-      disposed = true;
+      disposed = true; generation += 1;
+      retryConnectionRef.current = null;
+      clearProbe(); clearDeadline();
       clearReconnectTimer();
       window.removeEventListener("online", reconnectNow);
       globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -485,6 +570,7 @@ export function useYjsWorkspace({
     connected: status === "connected",
     participants,
     reconnectCount,
+    retryConnection,
     htmlGameSync,
     externalActivityRealtime,
     exerciseSync,

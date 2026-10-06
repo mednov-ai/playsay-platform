@@ -1619,6 +1619,7 @@ export const de = {
         reconnecting: "Wird wiederhergestellt",
       },
     },
+    collaborationRecovery: { unsaved: "Synchronisierung nicht verfügbar. Letzte Änderungen sind möglicherweise nicht gespeichert.", retry: "Neu verbinden" },
     activityRail: { aria: "Materialien und Einzelaufgaben", title: "Unterrichtsaktivitäten", open: "Aufgaben öffnen", materials: "Materialien", personal: "Individuell" },
     presence: {
       offline: "Noch nicht verbunden",

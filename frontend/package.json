@@ -18,5 +18,8 @@
     "@types/react-dom": "19.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
   }
 }

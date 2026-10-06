@@ -51,6 +51,7 @@ type LiveAnnotationSync = {
   participants: CollaborationParticipant[];
   ready: boolean;
   reconnectCount?: number;
+  retry?: () => void;
   redo?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   undo?: () => void;
@@ -675,6 +676,12 @@ export function LessonTaskCanvas({
 
       <div className="playsay-task-page">
         <div className="playsay-task-document" ref={taskDocumentRef}>
+      {annotationSync?.status === "error" ? (
+        <div className="playsay-task-collaboration-status" role="status">
+          <span>{t("classroom.collaborationRecovery.unsaved")}</span>
+          {annotationSync.retry ? <button type="button" className="playsay-ghost-button" onClick={annotationSync.retry}>{t("classroom.collaborationRecovery.retry")}</button> : null}
+        </div>
+      ) : null}
           <div
             className="playsay-task-document-surface"
             data-collaboration-reconnect-count={annotationSync?.reconnectCount ?? 0}

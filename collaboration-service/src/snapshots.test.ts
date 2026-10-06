@@ -9,6 +9,64 @@ describe("SnapshotQueue", () => {
     vi.restoreAllMocks();
   });
 
+  it("rejects a missing document instead of restoring empty state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
+    await expect(new SnapshotQueue(config).load(claims)).rejects.toThrow("document unavailable");
+  });
+  it("retains immutable unsaved edits after the live document is destroyed", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 })).mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const queue = new SnapshotQueue(config);
+    const doc = new Y.Doc(); doc.getText("body").insert(0, "retain me");
+    queue.markDirty(claims, doc);
+    await queue.flushAll(); doc.destroy();
+    doc.getText("body").insert(doc.getText("body").length, " uncaptured mutation");
+    vi.advanceTimersByTime(2000); await queue.flushAll();
+    const restored = new Y.Doc();
+    Y.applyUpdate(restored, Buffer.from(JSON.parse(fetchMock.mock.calls[1][1].body).snapshot.yjsUpdateBase64, "base64"));
+    expect(restored.getText("body").toString()).toBe("retain me");
+    expect(queue.hasPending()).toBe(false);
+    restored.destroy(); vi.useRealTimers();
+  });
+  it("rejects budget overflow without evicting previously retained state", () => {
+    const queue = new SnapshotQueue({ ...config, snapshotBudgetBytes: 400 });
+    const doc = new Y.Doc(); doc.getText("body").insert(0, "small"); queue.markDirty(claims, doc);
+    const update = new Y.Doc(); update.getText("body").insert(0, "x".repeat(500));
+    expect(() => queue.assertCanApply(claims, doc, Y.encodeStateAsUpdate(update))).toThrow("retention unavailable");
+    expect(queue.hasPending(claims.documentId)).toBe(true);
+    doc.destroy(); update.destroy();
+  });
+  it.each([401, 403, 400])("retains unsaved state without retrying terminal HTTP %s", async status => {
+    const fetchMock = vi.fn(async () => new Response(null, { status }));
+    vi.stubGlobal("fetch", fetchMock); vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const queue = new SnapshotQueue(config); queue.markDirty(claims, new Y.Doc());
+    const outcome = vi.fn(); queue.onOutcome = outcome;
+    await queue.flushAll(); await queue.flushAll();
+    expect(fetchMock).toHaveBeenCalledTimes(1); expect(queue.hasPending()).toBe(true);
+    expect(outcome).toHaveBeenCalledWith(claims, "unsaved");
+  });
+  it("aborts a hung request after five seconds and retains the snapshot", async () => {
+    vi.useFakeTimers(); vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(new Error("aborted")));
+    })));
+    const queue = new SnapshotQueue(config); queue.markDirty(claims, new Y.Doc());
+    const flush = queue.flushAll(); await vi.advanceTimersByTimeAsync(5000); await flush;
+    expect(queue.hasPending()).toBe(true); vi.useRealTimers();
+  });
+  it("limits concurrent saves to four", async () => {
+    let active = 0; let maximum = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      maximum = Math.max(maximum, ++active);
+      await new Promise(resolve => setTimeout(resolve, 1)); active -= 1;
+      return new Response(null, { status: 200 });
+    }));
+    const queue = new SnapshotQueue(config);
+    for (let i = 0; i < 10; i++) queue.markDirty({ ...claims, documentId: String(i) }, new Y.Doc());
+    await queue.flushAll(); expect(maximum).toBe(4); expect(queue.hasPending()).toBe(false);
+  });
   it("persists room snapshots with the collaboration service token header", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -80,10 +138,11 @@ describe("SnapshotQueue", () => {
     await queue.flushAll();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining("HTTP 404"));
+    expect(warnMock).toHaveBeenCalledWith(expect.stringContaining("document_invalid"));
   });
 
   it("retries transient snapshot persistence failures", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
@@ -98,7 +157,9 @@ describe("SnapshotQueue", () => {
 
     queue.markDirty(claims, new Y.Doc());
     await queue.flushAll();
+    vi.advanceTimersByTime(2000);
     await queue.flushAll();
+    vi.useRealTimers();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -152,3 +213,5 @@ const claims: CollaborationClaims = {
   yjsDocumentId: "lesson:22222222-2222-4222-8222-222222222222:material:33333333-3333-4333-8333-333333333333:group:kind:MATERIAL_WORK",
   canPublishMaterialViewport: false,
 };
+
+const config = { playsayApiBaseUrl: "https://api.example.test", collaborationServiceToken: "service-token-01234567890123456789", snapshotIntervalMs: 10_000 };

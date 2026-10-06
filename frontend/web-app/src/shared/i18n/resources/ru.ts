@@ -1647,6 +1647,7 @@ export const ru = {
         reconnecting: "Восстанавливается",
       },
     },
+    collaborationRecovery: { unsaved: "Синхронизация недоступна. Последние изменения могут быть не сохранены.", retry: "Восстановить связь" },
     activityRail: { aria: "Материалы и индивидуальные задания", title: "Работа на уроке", open: "Открыть задания", materials: "Материалы", personal: "Индивидуально" },
     presence: {
       offline: "Ещё не подключился",

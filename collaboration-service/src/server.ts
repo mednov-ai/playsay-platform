@@ -20,7 +20,7 @@ import {
 } from "./gameProtocol.js";
 import { CollaborationMetrics } from "./metrics.js";
 import { CollaborationHeartbeat } from "./heartbeat.js";
-import { SnapshotQueue } from "./snapshots.js";
+import { InvalidCollaborationDocument, SnapshotCapacityError, SnapshotQueue } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
 import { disconnectLessonSubject } from "./disconnect.js";
@@ -38,6 +38,8 @@ import {
 
 import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, messageHtmlGameLifecycle, stopHtmlGameRun } from "./htmlGameLifecycle.js";
 
+import { decodeProbe, encodeRecovery, messageRecovery } from "./recoveryProtocol.js";
+
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
@@ -46,6 +48,8 @@ const maxEphemeralPayloadBytes = 64 * 1024;
 
 interface CollaborationRoom {
   claims: CollaborationClaims;
+  snapshots: SnapshotQueue;
+  invalid: boolean;
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
   connections: Map<WebSocket, Set<number>>;
@@ -54,6 +58,8 @@ interface CollaborationRoom {
 }
 
 const rooms = new Map<string, Promise<CollaborationRoom>>();
+const lastProbe = new WeakMap<WebSocket, number>();
+const probeEnabled = new WeakSet<WebSocket>();
 const connectionClaims = new Map<WebSocket, CollaborationClaims>();
 
 async function main(): Promise<void> {
@@ -143,6 +149,18 @@ async function main(): Promise<void> {
     metrics,
   );
 
+  snapshots.onOutcome = (claims, outcome) => {
+    void rooms.get(claims.yjsDocumentId)?.then(room => {
+      if (room.claims.documentId !== claims.documentId) return;
+      if (outcome === "document_invalid") {
+        room.invalid = true;
+        if (rooms.get(claims.yjsDocumentId)) rooms.delete(claims.yjsDocumentId);
+        for (const ws of room.connections.keys()) ws.close(4404, "document unavailable");
+      } else if (outcome === "unsaved") {
+        for (const ws of room.connections.keys()) ws.close(4409, "snapshot unsaved");
+      }
+    }).catch(() => undefined);
+  };
   snapshots.start();
   heartbeat.start();
 
@@ -186,6 +204,7 @@ async function main(): Promise<void> {
 
   wss.on("connection", (ws: WebSocket, request: http.IncomingMessage, claims: CollaborationClaims) => {
     heartbeat.track(ws, socketChannel(ws));
+    if (config.recoveryProbesEnabled && isYjsSocket(ws)) probeEnabled.add(ws);
     connectionClaims.set(ws, claims);
     ws.once("close", () => connectionClaims.delete(ws));
     request.socket.setNoDelay(true);
@@ -215,7 +234,7 @@ async function main(): Promise<void> {
           pendingMessages,
         );
       })
-      .catch(() => ws.close(1011, "room restore failed"));
+      .catch(error => ws.close(error instanceof InvalidCollaborationDocument ? 4404 : 1011, error instanceof InvalidCollaborationDocument ? "document unavailable" : "room restore failed"));
   });
 
   process.on("SIGTERM", () => {
@@ -259,12 +278,37 @@ function getRoom(
 ): Promise<CollaborationRoom> {
   const existing = rooms.get(claims.yjsDocumentId);
   if (existing) {
-    return existing;
+    return existing.then(async room => {
+      try { await snapshots.load(claims); }
+      catch (error) {
+        if (error instanceof InvalidCollaborationDocument && room.claims.documentId === claims.documentId) {
+          room.invalid = true;
+          for (const ws of room.connections.keys()) ws.close(4404, "document unavailable");
+          if (rooms.get(claims.yjsDocumentId) === existing) rooms.delete(claims.yjsDocumentId);
+        }
+        throw error;
+      }
+      if (room.claims.documentId !== claims.documentId) {
+        try { await snapshots.load(room.claims); }
+        catch (error) {
+          if (!(error instanceof InvalidCollaborationDocument)) throw error;
+          room.invalid = true;
+          for (const ws of room.connections.keys()) ws.close(4404, "document unavailable");
+          if (rooms.get(claims.yjsDocumentId) === existing) rooms.delete(claims.yjsDocumentId);
+          return getRoom(claims, snapshots, backpressurePolicy, metrics);
+        }
+        throw new InvalidCollaborationDocument();
+      }
+      if (room.invalid) throw new InvalidCollaborationDocument();
+      return room;
+    });
   }
 
   const roomPromise = createRoom(claims, snapshots, backpressurePolicy, metrics);
   rooms.set(claims.yjsDocumentId, roomPromise);
-  void roomPromise.catch(() => rooms.delete(claims.yjsDocumentId));
+  void roomPromise.catch(() => {
+    if (rooms.get(claims.yjsDocumentId) === roomPromise) rooms.delete(claims.yjsDocumentId);
+  });
   return roomPromise;
 }
 
@@ -274,11 +318,13 @@ async function createRoom(
   backpressurePolicy: CollaborationBackpressurePolicy,
   metrics: CollaborationMetrics,
 ): Promise<CollaborationRoom> {
-  const doc = new Y.Doc();
   const persistedSnapshot = await snapshots.load(claims);
+  const doc = new Y.Doc();
   applyPersistedSnapshot(doc, persistedSnapshot);
   const room = {
     claims,
+    snapshots,
+    invalid: false,
     doc,
     awareness: new awarenessProtocol.Awareness(doc),
     connections: new Map(),
@@ -286,6 +332,8 @@ async function createRoom(
     idleTimer: null,
   } satisfies CollaborationRoom;
   const updateHandler = (update: Uint8Array, origin: unknown) => {
+    if (room.invalid) return;
+    snapshots.markDirty(room.claims, room.doc);
     const originSocket = room.connections.has(origin as WebSocket) ? origin as WebSocket : null;
     room.connections.forEach((_controlledIds, connection) => {
       if (
@@ -296,7 +344,6 @@ async function createRoom(
         sendSyncUpdate(connection, update, backpressurePolicy, metrics);
       }
     });
-    snapshots.markDirty(room.claims, room.doc);
   };
   const awarenessHandler = (
     changes: { added: number[]; updated: number[]; removed: number[] },
@@ -362,12 +409,13 @@ function bindWebSocket(
       awarenessProtocol.removeAwarenessStates(room.awareness, [...controlledIds], ws);
     }
     if (room.connections.size === 0) {
-      snapshots.markDirty(room.claims, room.doc);
       room.idleTimer = setTimeout(() => {
         room.idleTimer = null;
         void snapshots.flushAll().finally(() => {
           if (room.connections.size === 0) {
-            rooms.delete(room.claims.yjsDocumentId);
+            void rooms.get(room.claims.yjsDocumentId)?.then(current => {
+              if (current === room) rooms.delete(room.claims.yjsDocumentId);
+            }).catch(() => undefined);
             room.destroy();
           }
         });
@@ -375,6 +423,9 @@ function bindWebSocket(
     }
   });
 
+  if (isYjsSocket(ws) && probeEnabled.has(ws)) {
+    ws.send(encodeRecovery({ type: "hello", version: 1, liveness: true }));
+  }
   if (isGameSocket(ws)) {
     if (gameRealtimeMode === "off") {
       ws.close(1008, "game realtime is disabled");
@@ -406,6 +457,17 @@ function processMessage(
   metrics: CollaborationMetrics,
 ): void {
   try {
+    if (room.invalid) throw new InvalidCollaborationDocument();
+    const bytes = rawDataToUint8Array(message);
+    if (isYjsSocket(ws) && bytes[0] === messageRecovery) {
+      if (!probeEnabled.has(ws)) throw new Error("unnegotiated recovery probe");
+      const nonce = decodeProbe(bytes);
+      const now = performance.now();
+      if (now - (lastProbe.get(ws) ?? -Infinity) < 5_000) throw new Error("recovery probe limit");
+      lastProbe.set(ws, now);
+      ws.send(encodeRecovery({ type: "ack", version: 1, nonce }));
+      return;
+    }
     if (isGameSocket(ws)) {
       handleGameMessage(room, ws, message, backpressurePolicy, metrics);
     } else if (isExternalActivitySocket(ws)) {
@@ -413,8 +475,10 @@ function processMessage(
     } else {
       handleMessage(room, ws, message, backpressurePolicy, metrics);
     }
-  } catch {
-    ws.close(1003, "invalid collaboration message");
+  } catch (error) {
+    if (error instanceof SnapshotCapacityError) ws.close(4409, "snapshot unsaved");
+    else if (error instanceof InvalidCollaborationDocument) ws.close(4404, "document unavailable");
+    else ws.close(1003, "invalid collaboration message");
   }
 }
 
@@ -461,7 +525,9 @@ function handleMessage(
     decoding.readVarUint(validationDecoder);
     const syncType = decoding.readVarUint(validationDecoder);
     if (syncType === syncProtocol.messageYjsSyncStep2 || syncType === syncProtocol.messageYjsUpdate) {
-      assertGameLifecycleUpdate(room.doc, decoding.readVarUint8Array(validationDecoder));
+      const update = decoding.readVarUint8Array(validationDecoder);
+      assertGameLifecycleUpdate(room.doc, update);
+      room.snapshots.assertCanApply(room.claims, room.doc, update);
     }
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageSync);

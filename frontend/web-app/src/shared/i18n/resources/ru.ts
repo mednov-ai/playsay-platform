@@ -4,6 +4,7 @@ export const ruChatPushNotification = {
 };
 
 export const ru = {
+  sessionRecovery: {"title": "Восстановление входа", "ready": "Соединение восстановлено", "recovering": "Восстанавливаем соединение…", "unavailable": "Соединение временно недоступно. Попробуйте ещё раз.", "signInRequired": "Чтобы продолжить, войдите снова.", "protocolError": "Не удалось завершить вход. Попробуйте войти ещё раз.", "retry": "Повторить", "signIn": "Войти снова", "lessonInterruption": "Повторный вход прервёт ваше соединение с уроком. После входа вы вернётесь на эту страницу."},
   lessonExtension: {"title": "Продление урока", "ending": "Урок закончится в {{time}}. Продлить?", "extend": "Продлить на 10 минут", "decline": "Не продлевать", "pending": "Продлеваем…", "failed": "Не удалось подтвердить продление. Попробуйте снова.", "syncFailed": "Не удалось синхронизировать время урока."},
   routeDiagnostics: {
     geoProvider: "Источник GeoIP: IPinfo Lite · CC BY-SA 4.0",

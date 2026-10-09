@@ -1,5 +1,6 @@
 import { normalizeLanguage, rememberPendingLoginLanguage } from "../i18n";
-import { apiErrorFromResponse, apiFetch } from "./errors";
+import { ApiError } from "./errors";
+import { authProtocolError, getSessionRecoveryPhase, reportSessionRecovery, resetSessionRecoveryDiagnostics, sessionChangedError, sessionRejectedError, sessionUnavailableError } from "./sessionRecovery";
 import { currentApiLanguage } from "./locale";
 
 export type AuthConfig = {
@@ -73,6 +74,49 @@ const skipSilentLoginStorageKey = "playsay.auth.skipSilentLoginOnce";
 const themeStorageKey = "playsay.theme";
 const expirySkewMs = 30_000;
 const loginCompletionRequests = new Map<string, Promise<TokenSet>>();
+const authControllers = new Set<AbortController>();
+const recoveryStorageKey = "playsay.auth.recovery";
+let credentialGeneration = 0;
+let renewal: { key: string; promise: Promise<string | null>; controller: AbortController } | null = null;
+const authRequestDeadlineMs = 10_000;
+const renewalBudgetMs = 25_000;
+
+export function getCredentialGeneration(): number { return credentialGeneration; }
+export function markSessionVerified(): void {
+  window.sessionStorage.removeItem(recoveryStorageKey);
+  reportSessionRecovery("ready");
+}
+export function resetSilentRecovery(): void { window.sessionStorage.removeItem(recoveryStorageKey); }
+export function canStartSilentRecovery(): boolean {
+  return !window.sessionStorage.getItem(recoveryStorageKey)
+    && window.sessionStorage.getItem(skipSilentLoginStorageKey) !== "true";
+}
+export async function recoverSession(config = authConfig): Promise<void> {
+  if (!canStartSilentRecovery()) {
+    reportSessionRecovery("signInRequired");
+    throw sessionRejectedError();
+  }
+  window.sessionStorage.setItem(recoveryStorageKey, JSON.stringify({ startedAt: Date.now(), origin: window.location.origin }));
+  reportSessionRecovery("recovering");
+  try { await startSilentLogin(config); }
+  catch (error) { reportSessionRecovery("signInRequired"); throw error; }
+}
+
+function invalidateCredentials(): void {
+  credentialGeneration += 1;
+  authControllers.forEach((controller) => controller.abort());
+  renewal?.controller.abort();
+  renewal = null;
+  window.sessionStorage.removeItem(tokenStorageKey);
+  window.sessionStorage.removeItem(flowStorageKey);
+  window.sessionStorage.removeItem(completedFlowStorageKey);
+}
+export function rejectAccessToken(accessToken: string): boolean {
+  if (readTokens()?.accessToken !== accessToken) return false;
+  invalidateCredentials();
+  reportSessionRecovery("signInRequired");
+  return true;
+}
 
 export class SilentLoginUnavailableError extends Error {
   constructor(message = "Silent login is unavailable.") {
@@ -104,17 +148,22 @@ export function readTokens(): TokenSet | null {
 }
 
 export function clearTokens(): void {
-  window.sessionStorage.removeItem(tokenStorageKey);
-  window.sessionStorage.removeItem(flowStorageKey);
-  window.sessionStorage.removeItem(completedFlowStorageKey);
+  invalidateCredentials();
   window.sessionStorage.removeItem(completedLoginReturnPathStorageKey);
+  resetSilentRecovery();
+  resetSessionRecoveryDiagnostics();
 }
 
 export function storeTokens(tokens: TokenSet): void {
+  credentialGeneration += 1;
+  renewal?.controller.abort();
+  renewal = null;
   window.sessionStorage.setItem(tokenStorageKey, JSON.stringify(tokens));
 }
 
 export async function startLogin(config = authConfig): Promise<void> {
+  resetSilentRecovery();
+  window.sessionStorage.removeItem(skipSilentLoginStorageKey);
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
@@ -191,11 +240,22 @@ export async function completeLogin(url: URL, config = authConfig): Promise<Toke
         window.sessionStorage.setItem(completedLoginReturnPathStorageKey, safeReturnPath(flow.returnPath));
       }
       window.sessionStorage.removeItem(flowStorageKey);
-      throw new SilentLoginUnavailableError(url.searchParams.get("error_description") ?? error);
+      reportSessionRecovery("signInRequired");
+      throw new SilentLoginUnavailableError();
     }
-    throw new Error(url.searchParams.get("error_description") ?? error);
+    throw authProtocolError();
   }
 
+  const recovery = window.sessionStorage.getItem(recoveryStorageKey);
+  if (recovery) {
+    try {
+      const marker = JSON.parse(recovery) as { startedAt: number; origin: string };
+      if (marker.origin !== window.location.origin || !Number.isFinite(marker.startedAt) || Date.now() - marker.startedAt > 60_000) {
+        reportSessionRecovery("signInRequired");
+        throw sessionRejectedError();
+      }
+    } catch { reportSessionRecovery("signInRequired"); throw sessionRejectedError(); }
+  }
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   if (!code || !state) {
@@ -242,37 +302,123 @@ export function consumeSkipSilentLogin(): boolean {
 
 export async function getValidAccessToken(config = authConfig): Promise<string | null> {
   const tokens = readTokens();
-  if (!tokens) {
-    return null;
-  }
-
-  if (tokens.expiresAt > Date.now() + expirySkewMs) {
-    return tokens.accessToken;
-  }
-
+  if (!tokens) return null;
+  if (tokens.expiresAt > Date.now() + expirySkewMs) return tokens.accessToken;
+  if (getSessionRecoveryPhase() === "unavailable") throw sessionUnavailableError();
+  if (getSessionRecoveryPhase() === "protocolError") throw authProtocolError();
   if (!tokens.refreshToken) {
-    clearTokens();
-    return null;
+    rejectAccessToken(tokens.accessToken);
+    throw sessionRejectedError();
   }
+  const generation = credentialGeneration;
+  const key = `${config.issuer}:${config.clientId}:${generation}`;
+  if (renewal?.key === key) return renewal.promise;
+  const controller = new AbortController();
+  const promise = renewTokens(config, tokens, generation, controller);
+  renewal = { key, promise, controller };
+  try { return await promise; }
+  finally { if (renewal?.promise === promise) renewal = null; }
+}
 
-  const response = await apiFetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: config.clientId,
-      refresh_token: tokens.refreshToken,
-    }),
+async function renewTokens(config: AuthConfig, tokens: TokenSet, generation: number, controller: AbortController): Promise<string | null> {
+  const startedAt = performance.now();
+  reportSessionRecovery("recovering");
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const refreshed = await requestTokens(config, {
+        grant_type: "refresh_token", client_id: config.clientId, refresh_token: tokens.refreshToken!,
+      }, controller.signal);
+      if (credentialGeneration !== generation || controller.signal.aborted) throw sessionChangedError();
+      // Providers without rotation need not return a new refresh token.
+      refreshed.refreshToken ??= tokens.refreshToken;
+      refreshed.idToken ??= tokens.idToken;
+      storeTokens(refreshed);
+      reportSessionRecovery("ready", attempt, performance.now() - startedAt);
+      return refreshed.accessToken;
+    } catch (error) {
+      if (credentialGeneration !== generation || controller.signal.aborted) throw sessionChangedError();
+      if (error instanceof ApiError && error.errorCode === "SESSION_REJECTED") {
+        rejectAccessToken(tokens.accessToken);
+        throw error;
+      }
+      if (!(error instanceof ApiError) || error.errorCode !== "SESSION_UNAVAILABLE") {
+        reportSessionRecovery("protocolError", attempt, performance.now() - startedAt);
+        throw authProtocolError();
+      }
+      const delay = error instanceof AuthUnavailableError ? error.retryAfterMs : 1_000;
+      if (attempt === 2 || performance.now() - startedAt + delay + authRequestDeadlineMs > renewalBudgetMs) {
+        reportSessionRecovery("unavailable", attempt, performance.now() - startedAt);
+        throw sessionUnavailableError();
+      }
+      await abortableDelay(delay, controller.signal);
+    }
+  }
+  throw sessionUnavailableError();
+}
+
+class AuthUnavailableError extends ApiError {
+  constructor(readonly retryAfterMs = 1_000) {
+    const error = sessionUnavailableError();
+    super(error.status, error.errorCode, error.message);
+  }
+}
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) { reject(sessionChangedError()); return; }
+    const abort = () => { clearTimeout(timer); signal.removeEventListener("abort", abort); reject(sessionChangedError()); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, ms);
+    signal.addEventListener("abort", abort, { once: true });
   });
+}
 
-  if (!response.ok) {
-    clearTokens();
-    return null;
+async function requestTokens(config: AuthConfig, body: Record<string, string>, parentSignal?: AbortSignal): Promise<TokenSet> {
+  const controller = new AbortController();
+  authControllers.add(controller);
+  const abort = () => controller.abort();
+  if (parentSignal?.aborted) throw sessionChangedError();
+  parentSignal?.addEventListener("abort", abort, { once: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => { controller.abort(); reject(new AuthUnavailableError()); }, authRequestDeadlineMs);
+  });
+  const cancelled = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener("abort", () => reject(new AuthUnavailableError()), { once: true });
+  });
+  try {
+    return await Promise.race([deadline, cancelled, (async () => {
+      const response = await fetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(body), signal: controller.signal,
+      });
+      if (response.status === 429 || response.status >= 500) {
+        const header = response.headers.get("Retry-After");
+        const parsed = header === null ? NaN : Number(header);
+        const retryAfterMs = header === null ? 1_000 : Number.isFinite(parsed)
+          ? Math.max(1_000, parsed * 1000) : Math.max(1_000, Date.parse(header) - Date.now());
+        throw new AuthUnavailableError(Number.isFinite(retryAfterMs) ? retryAfterMs : 1_000);
+      }
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = payload && typeof payload === "object" && "error" in payload ? payload.error : null;
+        if (error === "invalid_grant" || error === "invalid_token") throw sessionRejectedError();
+        throw authProtocolError();
+      }
+      if (!payload || typeof payload !== "object" || !("access_token" in payload) || typeof payload.access_token !== "string"
+        || !payload.access_token || !("expires_in" in payload) || typeof payload.expires_in !== "number"
+        || !Number.isFinite(payload.expires_in) || payload.expires_in <= 0
+        || ("refresh_token" in payload && typeof payload.refresh_token !== "string")
+        || ("id_token" in payload && typeof payload.id_token !== "string")) throw authProtocolError();
+      return mapTokenResponse(payload as TokenResponse);
+    })()]);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new AuthUnavailableError();
+  } finally {
+    clearTimeout(timer);
+    authControllers.delete(controller);
+    parentSignal?.removeEventListener("abort", abort);
   }
-
-  const refreshed = await parseTokenResponse(response);
-  storeTokens(refreshed);
-  return refreshed.accessToken;
 }
 
 export function buildLogoutUrl(config = authConfig): string {
@@ -333,7 +479,7 @@ function isThemeMode(value: unknown): value is ThemeMode {
 }
 
 function isKeycloakSilentLoginError(error: string): boolean {
-  return error === "login_required" || error === "interaction_required";
+  return ["login_required", "interaction_required", "consent_required", "account_selection_required"].includes(error);
 }
 
 export function mapTokenResponse(response: TokenResponse, now = Date.now()): TokenSet {
@@ -363,19 +509,19 @@ async function exchangeLoginCode(config: AuthConfig, code: string, state: string
     throw new Error("Auth callback state is invalid.");
   }
 
-  const response = await apiFetch(`${trimTrailingSlash(config.issuer)}/protocol/openid-connect/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: config.clientId,
-      redirect_uri: flow.redirectUri,
-      code,
-      code_verifier: flow.codeVerifier,
-    }),
-  });
-
-  const tokens = await parseTokenResponse(response);
+  const generation = credentialGeneration;
+  let tokens: TokenSet;
+  try {
+    tokens = await requestTokens(config, {
+      grant_type: "authorization_code", client_id: config.clientId, redirect_uri: flow.redirectUri,
+      code, code_verifier: flow.codeVerifier,
+    });
+  } catch (error) {
+    if (credentialGeneration !== generation) throw sessionChangedError();
+    if (readLoginFlow()?.state === state) window.sessionStorage.removeItem(flowStorageKey);
+    throw error;
+  }
+  if (credentialGeneration !== generation || readLoginFlow()?.state !== state) throw sessionChangedError();
   if (flow.returnPath) {
     window.sessionStorage.setItem(completedLoginReturnPathStorageKey, safeReturnPath(flow.returnPath));
   }
@@ -423,14 +569,6 @@ function isCompletedLoginFlow(
   );
 }
 
-async function parseTokenResponse(response: Response): Promise<TokenSet> {
-  if (!response.ok) {
-    throw await apiErrorFromResponse(response, `Token request failed with HTTP ${response.status}.`);
-  }
-
-  return mapTokenResponse((await response.json()) as TokenResponse);
-}
-
 function createCodeVerifier(): string {
   const bytes = new Uint8Array(32);
   window.crypto.getRandomValues(bytes);
@@ -465,9 +603,14 @@ function currentLoginReturnPath(): string {
   return pathname === "/auth/callback" ? "/" : safeReturnPath(`${pathname}${search}${hash}`);
 }
 
-function safeReturnPath(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/";
-  }
-  return value;
+export function safeReturnPath(value: string | null | undefined): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin || url.pathname === "/auth/callback") return "/";
+    if (["token", "code", "state", "access_token", "refresh_token", "lesson_assertion"].some((key) => url.searchParams.has(key))) return "/";
+    if (url.pathname === "/l" || url.pathname.startsWith("/lesson-access/")) return url.pathname;
+    if (/(?:^|[&#])(?:token|code|state|access_token|refresh_token)=/i.test(url.hash)) return `${url.pathname}${url.search}`;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch { return "/"; }
 }

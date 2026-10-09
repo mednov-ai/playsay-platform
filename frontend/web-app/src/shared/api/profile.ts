@@ -6,17 +6,14 @@ import {
   listUserProfiles,
   updateMyUserProfile,
 } from "../../generated/playsay-api";
-import { authConfig, clearTokens } from "./auth";
+import { authConfig } from "./auth";
 import { apiErrorFromData } from "./errors";
-import { apiJson, authorizedOptions } from "./http";
+import { apiJson, authorizedRequest } from "./http";
 import type { AdminUserProfile, AppUserProfile, ManagedStudentInput, MeProfile, UpdateUserProfileInput } from "./types";
 
 export async function fetchMe(config = authConfig): Promise<MeProfile> {
-  const response = await getMe(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => getMe(options), 10_000);
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Profile request failed with HTTP ${response.status}.`);
@@ -26,11 +23,8 @@ export async function fetchMe(config = authConfig): Promise<MeProfile> {
 }
 
 export async function fetchUserProfile(config = authConfig): Promise<AppUserProfile> {
-  const response = await getMyUserProfile(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => getMyUserProfile(options), 10_000);
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `User profile request failed with HTTP ${response.status}.`);
@@ -40,11 +34,8 @@ export async function fetchUserProfile(config = authConfig): Promise<AppUserProf
 }
 
 export async function fetchAdminUserProfiles(config = authConfig): Promise<AdminUserProfile[]> {
-  const response = await listUserProfiles(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listUserProfiles(options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Admin users request failed with HTTP ${response.status}.`);
@@ -54,11 +45,8 @@ export async function fetchAdminUserProfiles(config = authConfig): Promise<Admin
 }
 
 export async function fetchStudentProfiles(config = authConfig): Promise<AdminUserProfile[]> {
-  const response = await listStudentProfiles(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listStudentProfiles(options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Student profiles request failed with HTTP ${response.status}.`);
@@ -86,11 +74,8 @@ export async function saveUserProfile(
   input: UpdateUserProfileInput,
   config = authConfig,
 ): Promise<AppUserProfile> {
-  const response = await updateMyUserProfile(input, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => updateMyUserProfile(input, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `User profile update failed with HTTP ${response.status}.`);
@@ -100,11 +85,8 @@ export async function saveUserProfile(
 }
 
 export async function resetUserProfile(config = authConfig): Promise<void> {
-  const response = await deleteMyUserProfile(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => deleteMyUserProfile(options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 204) {
     throw apiErrorFromData(response.status, response.data as unknown, `User profile reset failed with HTTP ${response.status}.`);

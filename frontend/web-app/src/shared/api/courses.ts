@@ -15,17 +15,14 @@ import {
   type CurriculumTopicRequest,
   type LessonTemplateCardsRequest,
 } from "../../generated/playsay-api";
-import { authConfig, clearTokens } from "./auth";
+import { authConfig } from "./auth";
 import { apiErrorFromData } from "./errors";
-import { authorizedOptions } from "./http";
+import { authorizedRequest } from "./http";
 import type { Course, CourseInput, CourseLesson, CourseLessonInput, CurriculumTopic, CurriculumTopicInput, LessonTemplateCardsInput } from "./types";
 
 export async function fetchCourses(config = authConfig): Promise<Course[]> {
-  const response = await listCourses(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listCourses(options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Courses request failed with HTTP ${response.status}.`);
@@ -35,11 +32,8 @@ export async function fetchCourses(config = authConfig): Promise<Course[]> {
 }
 
 export async function fetchCourseLessons(courseId: string, config = authConfig): Promise<CourseLesson[]> {
-  const response = await listCourseLessons(courseId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listCourseLessons(courseId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course lessons request failed with HTTP ${response.status}.`);
@@ -49,12 +43,9 @@ export async function fetchCourseLessons(courseId: string, config = authConfig):
 }
 
 export async function fetchCurriculumTopics(courseId: string, config = authConfig): Promise<CurriculumTopic[]> {
-  const response = await listCurriculumTopics(courseId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listCurriculumTopics(courseId, options));
   const status = response.status as number;
 
-  if (status === 401) {
-    clearTokens();
-  }
 
   if (status !== 200) {
     throw apiErrorFromData(status, response.data as unknown, `Curriculum topics request failed with HTTP ${status}.`);
@@ -64,11 +55,8 @@ export async function fetchCurriculumTopics(courseId: string, config = authConfi
 }
 
 export async function saveCourse(input: CourseInput, config = authConfig): Promise<Course> {
-  const response = await createCourse(input, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createCourse(input, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 201) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course create failed with HTTP ${response.status}.`);
@@ -78,11 +66,8 @@ export async function saveCourse(input: CourseInput, config = authConfig): Promi
 }
 
 export async function removeCourse(courseId: string, config = authConfig): Promise<void> {
-  const response = await deleteCourse(courseId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => deleteCourse(courseId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 204) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course delete failed with HTTP ${response.status}.`);
@@ -94,11 +79,8 @@ export async function saveCourseLesson(
   input: CourseLessonInput,
   config = authConfig,
 ): Promise<CourseLesson> {
-  const response = await createCourseLesson(courseId, input as CourseLessonRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createCourseLesson(courseId, input as CourseLessonRequest, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 201) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course lesson create failed with HTTP ${response.status}.`);
@@ -112,12 +94,9 @@ export async function saveCurriculumTopic(
   input: CurriculumTopicInput,
   config = authConfig,
 ): Promise<CurriculumTopic> {
-  const response = await createCurriculumTopic(courseId, input as CurriculumTopicRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createCurriculumTopic(courseId, input as CurriculumTopicRequest, options));
   const status = response.status as number;
 
-  if (status === 401) {
-    clearTokens();
-  }
 
   if (status !== 200 && status !== 201) {
     throw apiErrorFromData(status, response.data as unknown, `Curriculum topic create failed with HTTP ${status}.`);
@@ -132,11 +111,8 @@ export async function editCourseLesson(
   input: CourseLessonInput,
   config = authConfig,
 ): Promise<CourseLesson> {
-  const response = await updateCourseLesson(courseId, lessonId, input as CourseLessonRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => updateCourseLesson(courseId, lessonId, input as CourseLessonRequest, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course lesson update failed with HTTP ${response.status}.`);
@@ -151,12 +127,9 @@ export async function editCurriculumTopic(
   input: CurriculumTopicInput,
   config = authConfig,
 ): Promise<CurriculumTopic> {
-  const response = await updateCurriculumTopic(courseId, topicId, input as CurriculumTopicRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => updateCurriculumTopic(courseId, topicId, input as CurriculumTopicRequest, options));
   const status = response.status as number;
 
-  if (status === 401) {
-    clearTokens();
-  }
 
   if (status !== 200) {
     throw apiErrorFromData(status, response.data as unknown, `Curriculum topic update failed with HTTP ${status}.`);
@@ -171,12 +144,9 @@ export async function saveCourseLessonCards(
   input: LessonTemplateCardsInput,
   config = authConfig,
 ): Promise<CourseLesson> {
-  const response = await replaceCourseLessonCards(courseId, lessonId, input as LessonTemplateCardsRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => replaceCourseLessonCards(courseId, lessonId, input as LessonTemplateCardsRequest, options));
   const status = response.status as number;
 
-  if (status === 401) {
-    clearTokens();
-  }
 
   if (status !== 200) {
     throw apiErrorFromData(status, response.data as unknown, `Course lesson cards update failed with HTTP ${status}.`);
@@ -190,11 +160,8 @@ export async function removeCourseLesson(
   lessonId: string,
   config = authConfig,
 ): Promise<void> {
-  const response = await deleteCourseLesson(courseId, lessonId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => deleteCourseLesson(courseId, lessonId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 204) {
     throw apiErrorFromData(response.status, response.data as unknown, `Course lesson delete failed with HTTP ${response.status}.`);
@@ -206,12 +173,9 @@ export async function removeCurriculumTopic(
   topicId: string,
   config = authConfig,
 ): Promise<void> {
-  const response = await deleteCurriculumTopic(courseId, topicId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => deleteCurriculumTopic(courseId, topicId, options));
   const status = response.status as number;
 
-  if (status === 401) {
-    clearTokens();
-  }
 
   if (status !== 200 && status !== 204) {
     throw apiErrorFromData(status, response.data as unknown, `Curriculum topic delete failed with HTTP ${status}.`);

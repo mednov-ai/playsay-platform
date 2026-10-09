@@ -1,5 +1,5 @@
 import { serverNowMs, subscribeServerClock } from "../shared/lib/serverClock";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { workspaceTabsForProfile } from "../entities/workspace/model";
 import { compareJoinableLessons, isArchivedScheduleLesson, isJoinableScheduledLesson } from "../entities/schedule/model";
 import { rememberChatTargetFromLocation } from "../features/chat/model/chatDeepLink";
@@ -21,7 +21,13 @@ import {
   readTokens,
   saveUserProfile,
   skipSilentLoginOnce,
-  startSilentLogin,
+  recoverSession,
+  canStartSilentRecovery,
+  getCredentialGeneration,
+  getValidAccessToken,
+  markSessionVerified,
+  resetSilentRecovery,
+  startLogin,
   type AdminUserProfile,
   type AppUserProfile,
   type LessonMaterial,
@@ -60,10 +66,13 @@ import { useProfileActions } from "./controller/useProfileActions";
 import { useScheduleActions } from "./controller/useScheduleActions";
 import { useClassroomMediaRecovery } from "./controller/useClassroomMediaRecovery";
 import { useAppShellUiStore } from "./model/useAppShellUiStore";
+import { getSessionRecoveryPhase, subscribeSessionRecovery, reportSessionRecovery } from "../shared/api/sessionRecovery";
 import { regionalEntryUrl } from "../shared/routing/regionalEntry";
 
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
+  const recoveryPhase = useSyncExternalStore(subscribeSessionRecovery, getSessionRecoveryPhase);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [appProfile, setAppProfile] = useState<AppUserProfile | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
@@ -109,7 +118,7 @@ export function useAppController(): AppShellProps {
 
         if (!readTokens()) {
           if (!isAuthCallback(currentUrl) && !consumeSkipSilentLogin()) {
-            await startSilentLogin();
+            await recoverSession();
             return;
           }
           if (!cancelled) {
@@ -123,14 +132,11 @@ export function useAppController(): AppShellProps {
         }
 
         const me = await fetchMe();
+        const bootGeneration = getCredentialGeneration();
         const canManagePeople = me.roles.includes("TEACHER") || me.roles.includes("ADMIN");
-        const [currentAppProfile, currentAdminUsers, currentMaterials, currentSchedule, currentStudents] = await Promise.all([
-          fetchUserProfile(),
-          me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]),
-          fetchMaterials(),
-          fetchScheduledLessons(),
-          canManagePeople ? fetchStudentProfiles() : Promise.resolve([]),
-        ]);
+        const currentAppProfile = await fetchUserProfile();
+        if (cancelled) return;
+        markSessionVerified();
         const preferredRfEntry = currentAppProfile.connectionRoutePreference === "RF"
           ? regionalEntryUrl(window.location)
           : null;
@@ -164,17 +170,45 @@ export function useAppController(): AppShellProps {
             }
           }
 
+          if (cancelled) return;
+          if (bootGeneration !== getCredentialGeneration()) {
+            if (readTokens()) { setError(t("sessionRecovery.unavailable")); setStatus("error"); reportSessionRecovery("unavailable"); }
+            return;
+          }
+          if (profile?.subject !== me.subject) {
+            appQueryClient.clear();
+            setAdminUsers([]);
+            setMaterials([]);
+            setScheduledLessons([]);
+            setStudentUsers([]);
+            setRoomSession(null);
+            resetShellUi();
+          }
           setProfile(me);
           setAppProfile(authenticatedAppProfile);
-          setAdminUsers(
-            currentAdminUsers.map((user) =>
-              user.subject === authenticatedAppProfile.subject ? authenticatedAppProfile : user,
-            ),
-          );
-          setMaterials(currentMaterials);
-          setScheduledLessons(currentSchedule);
-          setStudentUsers(currentStudents);
+          setMaterialLoading(true);
+          setScheduleLoading(true);
+          setAdminLoading(canManagePeople);
           setStatus("authenticated");
+          // Module failures retain the verified identity and their own retry surface.
+          const generation = getCredentialGeneration();
+          await Promise.all([
+            (me.roles.includes("ADMIN") ? fetchAdminUserProfiles() : Promise.resolve([]))
+              .then((users) => { if (!cancelled && generation === getCredentialGeneration()) setAdminUsers(users); })
+              .catch((caught) => { if (!cancelled && generation === getCredentialGeneration()) setAdminMessage(applySessionError(caught, t("errors.requestFailed", { status: 503 }))); }),
+            fetchMaterials()
+              .then((items) => { if (!cancelled && generation === getCredentialGeneration()) setMaterials(items); })
+              .catch((caught) => { if (!cancelled && generation === getCredentialGeneration()) setMaterialMessage(applySessionError(caught, t("errors.requestFailed", { status: 503 }))); })
+              .finally(() => { if (!cancelled) setMaterialLoading(false); }),
+            fetchScheduledLessons()
+              .then((items) => { if (!cancelled && generation === getCredentialGeneration()) setScheduledLessons(items); })
+              .catch((caught) => { if (!cancelled && generation === getCredentialGeneration()) setScheduleMessage(applySessionError(caught, t("errors.requestFailed", { status: 503 }))); })
+              .finally(() => { if (!cancelled) setScheduleLoading(false); }),
+            (canManagePeople ? fetchStudentProfiles() : Promise.resolve([]))
+              .then((users) => { if (!cancelled && generation === getCredentialGeneration()) setStudentUsers(users); })
+              .catch((caught) => { if (!cancelled && generation === getCredentialGeneration()) setAdminMessage(applySessionError(caught, t("errors.requestFailed", { status: 503 }))); }),
+          ]);
+          if (!cancelled) setAdminLoading(false);
         }
       } catch (caught) {
         if (isSilentLoginUnavailable(caught)) {
@@ -186,11 +220,15 @@ export function useAppController(): AppShellProps {
           }
           return;
         }
-        clearTokens();
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : t("errors.authFailed"));
-          setStatus("error");
+        if (cancelled) return;
+        if (caught instanceof ApiError && caught.errorCode === "SESSION_CHANGED") {
+          if (readTokens()) { setError(t("sessionRecovery.unavailable")); setStatus("error"); reportSessionRecovery("unavailable"); }
+          return;
         }
+        const terminal = caught instanceof ApiError && caught.status === 401;
+        reportSessionRecovery(terminal ? "signInRequired" : caught instanceof ApiError && caught.errorCode === "AUTH_PROTOCOL_ERROR" ? "protocolError" : "unavailable");
+        setError(terminal ? t("sessionRecovery.signInRequired") : t("sessionRecovery.unavailable"));
+        setStatus("error");
       }
     }
 
@@ -198,7 +236,7 @@ export function useAppController(): AppShellProps {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bootAttempt]);
 
   useEffect(() => {
     return subscribeToPathnameHistory(window, setCurrentPath);
@@ -216,10 +254,30 @@ export function useAppController(): AppShellProps {
     return () => document.body.classList.remove("playsay-classroom-active");
   }, [classroomLesson, roomSession]);
 
-  const isAuthenticated = status === "authenticated" && profile !== null;
+  const isAuthenticated = status === "authenticated" && profile !== null && recoveryPhase !== "signInRequired" && recoveryPhase !== "protocolError";
   const isAdmin = profile?.roles.includes("ADMIN") ?? false;
   const canManagePeople = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
   const isClassroomOpen = classroomLesson !== null || roomSession !== null;
+  useEffect(() => {
+    if (recoveryPhase !== "signInRequired" || roomSession !== null || status === "loggingOut"
+      || isAuthCallback(new URL(window.location.href)) || !canStartSilentRecovery()) return;
+    void recoverSession().catch(() => { /* The notice retains the explicit sign-in action. */ });
+  }, [recoveryPhase, roomSession, status]);
+
+  useEffect(() => {
+    let pending = false;
+    let disposed = false;
+    const revalidate = () => {
+      if (document.visibilityState === "hidden" || pending || !readTokens()) return;
+      pending = true;
+      void getValidAccessToken().catch(() => { /* Outcomes are published by the coordinator. */ })
+        .finally(() => { if (!disposed) pending = false; });
+    };
+    document.addEventListener("visibilitychange", revalidate);
+    window.addEventListener("pageshow", revalidate);
+    return () => { disposed = true; document.removeEventListener("visibilitychange", revalidate); window.removeEventListener("pageshow", revalidate); };
+  }, []);
+
   const workspaceTabs = workspaceTabsForProfile(profile);
   const nextJoinableLesson = [...scheduledLessons]
     .filter((lesson) => isJoinableScheduledLesson(lesson, nowMs))
@@ -357,7 +415,7 @@ export function useAppController(): AppShellProps {
   }, [routeLessonId, roomSession]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !routeLessonId || roomSession || roomLoadingLessonId) {
+    if (status !== "authenticated" || !routeLessonId || roomSession || roomLoadingLessonId || scheduleLoading || scheduleMessage !== null) {
       return;
     }
 
@@ -367,7 +425,7 @@ export function useAppController(): AppShellProps {
         : t("schedule.messages.alreadyClosed"));
       navigateToPath("/");
     }
-  }, [nowMs, profile, routeLesson, routeLessonId, roomLoadingLessonId, roomSession, status, t]);
+  }, [nowMs, profile, routeLesson, routeLessonId, roomLoadingLessonId, roomSession, scheduleLoading, scheduleMessage, status, t]);
 
   function openLessonPreparation(lessonId: string) {
     navigateToPath(lessonPreparationPath(lessonId));
@@ -420,27 +478,30 @@ export function useAppController(): AppShellProps {
 
   function applySessionError(caught: unknown, fallback: string): string {
     const message = caught instanceof Error ? caught.message : fallback;
-    if (
-      (caught instanceof ApiError && caught.status === 401) ||
-      message.includes("Not authenticated") ||
-      message.includes("HTTP 401")
-    ) {
-      clearTokens();
-      appQueryClient.clear();
-      setProfile(null);
-      setAppProfile(null);
-      setAdminUsers([]);
-      setMaterials([]);
-      setScheduledLessons([]);
-      setStudentUsers([]);
-      setRoomSession(null);
-      setRoomLoadingLessonId(null);
-      setRoomMessage(null);
-      resetShellUi();
-      setStatus("anonymous");
-      return t("errors.sessionExpired");
+    if (caught instanceof ApiError && caught.errorCode === "SESSION_CHANGED") return t("sessionRecovery.retry");
+    if (caught instanceof ApiError && caught.status === 401) {
+      reportSessionRecovery("signInRequired");
+      // Keep the current classroom mounted; new API operations remain unauthorized.
+      return t("sessionRecovery.signInRequired");
     }
     return message;
+  }
+
+  function retrySessionRecovery() {
+    reportSessionRecovery("recovering");
+    if (roomSession) {
+      void getValidAccessToken().then((token) => { if (token) markSessionVerified(); }).catch(() => { /* Keep recovery controls usable. */ });
+      return;
+    }
+    resetSilentRecovery();
+    setError(null);
+    setStatus("checking");
+    setBootAttempt((attempt) => attempt + 1);
+  }
+
+  async function continueSessionLogin() {
+    if (roomSession) leaveScheduledLessonRoom();
+    await startLogin();
   }
 
   function navigateToPath(path: string) {
@@ -450,6 +511,9 @@ export function useAppController(): AppShellProps {
 
 
   return {
+    recoveryPhase,
+    retrySessionRecovery,
+    continueSessionLogin,
     adminLoading,
     adminMessage,
     adminUsers,

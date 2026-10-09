@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearTokens, readTokens, storeTokens, skipSilentLoginOnce, rejectAccessToken } from "../shared/api/auth";
+import { clearTokens, readTokens, storeTokens, skipSilentLoginOnce, rejectAccessToken, canStartSilentRecovery } from "../shared/api/auth";
+import { reportSessionRecovery } from "../shared/api/sessionRecovery";
 import { useAppController } from "./useAppController";
 
 vi.mock("./controller/useLessonRealtime", () => ({ useLessonRealtime: () => ({}) }));
@@ -99,9 +100,11 @@ describe("session recovery through the app controller", () => {
       history.replaceState({}, "", "/lessons/fixture/classroom?panel=task#board");
       expect(view.result.current.continueSessionLogin).toBeTypeOf("function");
       act(() => { continuation = view.result.current.continueSessionLogin?.(); });
+      // A late protected-request rejection must not replace interactive PKCE.
+      act(() => reportSessionRecovery("signInRequired"));
       await act(async () => { await Promise.resolve(); });
       expect(digest).toHaveBeenCalledTimes(1);
-      expect(view.result.current.recoveryPhase).toBe("recovering");
+      expect(canStartSilentRecovery()).toBe(false);
       expect(view.result.current.roomSession).toBeNull();
     } finally {
       completions.forEach((resolve) => resolve(new ArrayBuffer(32)));

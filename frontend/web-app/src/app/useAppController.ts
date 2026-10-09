@@ -500,8 +500,9 @@ export function useAppController(): AppShellProps {
   }
 
   async function continueSessionLogin() {
+    const login = startLogin();
     if (roomSession) leaveScheduledLessonRoom();
-    await startLogin();
+    await login;
   }
 
   function navigateToPath(path: string) {

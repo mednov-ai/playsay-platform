@@ -96,6 +96,7 @@ describe("session recovery through the app controller", () => {
     Object.defineProperty(window.crypto, "subtle", { configurable: true, value: { digest } });
     let continuation: Promise<void> | undefined;
     try {
+      history.replaceState({}, "", "/lessons/fixture/classroom?panel=task#board");
       expect(view.result.current.continueSessionLogin).toBeTypeOf("function");
       act(() => { continuation = view.result.current.continueSessionLogin?.(); });
       await act(async () => { await Promise.resolve(); });
@@ -105,6 +106,7 @@ describe("session recovery through the app controller", () => {
     } finally {
       completions.forEach((resolve) => resolve(new ArrayBuffer(32)));
       await act(async () => { await continuation; });
+      expect(JSON.parse(sessionStorage.getItem("playsay.auth.loginFlow") ?? "{}").returnPath).toBe("/lessons/fixture/classroom?panel=task#board");
       if (original) Object.defineProperty(window.crypto, "subtle", original);
       else Reflect.deleteProperty(window.crypto, "subtle");
     }

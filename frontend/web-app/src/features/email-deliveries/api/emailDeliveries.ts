@@ -8,9 +8,9 @@ import {
   type EmailDeliverySummaryResponse,
   type ListEmailDeliveriesParams,
 } from "../../../generated/playsay-api";
-import { authConfig, clearTokens } from "../../../shared/api/auth";
+import { authConfig } from "../../../shared/api/auth";
 import { apiErrorFromData } from "../../../shared/api/errors";
-import { authorizedOptions } from "../../../shared/api/http";
+import { authorizedRequest } from "../../../shared/api/http";
 
 export type EmailDeliverySummary = EmailDeliverySummaryResponse;
 export type EmailDeliveryDetail = EmailDeliveryDetailResponse;
@@ -43,22 +43,21 @@ export async function fetchEmailDeliveries(filters: EmailDeliveryFilters): Promi
     createdFrom: filters.createdFrom ? new Date(filters.createdFrom).toISOString() : undefined,
     createdTo: filters.createdTo ? new Date(filters.createdTo).toISOString() : undefined,
   };
-  const response = await listEmailDeliveriesRequest(params, await authorizedOptions(authConfig));
+  const response = await authorizedRequest(authConfig, (options) => listEmailDeliveriesRequest(params, options));
   return successfulData(response.status, response.data, "Email delivery list request failed");
 }
 
 export async function fetchEmailDelivery(id: string): Promise<EmailDeliveryDetail> {
-  const response = await getEmailDeliveryRequest(id, await authorizedOptions(authConfig));
+  const response = await authorizedRequest(authConfig, (options) => getEmailDeliveryRequest(id, options));
   return successfulData(response.status, response.data, "Email delivery detail request failed");
 }
 
 export async function resendEmailDelivery(id: string): Promise<EmailDeliveryResendResponse> {
-  const response = await resendEmailDeliveryRequest(id, await authorizedOptions(authConfig));
+  const response = await authorizedRequest(authConfig, (options) => resendEmailDeliveryRequest(id, options));
   return successfulData(response.status, response.data, "Email delivery resend request failed");
 }
 
 function successfulData<T>(status: number, data: T, fallback: string): T {
-  if (status === 401) clearTokens();
   if (status !== 200) throw apiErrorFromData(status, data as unknown, `${fallback} with HTTP ${status}.`);
   return data;
 }

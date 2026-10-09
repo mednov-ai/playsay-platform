@@ -8,7 +8,9 @@ import {
 
 vi.mock("./auth", () => ({
   authConfig: {},
-  clearTokens: vi.fn(),
+  getCredentialGeneration: () => 0,
+  readTokens: () => ({ accessToken: "access-token" }),
+  rejectAccessToken: vi.fn(() => true),
   getValidAccessToken: vi.fn(async () => "access-token"),
 }));
 

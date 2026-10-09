@@ -4,6 +4,7 @@ export const deChatPushNotification = {
 };
 
 export const de = {
+  sessionRecovery: {"title": "Sitzung wiederherstellen", "ready": "Verbunden", "recovering": "Verbindung wird wiederhergestellt…", "unavailable": "Die Verbindung ist vorübergehend nicht verfügbar. Bitte erneut versuchen.", "signInRequired": "Bitte erneut anmelden, um fortzufahren.", "protocolError": "Die Anmeldung konnte nicht abgeschlossen werden. Bitte erneut anmelden.", "retry": "Erneut versuchen", "signIn": "Erneut anmelden", "lessonInterruption": "Die erneute Anmeldung unterbricht Ihre Verbindung zur Unterrichtsstunde. Danach kehren Sie auf diese Seite zurück."},
   lessonExtension: {"title": "Stunde verlängern", "ending": "Die Stunde endet um {{time}}. Verlängern?", "extend": "Um 10 Minuten verlängern", "decline": "Nicht verlängern", "pending": "Wird verlängert…", "failed": "Verlängerung nicht bestätigt. Versuchen Sie es erneut.", "syncFailed": "Die Unterrichtszeit konnte nicht synchronisiert werden."},
   routeDiagnostics: {
     geoProvider: "GeoIP-Anbieter: IPinfo Lite · CC BY-SA 4.0",

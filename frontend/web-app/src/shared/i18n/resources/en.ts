@@ -4,6 +4,7 @@ export const enChatPushNotification = {
 };
 
 export const en = {
+  sessionRecovery: {"title": "Session recovery", "ready": "Connected", "recovering": "Restoring your connection…", "unavailable": "Connection is temporarily unavailable. Please try again.", "signInRequired": "Please sign in again to continue.", "protocolError": "Could not complete sign-in. Please try signing in again.", "retry": "Retry", "signIn": "Sign in again", "lessonInterruption": "Signing in again will interrupt your connection to this lesson. You will return to this page afterwards."},
   lessonExtension: {"title": "Extend lesson", "ending": "The lesson will end at {{time}}. Extend?", "extend": "Extend by 10 minutes", "decline": "Do not extend", "pending": "Extending…", "failed": "Could not confirm the extension. Try again.", "syncFailed": "Could not synchronize lesson time."},
   routeDiagnostics: {
     geoProvider: "GeoIP provider: IPinfo Lite · CC BY-SA 4.0",

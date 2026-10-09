@@ -13,17 +13,14 @@ import {
   type ScheduledLessonScheduleUpdateRequest,
   type ScheduledLessonRequest,
 } from "../../generated/playsay-api";
-import { authConfig, clearTokens } from "./auth";
+import { authConfig } from "./auth";
 import { apiErrorFromData } from "./errors";
-import { apiJson, authorizedOptions } from "./http";
+import { apiJson, authorizedRequest } from "./http";
 import type { LessonAccessLink, LessonTranslationSession, LiveKitRoomToken, ScheduledLesson, ScheduledLessonInput, ScheduledLessonParticipantLinks } from "./types";
 
 export async function fetchScheduledLessons(config = authConfig): Promise<ScheduledLesson[]> {
-  const response = await listScheduledLessons(await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => listScheduledLessons(options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Schedule request failed with HTTP ${response.status}.`);
@@ -37,11 +34,8 @@ export async function fetchScheduledLesson(
   lessonId: string,
   config = authConfig,
 ): Promise<ScheduledLesson> {
-  const response = await getScheduledLesson(lessonId, { ...await authorizedOptions(config), signal: AbortSignal.timeout(5000) });
+  const response = await authorizedRequest(config, (options) => getScheduledLesson(lessonId, options), 5000);
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson request failed with HTTP ${response.status}.`);
@@ -55,11 +49,8 @@ export async function saveScheduledLesson(
   input: ScheduledLessonInput,
   config = authConfig,
 ): Promise<ScheduledLesson> {
-  const response = await createScheduledLesson(input as ScheduledLessonRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createScheduledLesson(input as ScheduledLessonRequest, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 201) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson create failed with HTTP ${response.status}.`);
@@ -74,11 +65,8 @@ export async function editScheduledLesson(
   input: ScheduledLessonInput,
   config = authConfig,
 ): Promise<ScheduledLesson> {
-  const response = await updateScheduledLesson(lessonId, input as ScheduledLessonRequest, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => updateScheduledLesson(lessonId, input as ScheduledLessonRequest, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson update failed with HTTP ${response.status}.`);
@@ -93,11 +81,8 @@ export async function rescheduleScheduledLesson(
   input: ScheduledLessonScheduleUpdateRequest,
   config = authConfig,
 ): Promise<ScheduledLesson> {
-  const response = await rescheduleScheduledLessonGenerated(lessonId, input, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => rescheduleScheduledLessonGenerated(lessonId, input, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson reschedule failed with HTTP ${response.status}.`);
@@ -108,11 +93,8 @@ export async function rescheduleScheduledLesson(
 }
 
 export async function removeScheduledLesson(lessonId: string, config = authConfig): Promise<void> {
-  const response = await deleteScheduledLesson(lessonId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => deleteScheduledLesson(lessonId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 204) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson delete failed with HTTP ${response.status}.`);
@@ -120,11 +102,8 @@ export async function removeScheduledLesson(lessonId: string, config = authConfi
 }
 
 export async function completeScheduledLesson(lessonId: string, config = authConfig): Promise<ScheduledLesson> {
-  const response = await completeScheduledLessonGenerated(lessonId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => completeScheduledLessonGenerated(lessonId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Scheduled lesson complete failed with HTTP ${response.status}.`);
@@ -144,11 +123,8 @@ export async function startScheduledLesson(lessonId: string, config = authConfig
 }
 
 export async function enterScheduledLessonRoom(lessonId: string, config = authConfig): Promise<LiveKitRoomToken> {
-  const response = await createScheduledLessonRoomToken(lessonId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createScheduledLessonRoomToken(lessonId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Video room token request failed with HTTP ${response.status}.`);
@@ -162,11 +138,8 @@ export async function createLessonTranslationSession(
   lessonId: string,
   config = authConfig,
 ): Promise<LessonTranslationSession> {
-  const response = await createLessonTranslationSessionGenerated(lessonId, await authorizedOptions(config));
+  const response = await authorizedRequest(config, (options) => createLessonTranslationSessionGenerated(lessonId, options));
 
-  if (response.status === 401) {
-    clearTokens();
-  }
 
   if (response.status !== 200) {
     throw apiErrorFromData(response.status, response.data as unknown, `Translation session request failed with HTTP ${response.status}.`);
@@ -197,10 +170,7 @@ export async function fetchLessonAccessLink(lessonId: string, config = authConfi
 }
 
 export async function extendScheduledLessonAccess(lessonId: string, expectedAccessRevision: number, config = authConfig): Promise<ScheduledLesson> {
-  const response = await extendLessonAccessGenerated(lessonId, { expectedAccessRevision }, {
-    ...await authorizedOptions(config), signal: AbortSignal.timeout(5000),
-  });
-  if (response.status === 401) clearTokens();
+  const response = await authorizedRequest(config, (options) => extendLessonAccessGenerated(lessonId, { expectedAccessRevision }, options), 5000);
   if (response.status !== 200) throw apiErrorFromData(response.status, response.data);
   observeServerTime(response.data);
   return response.data;

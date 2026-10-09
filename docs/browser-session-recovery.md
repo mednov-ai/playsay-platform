@@ -6,6 +6,7 @@ The online app supports coordinated credential renewal and bounded recovery on b
 
 - Concurrent REST/realtime callers share one renewal for the current credential generation. Late renewal, callback and API responses cannot overwrite or clear newer credentials or restore a logged-out account.
 - Temporary auth/API failures retain credentials without sending an expired token as authority. Auth fetches have a 10-second deadline; renewal allows at most two attempts within a 25-second local budget and honors bounded Retry-After. User Retry starts an explicit new attempt. Business writes are never automatically replayed.
+- Explicit sign-in reserves recovery synchronously before asynchronous PKCE or active-room teardown can start a competing silent attempt.
 - Terminal token rejection allows one silent PKCE/OIDC recovery episode. Interaction-required, stale navigation markers, protocol errors or failed recovery expose explicit sign-in. Identity verification completes recovery; a successful token response alone does not reset the redirect budget.
 - Safe internal navigation stays on the initiating origin. Callback credentials and shared lesson-link bearer fragments are excluded from stored return paths; the existing lesson-entry continuation remains responsible for admission.
 - Verified identity is separate from module availability. Materials/schedule/people failures provide their own retry messages. Required profile/permission context gates dependent actions without deleting credentials on temporary failure.

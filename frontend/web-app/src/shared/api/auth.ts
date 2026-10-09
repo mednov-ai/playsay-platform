@@ -162,6 +162,8 @@ export function storeTokens(tokens: TokenSet): void {
 }
 
 export async function startLogin(config = authConfig): Promise<void> {
+  // Reserve interactive recovery before PKCE yields or the active room is released.
+  reportSessionRecovery("recovering");
   resetSilentRecovery();
   window.sessionStorage.removeItem(skipSilentLoginStorageKey);
   const redirectUri = getRedirectUri(config);

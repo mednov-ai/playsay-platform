@@ -89,6 +89,7 @@ export function markSessionVerified(): void {
 export function resetSilentRecovery(): void { window.sessionStorage.removeItem(recoveryStorageKey); }
 export function canStartSilentRecovery(): boolean {
   return !window.sessionStorage.getItem(recoveryStorageKey)
+    && !window.sessionStorage.getItem(flowStorageKey)
     && window.sessionStorage.getItem(skipSilentLoginStorageKey) !== "true";
 }
 export async function recoverSession(config = authConfig): Promise<void> {
@@ -169,13 +170,15 @@ export async function startLogin(config = authConfig): Promise<void> {
   const returnPath = currentLoginReturnPath();
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
-  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const generation = credentialGeneration;
   const state = createCodeVerifier();
   const language = currentApiLanguage();
   const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath };
 
   rememberPendingLoginLanguage(language);
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  if (credentialGeneration !== generation || readLoginFlow()?.state !== state) throw sessionChangedError();
   window.location.assign(
     buildAuthorizeUrl({
       config,
@@ -195,12 +198,14 @@ export async function startLessonAssertionLogin(
 ): Promise<void> {
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
-  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const generation = credentialGeneration;
   const state = createCodeVerifier();
   const language = currentApiLanguage();
   const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath: safeReturnPath(returnPath) };
   rememberPendingLoginLanguage(language);
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  if (credentialGeneration !== generation || readLoginFlow()?.state !== state) throw sessionChangedError();
   window.location.assign(buildAuthorizeUrl({
     config,
     redirectUri,
@@ -215,11 +220,13 @@ export async function startLessonAssertionLogin(
 export async function startSilentLogin(config = authConfig, returnPath?: string): Promise<void> {
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
-  const codeChallenge = await createCodeChallenge(codeVerifier);
+  const generation = credentialGeneration;
   const state = createCodeVerifier();
   const flow: LoginFlow = { codeVerifier, state, redirectUri, silent: true, returnPath: returnPath === undefined ? currentLoginReturnPath() : safeReturnPath(returnPath) };
 
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));
+  const codeChallenge = await createCodeChallenge(codeVerifier);
+  if (credentialGeneration !== generation || readLoginFlow()?.state !== state) throw sessionChangedError();
   window.location.assign(
     buildAuthorizeUrl({
       config,

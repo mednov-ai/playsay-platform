@@ -1,6 +1,6 @@
 import { normalizeLanguage, rememberPendingLoginLanguage } from "../i18n";
 import { ApiError } from "./errors";
-import { authProtocolError, reportSessionRecovery, resetSessionRecoveryDiagnostics, sessionChangedError, sessionRejectedError, sessionUnavailableError } from "./sessionRecovery";
+import { authProtocolError, getSessionRecoveryPhase, reportSessionRecovery, resetSessionRecoveryDiagnostics, sessionChangedError, sessionRejectedError, sessionUnavailableError } from "./sessionRecovery";
 import { currentApiLanguage } from "./locale";
 
 export type AuthConfig = {
@@ -304,6 +304,8 @@ export async function getValidAccessToken(config = authConfig): Promise<string |
   const tokens = readTokens();
   if (!tokens) return null;
   if (tokens.expiresAt > Date.now() + expirySkewMs) return tokens.accessToken;
+  if (getSessionRecoveryPhase() === "unavailable") throw sessionUnavailableError();
+  if (getSessionRecoveryPhase() === "protocolError") throw authProtocolError();
   if (!tokens.refreshToken) {
     rejectAccessToken(tokens.accessToken);
     throw sessionRejectedError();

@@ -488,6 +488,7 @@ export function useAppController(): AppShellProps {
   }
 
   function retrySessionRecovery() {
+    reportSessionRecovery("recovering");
     if (roomSession) {
       void getValidAccessToken().then((token) => { if (token) markSessionVerified(); }).catch(() => { /* Keep recovery controls usable. */ });
       return;
@@ -495,7 +496,6 @@ export function useAppController(): AppShellProps {
     resetSilentRecovery();
     setError(null);
     setStatus("checking");
-    reportSessionRecovery("recovering");
     setBootAttempt((attempt) => attempt + 1);
   }
 

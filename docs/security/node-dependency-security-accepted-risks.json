@@ -4,7 +4,7 @@
   "approvedAt": "2026-10-05T10:46:15Z",
   "expiresAt": "2026-12-05T10:46:15Z",
   "approval": "Owner approvals retained below; the existing expiry is unchanged. Session-recovery scope and its exact indirect chain were explicitly accepted on 2026-10-09.",
-  "scope": "html-game-explicit-stop numeric candidate and release-text-annotation-fix-only candidate; their develop merge-back; frontend build toolchain only; hotfix-classroom-collaboration-recovery candidate and develop merge-back; hotfix-session-recovery develop integration and numeric production candidate/promotion; frontend build toolchain only",
+  "scope": "html-game-explicit-stop numeric candidate and release-text-annotation-fix-only candidate; their develop merge-back; frontend build toolchain only; hotfix-classroom-collaboration-recovery candidate and develop merge-back; hotfix-session-recovery develop integration and numeric production candidate/promotion; frontend build toolchain only; hotfix-lesson-text-collaboration-loss develop integration, numeric release build and release merge-back; frontend build toolchain only; production promotion requires separate authorization",
   "advisory": "GHSA-vfj7-8cjw-p6xm",
   "cve": "CVE-2026-93687",
   "packages": {
@@ -43,6 +43,19 @@
       "approvedAt": "2026-10-09T12:51:00Z",
       "approval": "Owner answered «Да» to the explicit 2026-10-09 request accepting CVE-2026-93687 for this hotfix, develop merge and production release until the existing expiry. Prior delivery instruction: «Деплой в прод».",
       "scope": "hotfix-session-recovery develop integration and numeric production candidate/promotion; frontend build toolchain only",
+      "packages": {
+        "braces": "3.0.3",
+        "chokidar": "3.6.0",
+        "fast-glob": "3.3.3",
+        "micromatch": "4.0.8",
+        "tailwindcss": "3.4.19",
+        "tailwindcss-animate": "1.0.7"
+      }
+    },
+    {
+      "approvedAt": "2026-10-09",
+      "approval": "Owner explicitly instructed in this chat: «применить исключение уязвимости и оставить защиту на будущее»; same advisory, package versions and existing expiry. Production deployment was not authorized.",
+      "scope": "hotfix-lesson-text-collaboration-loss develop integration, numeric release build and release merge-back; frontend build toolchain only; production promotion requires separate authorization",
       "packages": {
         "braces": "3.0.3",
         "chokidar": "3.6.0",

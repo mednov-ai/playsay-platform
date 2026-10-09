@@ -68,7 +68,8 @@ export function createAnnotationPersistence({ load, save, onLoad }: {
       clearTimeout(debounce);
       debounce = setTimeout(() => { void flush(); }, 500);
     },
-    close() {
+    close({ discardPending = false }: { discardPending?: boolean } = {}) {
+      if (discardPending) pending = null;
       closed = true;
       clearInterval(interval);
       clearTimeout(debounce);

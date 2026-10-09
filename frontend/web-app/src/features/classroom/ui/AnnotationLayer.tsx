@@ -89,42 +89,24 @@ export const AnnotationLayer = memo(function AnnotationLayer({
     element.kind === "mindMapNode"
   ));
 
-  useEffect(() => {
-    if (readOnly) {
-      return undefined;
+  function handleKeyboard(event: KeyboardEvent<SVGSVGElement>) {
+    if (event.target instanceof Node && document.activeElement !== event.target && !document.activeElement?.contains(event.target)) return;
+    if (readOnly || event.defaultPrevented || event.nativeEvent.isComposing || isEditableTarget(event.target)) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) onRedo();
+      else onUndo();
+    } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      onRedo();
+    } else if (selectedElement && (event.key === "Delete" || event.key === "Backspace")) {
+      event.preventDefault();
+      onDeleteSelected();
+    } else if (event.key === "Escape") {
+      onFinishTextEditing();
+      onDeselect();
     }
-    function handleKeyboard(event: globalThis.KeyboardEvent) {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        if (event.shiftKey) {
-          onRedo();
-        } else {
-          onUndo();
-        }
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
-        event.preventDefault();
-        onRedo();
-        return;
-      }
-      if (selectedElementId && (event.key === "Delete" || event.key === "Backspace")) {
-        event.preventDefault();
-        onDeleteSelected();
-        return;
-      }
-      if (event.key === "Escape") {
-        onFinishTextEditing();
-        onDeselect();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyboard);
-    return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [onDeleteSelected, onDeselect, onFinishTextEditing, onRedo, onUndo, readOnly, selectedElementId]);
+  }
 
   return (
     <>
@@ -138,7 +120,12 @@ export const AnnotationLayer = memo(function AnnotationLayer({
         data-read-only={readOnly ? "true" : "false"}
         data-tool={tool}
         onPointerCancel={readOnly ? undefined : onEnd}
-        onPointerDown={readOnly ? undefined : onBegin}
+        onKeyDown={handleKeyboard}
+        tabIndex={readOnly ? -1 : 0}
+        onPointerDown={readOnly ? undefined : (event) => {
+          if (!isEditableTarget(event.target)) event.currentTarget.focus({ preventScroll: true });
+          onBegin(event);
+        }}
         onPointerMove={readOnly ? undefined : onMove}
         onPointerUp={readOnly ? undefined : onEnd}
         preserveAspectRatio="none"
@@ -387,7 +374,12 @@ const AnnotationElementView = memo(function AnnotationElementView({
         }
       }
     },
-    onPointerDown: readOnly ? undefined : (event: PointerEvent<SVGElement>) => onMoveElement(event, element.id),
+    onPointerDown: readOnly ? undefined : (event: PointerEvent<SVGElement>) => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>(".playsay-annotation-html-element") : null;
+      if (target) target.focus({ preventScroll: true });
+      else (event.currentTarget as SVGElement & { focus: (options: FocusOptions) => void }).focus({ preventScroll: true });
+      onMoveElement(event, element.id);
+    },
     role: readOnly ? "img" : "button",
     tabIndex: !readOnly && tool === "pointer" ? 0 : -1,
   };
@@ -589,6 +581,7 @@ function AnnotationTextEditor({
       }}
       onKeyDown={(event) => {
         event.stopPropagation();
+        if (composingRef.current || event.nativeEvent.isComposing) return;
         if (element.kind === "mindMapNode" && event.key === "Tab") {
           event.preventDefault();
           event.currentTarget.blur();

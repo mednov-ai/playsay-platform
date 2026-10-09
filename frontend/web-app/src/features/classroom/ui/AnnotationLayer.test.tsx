@@ -22,6 +22,46 @@ function dimensions() {
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ x: 20, y: 30, left: 20, top: 30, right: 520, bottom: 280, width: 500, height: 250, toJSON: () => ({}) });
 }
 describe("HTML annotation rendering", () => {
+  it("does not delete a selection when Backspace targets BODY or an unrelated button", () => {
+    dimensions();
+    const input = props();
+    const { container } = render(<div><button>Expand image</button><AnnotationLayer {...input} /><AnnotationLayer {...input} /></div>);
+    fireEvent.keyDown(document.body, { key: "Backspace" });
+    const button = container.querySelector("button")!;
+    button.focus();
+    fireEvent.keyDown(button, { key: "Delete" });
+    expect(input.onDeleteSelected).not.toHaveBeenCalled();
+  });
+
+  it("deletes only the focused annotation once across multiple layers", () => {
+    dimensions();
+    const input = props();
+    const { container } = render(<div><AnnotationLayer {...input} /><AnnotationLayer {...input} /></div>);
+    const box = container.querySelector<HTMLElement>(".playsay-annotation-html-element")!;
+    box.focus();
+    fireEvent.keyDown(box, { key: "Backspace" });
+    expect(input.onDeleteSelected).toHaveBeenCalledOnce();
+  });
+  it("leaves native editor keys and composition alone, and handles focused undo only once", () => {
+    dimensions();
+    const input = props();
+    const { container, rerender } = render(<div><AnnotationLayer {...input} /><AnnotationLayer {...input} /></div>);
+    const box = container.querySelector<HTMLElement>(".playsay-annotation-html-element")!;
+    box.focus();
+    fireEvent.keyDown(box, { key: "Delete", isComposing: true });
+    expect(input.onDeleteSelected).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: "z", ctrlKey: true });
+    expect(input.onUndo).toHaveBeenCalledOnce();
+    rerender(<AnnotationLayer {...input} editingElementId="text-1" />);
+    const editor = container.querySelector("textarea")!;
+    editor.focus();
+    fireEvent.keyDown(editor, { key: "Backspace" });
+    fireEvent.compositionStart(editor);
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true, isComposing: true });
+    expect(input.onFinishTextEditing).not.toHaveBeenCalled();
+    expect(input.onDeleteSelected).not.toHaveBeenCalled();
+  });
+
   it("paints beside SVG in the same clipped coordinate space and preserves SVG event ownership", () => {
     dimensions();
     const input = props();

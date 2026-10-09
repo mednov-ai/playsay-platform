@@ -399,6 +399,32 @@ export function pointsToSvgPath(points: AnnotationPoint[]): string {
   );
 }
 
+// A gesture snapshot owns geometry, never the current caption or style.
+export function mergeAnnotationGeometry(
+  current: AnnotationElement,
+  geometry: AnnotationElement,
+  mode: "move" | "resize",
+): AnnotationElement {
+  if (current.id !== geometry.id || current.kind !== geometry.kind
+    || current.pageId !== geometry.pageId || current.anchorId !== geometry.anchorId) return current;
+  if (current.kind === "stroke" && geometry.kind === "stroke") {
+    return { ...current, points: geometry.points };
+  }
+  if ((current.kind === "line" || current.kind === "arrow") && (geometry.kind === "line" || geometry.kind === "arrow")) {
+    return { ...current, start: geometry.start, end: geometry.end };
+  }
+  if (!("x" in current) || !("x" in geometry)) return current;
+  return {
+    ...current,
+    x: clampCoordinate(geometry.x, annotationCoordinateMax - (mode === "resize" ? geometry.width : current.width)),
+    y: clampCoordinate(geometry.y, annotationCoordinateMax - (mode === "resize" ? geometry.height : current.height)),
+    ...(mode === "resize" ? { width: geometry.width, height: geometry.height } : {}),
+    ...(mode === "resize" && current.kind === "text" && geometry.kind === "text"
+      ? { autoWidth: geometry.autoWidth, autoHeight: geometry.autoHeight }
+      : {}),
+  };
+}
+
 export function moveAnnotationElement(
   element: AnnotationElement,
   deltaX: number,

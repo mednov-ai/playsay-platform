@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import {
   fetchScheduledLessonMaterialAnnotation,
   saveScheduledLessonMaterialAnnotation,
@@ -15,6 +15,7 @@ import {
   mindMapNodeLimit,
   mindMapNodes,
   moveAnnotationElement,
+  mergeAnnotationGeometry,
   resizeAnnotationElement,
   resizeMindMapNodeForText,
   svgPointFromEvent,
@@ -89,6 +90,7 @@ export function useLessonAnnotation({
   const [annotationStrokeWidth, setAnnotationStrokeWidth] = useState<AnnotationStrokeWidth>(8);
   const [defaultAnnotationFontSize, setDefaultAnnotationFontSize] = useState<AnnotationFontSize>(18);
   const [activePageId, setActivePageId] = useState(initialPageId?.trim() || defaultAnnotationPageId);
+  const [handoffPending, setHandoffPending] = useState(false);
   const [localAnnotationElements, setLocalAnnotationElements] = useState<AnnotationElement[]>([]);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
@@ -98,6 +100,12 @@ export function useLessonAnnotation({
   const captureTargetRef = useRef<SVGSVGElement | HTMLElement | null>(null);
   const elementsRef = useRef<AnnotationElement[]>([]);
   const localPersistenceRef = useRef<ReturnType<typeof createAnnotationPersistence> | null>(null);
+  const localDraftRef = useRef<AnnotationElement[]>([]);
+  const localBaselineRef = useRef<AnnotationElement[]>([]);
+  const localDirtyRef = useRef(false);
+  const persistenceTargetRef = useRef({ lessonId, materialId, live: Boolean(liveAnnotation) });
+  const contextRef = useRef<string | null>(null);
+  const handoffRef = useRef<{ baseline: AnnotationElement[]; draft: AnnotationElement[]; observedIds: Set<string> } | null>(null);
   const legacySeedRef = useRef<AnnotationContent | null>(null);
   const liveAnnotationRef = useRef<LiveAnnotationSync | null>(liveAnnotation ?? null);
   const liveElementCountRef = useRef(0);
@@ -108,9 +116,16 @@ export function useLessonAnnotation({
   const redoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
   const textEditBeforeRef = useRef<AnnotationElement | null>(null);
   const undoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
-  const annotationElements = controlledAnnotation?.elements ?? liveAnnotation?.elements ?? localAnnotationElements;
+  const pendingHandoff = handoffPending ? handoffRef.current : null;
+  const deletedHandoffIds = new Set(pendingHandoff && liveAnnotation
+    ? [...pendingHandoff.observedIds].filter((id) => !liveAnnotation.elements.some((element) => element.id === id))
+    : []);
+  const annotationElements = controlledAnnotation?.elements ?? (liveAnnotation && pendingHandoff
+    ? mergeLocalDraft(liveAnnotation.elements, pendingHandoff.baseline, localAnnotationElements, deletedHandoffIds)
+    : liveAnnotation?.elements ?? localAnnotationElements);
   const setAnnotationElements = controlledAnnotation?.setElements ?? liveAnnotation?.setElements ?? setLocalAnnotationElements;
   const normalizedInitialPageId = initialPageId?.trim() || defaultAnnotationPageId;
+  const annotationContextKey = JSON.stringify([lessonId, materialId, controlledAnnotation?.key, normalizedInitialPageId]);
   const selectedFontElement = selectedElementId
     ? annotationElements.find((element): element is Extract<AnnotationElement, { kind: "mindMapNode" | "text" }> => (
         element.id === selectedElementId && (element.kind === "text" || element.kind === "mindMapNode")
@@ -118,9 +133,10 @@ export function useLessonAnnotation({
     : null;
   const annotationFontSize = selectedFontElement?.fontSize ?? defaultAnnotationFontSize;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     liveAnnotationRef.current = liveAnnotation ?? null;
-  }, [liveAnnotation]);
+    persistenceTargetRef.current = { lessonId, materialId, live: Boolean(liveAnnotation) };
+  }, [lessonId, materialId, liveAnnotation]);
 
   useEffect(() => {
     elementsRef.current = annotationElements;
@@ -139,25 +155,41 @@ export function useLessonAnnotation({
 
   const hasLiveAnnotation = Boolean(liveAnnotation);
   useEffect(() => {
-    setActivePageId(normalizedInitialPageId);
-    pendingInteractionPointRef.current = null;
-    cancelPointerFrame();
-    resetHistory();
-    textEditBeforeRef.current = null;
-    setSelectedElementId(null);
-    setEditingElementId(null);
-    liveSeedAttemptedRef.current = false;
-    localLiveMutationRef.current = false;
-    legacySeedRef.current = null;
+    const context = annotationContextKey;
+    const sameContext = contextRef.current === context;
+    if (!sameContext) {
+      contextRef.current = context;
+      localDirtyRef.current = false;
+      localBaselineRef.current = [];
+      handoffRef.current = null;
+      setHandoffPending(false);
+      setActivePageId(normalizedInitialPageId);
+      pendingInteractionPointRef.current = null;
+      activeInteractionRef.current = null;
+      captureTargetRef.current = null;
+      cancelPointerFrame();
+      resetHistory();
+      textEditBeforeRef.current = null;
+      setSelectedElementId(null);
+      setEditingElementId(null);
+      liveSeedAttemptedRef.current = false;
+      localLiveMutationRef.current = false;
+      legacySeedRef.current = null;
+    }
     if (controlledAnnotation) {
       return;
     }
-    if (hasLiveAnnotation) setLocalAnnotationElements([]);
-    else replaceLocalElements([]);
+    if (!hasLiveAnnotation && !sameContext) replaceLocalElements([]);
     if (!materialId) {
       return;
     }
     if (hasLiveAnnotation) {
+      if (sameContext && localDirtyRef.current) {
+        handoffRef.current = { baseline: localBaselineRef.current, draft: localDraftRef.current, observedIds: new Set(liveAnnotationRef.current?.elements.map((element) => element.id)) };
+        setHandoffPending(!liveAnnotationRef.current?.ready);
+        seedLiveAnnotation();
+        return;
+      }
       let cancelled = false;
       void fetchScheduledLessonMaterialAnnotation(lessonId).then((annotation) => {
         if (cancelled) return;
@@ -175,6 +207,8 @@ export function useLessonAnnotation({
       },
       save: (content) => saveScheduledLessonMaterialAnnotation(lessonId, { content }),
       onLoad: (content) => {
+        localBaselineRef.current = content.elements;
+        localDirtyRef.current = false;
         setActivePageId(content.activePageId);
         replaceLocalElements(content.elements);
       },
@@ -182,14 +216,31 @@ export function useLessonAnnotation({
     localPersistenceRef.current = persistence;
     return () => {
       localPersistenceRef.current = null;
-      persistence.close();
+      const target = persistenceTargetRef.current;
+      persistence.close({ discardPending: target.live || (target.lessonId === lessonId && target.materialId !== materialId) });
     };
-  }, [controlledAnnotation?.key, hasLiveAnnotation, lessonId, liveAnnotation?.setElements, materialId, normalizedInitialPageId]);
+  }, [controlledAnnotation?.key, hasLiveAnnotation, lessonId, materialId, normalizedInitialPageId]);
 
   function seedLiveAnnotation() {
     const live = liveAnnotationRef.current;
     const content = legacySeedRef.current;
-    if (!live?.ready || !content || liveSeedAttemptedRef.current) return;
+    if (!live || liveSeedAttemptedRef.current) return;
+    const handoff = handoffRef.current;
+    if (handoff) {
+      const liveIds = new Set(live.elements.map((element) => element.id));
+      const deletedIds = new Set([...handoff.observedIds].filter((id) => !liveIds.has(id)));
+      if (!live.ready) {
+        live.elements.forEach((element) => handoff.observedIds.add(element.id));
+        return;
+      }
+      live.setElements((current) => mergeLocalDraft(current, handoff.baseline, handoff.draft, deletedIds));
+      handoffRef.current = null;
+      setHandoffPending(false);
+      localDirtyRef.current = false;
+      liveSeedAttemptedRef.current = true;
+      return;
+    }
+    if (!live.ready || !content) return;
     if (!localLiveMutationRef.current && liveElementCountRef.current === 0 && content.elements.length > 0) {
       live.setElements((current) => current.length === 0 ? content.elements : current);
     }
@@ -198,7 +249,7 @@ export function useLessonAnnotation({
 
   useEffect(() => {
     seedLiveAnnotation();
-  }, [liveAnnotation?.ready]);
+  }, [liveAnnotation?.ready, liveAnnotation?.elements]);
 
   const changeActivePageId = useCallback((pageId: string) => {
     setActivePageId(pageId);
@@ -207,14 +258,27 @@ export function useLessonAnnotation({
 
   function replaceLocalElements(elements: AnnotationElement[]) {
     elementsRef.current = elements;
+    localDraftRef.current = elements;
     setLocalAnnotationElements(elements);
   }
 
   function updateElements(updater: (current: AnnotationElement[]) => AnnotationElement[]) {
+    if (contextRef.current !== annotationContextKey) return;
+    const handoff = handoffRef.current;
+    if (handoff && liveAnnotationRef.current && !liveAnnotationRef.current.ready) {
+      const current = elementsRef.current;
+      const next = [...updater(current)].sort(compareAnnotationElements);
+      const baselineIds = new Set(handoff.baseline.map((element) => element.id));
+      handoff.baseline = [...handoff.baseline, ...liveAnnotationRef.current.elements.filter((element) => !baselineIds.has(element.id))];
+      handoff.draft = mergeLocalDraft(handoff.draft, current, next, deletedHandoffIds);
+      replaceLocalElements(handoff.draft);
+      return;
+    }
     if (liveAnnotationRef.current) {
       localLiveMutationRef.current = true;
     }
     if (!controlledAnnotation && !liveAnnotationRef.current) {
+      localDirtyRef.current = true;
       const next = [...updater(elementsRef.current)].sort(compareAnnotationElements);
       replaceLocalElements(next);
       localPersistenceRef.current?.change(annotationContentFromElements(next, activePageId));
@@ -313,25 +377,27 @@ export function useLessonAnnotation({
         updateElements((current) => current.map((element) => {
           const before = interaction.beforeGroup?.find((candidate) => candidate.id === element.id);
           return before?.kind === "mindMapNode"
-            ? { ...before, x: before.x + deltaX, y: before.y + deltaY }
+            ? mergeAnnotationGeometry(element, { ...before, x: before.x + deltaX, y: before.y + deltaY }, "move")
             : element;
         }));
         return;
       }
-      updateElementWithoutHistory(
+      updateElementGeometry(
         interaction.id,
         moveAnnotationElement(
           interaction.before,
           point.x - interaction.start.x,
           point.y - interaction.start.y,
         ),
+        "move",
       );
       return;
     }
     if (interaction.mode === "resize" && interaction.handle) {
-      updateElementWithoutHistory(
+      updateElementGeometry(
         interaction.id,
         resizeAnnotationElement(interaction.before, interaction.handle, point),
+        "resize",
       );
       return;
     }
@@ -871,6 +937,12 @@ export function useLessonAnnotation({
     updateElements((current) => current.map((element) => element.id === elementId ? next : element));
   }
 
+  function updateElementGeometry(elementId: string, geometry: AnnotationElement, mode: "move" | "resize") {
+    updateElements((current) => current.map((element) => element.id === elementId
+      ? mergeAnnotationGeometry(element, geometry, mode)
+      : element));
+  }
+
   function recordHistory(before: AnnotationElement[], after: AnnotationElement[]) {
     if (liveAnnotationRef.current) {
       return;
@@ -1039,3 +1111,22 @@ function cancelScheduledPointerFrame(frameId: number) {
 const defaultAnnotationPageId = "material";
 const historyLimit = 50;
 const minimumCreatedSize = 36;
+
+// Transfer only locally changed fields; concurrent live elements and fields remain authoritative.
+function mergeLocalDraft(current: AnnotationElement[], baseline: AnnotationElement[], draft: AnnotationElement[], deletedIds: Set<string>): AnnotationElement[] {
+  const before = new Map(baseline.map((element) => [element.id, element]));
+  const after = new Map(draft.map((element) => [element.id, element]));
+  const result = current.filter((element) => !before.has(element.id) || after.has(element.id));
+  for (const element of draft) {
+    if (deletedIds.has(element.id)) continue;
+    const original = before.get(element.id);
+    const index = result.findIndex((candidate) => candidate.id === element.id);
+    if (JSON.stringify(original) === JSON.stringify(element)) continue;
+    if (index === -1) { result.push(element); continue; }
+    const patch = Object.fromEntries(Object.entries(element).filter(([key, value]) => (
+      !original || JSON.stringify(value) !== JSON.stringify(original[key as keyof AnnotationElement])
+    )));
+    result[index] = { ...result[index], ...patch } as AnnotationElement;
+  }
+  return result.sort(compareAnnotationElements);
+}

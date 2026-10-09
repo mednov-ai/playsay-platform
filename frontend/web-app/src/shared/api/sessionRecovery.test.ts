@@ -82,6 +82,17 @@ describe("session recovery regressions", () => {
     expect(await task).toMatchObject({ errorCode: "SESSION_UNAVAILABLE" });
     expect(fetch).toHaveBeenCalledTimes(2); expect(readTokens()?.refreshToken).toBe("refresh");
   });
+  it("does not restart exhausted renewal from background callers before Retry", async () => {
+    storeTokens({ accessToken: "old", refreshToken: "refresh", expiresAt: 0 });
+    const fetch = vi.fn().mockImplementation(async () => new Response("", { status: 429, headers: { "Retry-After": "60" } }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(getValidAccessToken()).rejects.toMatchObject({ errorCode: "SESSION_UNAVAILABLE" });
+    await expect(getValidAccessToken()).rejects.toMatchObject({ errorCode: "SESSION_UNAVAILABLE" });
+    expect(fetch).toHaveBeenCalledOnce();
+    reportSessionRecovery("recovering");
+    fetch.mockResolvedValueOnce(tokenResponse("new"));
+    expect(await getValidAccessToken()).toBe("new"); expect(fetch).toHaveBeenCalledTimes(2);
+  });
   it("respects Retry-After that exceeds the local budget", async () => {
     storeTokens({ accessToken: "old", refreshToken: "refresh", expiresAt: 0 });
     const fetch = vi.fn().mockResolvedValue(new Response("", { status: 429, headers: { "Retry-After": "60" } })); vi.stubGlobal("fetch", fetch);

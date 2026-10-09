@@ -1,6 +1,6 @@
 # Lesson Text collaboration hotfix — local preparation
 
-Status on 2026-10-09: reviewed local frontend implementation; draft integration only. Develop acceptance, remote CI and numeric ready-candidate gates are pending. Production promotion is not authorized.
+Status on 2026-10-09: reviewed local frontend implementation; owner-authorized develop integration and release preparation in progress. Develop acceptance, remote CI and numeric ready-candidate gates are pending. Production promotion is not authorized.
 
 ## Cause and change
 
@@ -18,9 +18,9 @@ The external Playwright runner exercises actual LessonTaskCanvas with two Yjs cl
 
 ## Pending delivery decisions and limits
 
-A fresh full frontend audit retains five high findings for the exact existing braces/chokidar/fast-glob/micromatch/Tailwind chain. No compatible braces patch is published. Existing owner exceptions enumerate earlier candidates; this hotfix awaits its own exact-scope acceptance to the unchanged expiry. The exception file has not been broadened.
+A fresh full frontend audit retains five high findings for the exact existing braces/chokidar/fast-glob/micromatch/Tailwind chain. No compatible braces patch is published. Existing owner exceptions enumerate earlier candidates; the owner explicitly applied the same exception to this hotfix on 2026-10-09, through the unchanged 2026-12-05 10:46:15 UTC expiry. The exact scope and chain are recorded in the acceptance JSON. This is passed-with-accepted-risks, not a vulnerability fix.
 
-The legacy REST endpoint selects the currently assigned material server-side from a lesson-only URL. Dropping queued writes cannot recall an already issued request during a concurrent material reassignment. The stronger API-level material guard is a separate unresolved scope decision; it is not claimed as implemented or accepted.
+The legacy REST endpoint selects the currently assigned material server-side from a lesson-only URL. Dropping queued writes cannot recall an already issued request during a concurrent material reassignment. The stronger API-level material guard is explicitly deferred by the owner to a future change; it is not claimed as implemented or accepted.
 
 Fresh infra develop `4763c50e63d568c88f9c74e146967499602156c6` still points to `release/01.007.16`; platform production source is `b3da7da314702765d04a5616233a29f6e696be09`. The next unused numeric fix observed is `release/01.007.17`, but no release branch/candidate is created. The runbook's release-version helper is absent from current develop; its last retained pre-deletion version was used from Git history solely to calculate that number. Revalidate refs and acceptedDevCommit before an actual release build.
 

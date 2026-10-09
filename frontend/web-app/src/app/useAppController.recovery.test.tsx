@@ -85,6 +85,29 @@ describe("session recovery through the app controller", () => {
     expect(view.result.current.isAuthenticated).toBe(false);
     expect(view.result.current.recoveryPhase).toBe("signInRequired");
   });
+  it("does not start a parallel silent login when explicit continuation releases the room", async () => {
+    installApi(); const view = renderHook(() => useAppController());
+    await waitFor(() => expect(view.result.current.status).toBe("authenticated"));
+    await act(async () => { await view.result.current.joinScheduledLesson({ id: "fixture" } as never); await view.result.current.confirmScheduledLessonJoin({ id: "fixture" } as never, {} as never); });
+    act(() => rejectAccessToken("valid"));
+    const original = Object.getOwnPropertyDescriptor(window.crypto, "subtle");
+    const completions: Array<(value: ArrayBuffer) => void> = [];
+    const digest = vi.fn(() => new Promise<ArrayBuffer>((resolve) => { completions.push(resolve); }));
+    Object.defineProperty(window.crypto, "subtle", { configurable: true, value: { digest } });
+    let continuation: Promise<void> | undefined;
+    try {
+      act(() => { continuation = view.result.current.continueSessionLogin(); });
+      await act(async () => { await Promise.resolve(); });
+      expect(digest).toHaveBeenCalledTimes(1);
+      expect(view.result.current.recoveryPhase).toBe("recovering");
+      expect(view.result.current.roomSession).toBeNull();
+    } finally {
+      completions.forEach((resolve) => resolve(new ArrayBuffer(32)));
+      await act(async () => { await continuation; });
+      if (original) Object.defineProperty(window.crypto, "subtle", original);
+      else Reflect.deleteProperty(window.crypto, "subtle");
+    }
+  });
   it("does not restore the old account when logout happens during bootstrap", async () => {
     let finish!: (value: Response) => void;
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; })));

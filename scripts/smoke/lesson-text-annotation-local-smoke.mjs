@@ -44,7 +44,7 @@ try {
     await context.route(url=>url.pathname.startsWith('/api/'),route=>{
      const url=route.request().url();
      const room=new URL(route.request().frame().url()).searchParams.get('room');
-     route.fulfill({json:url.endsWith('/token')?{websocketUrl:socketUrl,yjsDocumentId:room,token:'synthetic'}:url.includes('material-annotation')?{content:{activePageId:'page-1',elements:[]}}:[]});
+     route.fulfill({json:url.endsWith('/token')?{websocketUrl:socketUrl,documentId:room,yjsDocumentId:room,token:'synthetic'}:url.includes('material-annotation')?{content:{activePageId:'page-1',elements:[]}}:[]});
     });
     const teacher=await context.newPage(); const student=await context.newPage();
     teacher.on('pageerror',e=>{errors.push(e.message);console.log('PAGE',e.message)});teacher.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text())});student.on('pageerror',e=>errors.push(e.message));
@@ -56,6 +56,45 @@ try {
     await layer.click({position:{x:80,y:110}});
     const editor=teacher.locator('.playsay-annotation-text-text textarea');await editor.fill('Привет JPEG\nLine two ');
     const expected='Привет JPEG\nLine two ';
+    await student.waitForFunction(text=>window.smoke.elements.some(e=>e.text===text),expected);
+    for (const [writer, mover, actor] of [[teacher, student, 'teacher'], [student, teacher, 'student']]) {
+      for (const mode of ['move', 'resize']) {
+        await mover.locator('[data-testid="annotation-tool-pointer"]').click();
+        const writerBox = writer.locator('.playsay-annotation-html-element').first();
+        if (!await writer.locator('textarea').count()) await writerBox.dblclick();
+        const currentEditor = writer.locator('.playsay-annotation-text-text textarea');
+        await currentEditor.waitFor();
+        const moverBox = mover.locator('.playsay-annotation-html-element').first();
+        let bounds = await moverBox.boundingBox();
+        if (mode === 'resize') {
+          await moverBox.click({position:{x:2,y:2}});
+          bounds = await mover.locator('.playsay-annotation-resize-handle').last().boundingBox();
+        }
+        await mover.evaluate(() => {
+          window.lastGestureTarget = null;
+          document.addEventListener('pointerdown', event => { window.lastGestureTarget = event.target.classList?.contains('playsay-annotation-resize-handle') ? 'resize-handle' : 'box'; }, {once:true,capture:true});
+        });
+        const x = bounds.x + (mode === 'resize' ? bounds.width/2 : 2);
+        const y = bounds.y + (mode === 'resize' ? bounds.height/2 : 2);
+        await mover.mouse.move(x,y); await mover.mouse.down();
+        if (mode === 'resize') assert.equal(await mover.evaluate(()=>window.lastGestureTarget), 'resize-handle');
+        const value = ` ${actor} concurrent ${mode}\nПоследний символ Я `;
+        await currentEditor.fill(value);
+        await mover.waitForFunction(text=>window.smoke.elements.some(e=>e.text===text), value);
+        await mover.mouse.move(x+12,y+8); await mover.mouse.up();
+        await writer.waitForFunction(text=>window.smoke.elements.some(e=>e.text===text), value);
+        assert.equal(await currentEditor.inputValue(), value);
+        await mover.waitForFunction(text=>window.smoke.elements.some(e=>e.text===text), value);
+        await currentEditor.press('Control+Enter');
+        if (name === 'webkit') {
+          // Dispatch the same event without WebKit's browser-history Backspace default.
+          await writer.evaluate(()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Backspace',bubbles:true,cancelable:true})));
+        } else await writer.keyboard.press('Backspace');
+        assert.equal(await writer.evaluate(()=>window.smoke.elements.length),1);
+      }
+    }
+    await teacher.locator('.playsay-annotation-html-element').first().dblclick();
+    await editor.fill(expected);
     await student.waitForFunction(text=>window.smoke.elements.some(e=>e.text===text),expected);
     await student.evaluate(()=>window.smoke.addRemote());
     await teacher.waitForFunction(()=>window.smoke.elements.length===2);
@@ -113,7 +152,7 @@ try {
       await student.waitForFunction(text=>window.smoke?.elements.some(e=>e.text===text),value);
     }
     assert.deepEqual(errors,[]);
-    results.push({browser:name,version:browser.version(),layout,passed:true,paintedGlyphPixels:painted,longTextScroll:true,moveAndResize:true,elements:await teacher.evaluate(()=>window.smoke.elements.map(e=>({id:e.id,anchorId:e.anchorId,text:e.text}))) });
+    results.push({browser:name,version:browser.version(),layout,passed:true,paintedGlyphPixels:painted,longTextScroll:true,moveAndResize:true,concurrentBothDirections:true,keyboardAfterBlur:true,elements:await teacher.evaluate(()=>window.smoke.elements.map(e=>({id:e.id,anchorId:e.anchorId,text:e.text}))) });
     await context.close();
    }
   } finally {await browser.close();}

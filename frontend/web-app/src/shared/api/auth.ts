@@ -166,12 +166,13 @@ export async function startLogin(config = authConfig): Promise<void> {
   reportSessionRecovery("recovering");
   resetSilentRecovery();
   window.sessionStorage.removeItem(skipSilentLoginStorageKey);
+  const returnPath = currentLoginReturnPath();
   const redirectUri = getRedirectUri(config);
   const codeVerifier = createCodeVerifier();
   const codeChallenge = await createCodeChallenge(codeVerifier);
   const state = createCodeVerifier();
   const language = currentApiLanguage();
-  const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath: currentLoginReturnPath() };
+  const flow: LoginFlow = { codeVerifier, state, redirectUri, returnPath };
 
   rememberPendingLoginLanguage(language);
   window.sessionStorage.setItem(flowStorageKey, JSON.stringify(flow));

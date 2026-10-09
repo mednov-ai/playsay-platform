@@ -18,7 +18,7 @@ The external Playwright runner exercises actual LessonTaskCanvas with two Yjs cl
 
 ## Pending delivery decisions and limits
 
-A fresh full frontend audit retains five high findings for the exact existing braces/chokidar/fast-glob/micromatch/Tailwind chain. No compatible braces patch is published. Existing owner exceptions enumerate earlier candidates; the owner explicitly applied the same exception to this hotfix on 2026-10-09, through the unchanged 2026-12-05 10:46:15 UTC expiry. The exact scope and chain are recorded in the acceptance JSON. This is passed-with-accepted-risks, not a vulnerability fix.
+A fresh full frontend audit retains six high package findings (the same advisory, including the already recorded indirect tailwindcss-animate) for the exact existing braces/chokidar/fast-glob/micromatch/Tailwind chain. No compatible braces patch is published. Existing owner exceptions enumerate earlier candidates; the owner explicitly applied the same exception to this hotfix on 2026-10-09, through the unchanged 2026-12-05 10:46:15 UTC expiry. The exact scope and chain are recorded in the acceptance JSON. This is passed-with-accepted-risks, not a vulnerability fix.
 
 The legacy REST endpoint selects the currently assigned material server-side from a lesson-only URL. Dropping queued writes cannot recall an already issued request during a concurrent material reassignment. The stronger API-level material guard is explicitly deferred by the owner to a future change; it is not claimed as implemented or accepted.
 

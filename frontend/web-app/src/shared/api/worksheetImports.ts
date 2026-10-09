@@ -1,6 +1,6 @@
-import { authConfig, clearTokens, type AuthConfig } from "./auth";
+import { authConfig, getCredentialGeneration, type AuthConfig } from "./auth";
 import { apiErrorFromResponse, apiFetch } from "./errors";
-import { apiJson, authorizedOptions } from "./http";
+import { apiJson, authorizedOptions, assertAuthorizedResponse } from "./http";
 
 export type WorksheetImportStatus = "ANALYZING" | "REVIEW_REQUIRED" | "READY" | "FAILED" | "MATERIALIZED";
 export type WorksheetPageRole = "WORKSHEET" | "ANSWER_KEY" | "STATIC_REFERENCE";
@@ -62,10 +62,13 @@ export async function createWorksheetImport(
   form.append("metadata", new Blob([JSON.stringify(input)], { type: "application/json" }));
   files.forEach((file) => form.append("files", file));
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch("/api/worksheet-imports", { method: "POST", body: form, headers: authorized.headers });
-  if (response.status === 401) clearTokens();
+  assertAuthorizedResponse(response, authorized, generation);
   if (response.status !== 201) throw await apiErrorFromResponse(response, "");
-  return response.json() as Promise<WorksheetImportCreation>;
+  const data = await response.json() as WorksheetImportCreation;
+  assertAuthorizedResponse(response, authorized, generation);
+  return data;
 }
 
 export const fetchWorksheetImport = (sessionId: string, config: AuthConfig = authConfig) =>
@@ -93,8 +96,11 @@ export const materializeWorksheetImport = (
 
 export async function fetchWorksheetPagePreview(sessionId: string, pageId: string, config: AuthConfig = authConfig): Promise<string> {
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch(`/api/worksheet-imports/${sessionId}/pages/${pageId}/preview`, { headers: authorized.headers });
-  if (response.status === 401) clearTokens();
+  assertAuthorizedResponse(response, authorized, generation);
   if (response.status !== 200) throw await apiErrorFromResponse(response, "");
-  return URL.createObjectURL(await response.blob());
+  const body = await response.blob();
+  assertAuthorizedResponse(response, authorized, generation);
+  return URL.createObjectURL(body);
 }

@@ -1,3 +1,5 @@
+import { SessionRecoveryNotice } from "../shared/ui/SessionRecoveryNotice";
+import type { RecoveryPhase } from "../shared/api/sessionRecovery";
 import { LessonExtensionOffer } from "../features/classroom/ui/LessonExtensionOffer";
 import { lazy, Suspense, useCallback, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { publicSiteUrl } from "@playsay/shared-ui";
@@ -77,6 +79,9 @@ const EmailDeliveriesPanel = lazy(() => import("../features/email-deliveries/ui/
 const GlobalToolsRail = lazy(() => import("../features/chat/ui/GlobalToolsRail").then((module) => ({ default: module.GlobalToolsRail })));
 
 export type AppShellProps = {
+  recoveryPhase?: RecoveryPhase;
+  retrySessionRecovery?: () => void;
+  continueSessionLogin?: () => Promise<void>;
   adminLoading: boolean;
   adminMessage: string | null;
   adminUsers: AdminUserProfile[];
@@ -170,6 +175,9 @@ export function AppShell(props: AppShellProps) {
   const theme = useAppTheme();
   const [materialAuthoringState, setMaterialAuthoringState] = useState({ dirty: false, focused: false });
   const {
+    recoveryPhase = "ready",
+    retrySessionRecovery = () => undefined,
+    continueSessionLogin = startLogin,
     adminLoading,
     adminMessage,
     adminUsers,
@@ -315,6 +323,8 @@ export function AppShell(props: AppShellProps) {
       className={`${isClassroomOpen ? "h-dvh overflow-hidden" : "min-h-screen overflow-hidden"} bg-background text-foreground`}
       data-playsay-tools-layout={hasGlobalTools ? "true" : undefined}
     >
+      <SessionRecoveryNotice phase={recoveryPhase} activeClassroom={roomSession !== null}
+        onRetry={retrySessionRecovery} onSignIn={() => void continueSessionLogin()} />
       {hasGlobalTools && profile ? (
         <Suspense fallback={null}>
           <GlobalToolsRail classroomDice={roomSession ? lessonDice : undefined} profile={profile} />

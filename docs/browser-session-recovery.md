@@ -1,0 +1,25 @@
+# Honey School browser session recovery
+
+The online app supports coordinated credential renewal and bounded recovery on both production origins and their dev aliases. This is a frontend hotfix; Keycloak remains the identity provider, and backend permission, revocation and lesson admission remain authoritative.
+
+## Behavior
+
+- Concurrent REST/realtime callers share one renewal for the current credential generation. Late renewal, callback and API responses cannot overwrite or clear newer credentials or restore a logged-out account.
+- Temporary auth/API failures retain credentials without sending an expired token as authority. Auth fetches have a 10-second deadline; renewal allows at most two attempts within a 25-second local budget and honors bounded Retry-After. User Retry starts an explicit new attempt. Business writes are never automatically replayed.
+- Terminal token rejection allows one silent PKCE/OIDC recovery episode. Interaction-required, stale navigation markers, protocol errors or failed recovery expose explicit sign-in. Identity verification completes recovery; a successful token response alone does not reset the redirect budget.
+- Safe internal navigation stays on the initiating origin. Callback credentials and shared lesson-link bearer fragments are excluded from stored return paths; the existing lesson-entry continuation remains responsible for admission.
+- Verified identity is separate from module availability. Materials/schedule/people failures provide their own retry messages. Required profile/permission context gates dependent actions without deleting credentials on temporary failure.
+- Foreground/pageshow and pre-admission work use the same renewal coordinator. An active classroom remains mounted during temporary failure. Navigation to recover terminal rejection requires a user action explaining the local interruption and never finishes the shared lesson.
+- Visible and assistive recovery controls are localized in ru/en/de/fr. Local diagnostics retain at most 20 allowlisted outcome/count/timing records and reset on logout. They contain no credentials, identities, user content, return URLs or provider bodies.
+
+The local deadline does not bound a browser stalled on an external identity-provider page. A silent recovery marker older than 60 seconds terminates automatic recovery when the app is revisited. Explicit logout and account replacement still clear old account state; ordinary refreshed credentials do not create a second identity provider or extend session lifetime.
+
+## Implementation verification
+
+The implementation is based on platform develop `af7e2e2128860ce7e790dab737b600a32a56ed8d`. The primary dirty workspace was preserved; an isolated checkout contains this patch. Regression tests first reproduced duplicate refresh, token deletion after HTTP 503 and undifferentiated terminal rejection.
+
+Verification includes real app-controller state paths, stale API/callback completion, lost mutation response, refresh deadline/Retry-After, foreground overlap, active-room preservation and all four translations. External Playwright uses the local production build with synthetic API/OIDC responses for both origin policies at desktop 1366×900 and mobile 390×844. Synthetic OIDC continuation does not constitute live Keycloak/dev/production acceptance.
+
+A fresh full npm audit discovered GHSA-6qxp-vccf-f47h in the transitive MCP SDK. The lockfile-only compatible update from 1.30.0 to 1.32.1 removes that finding. The remaining GHSA-vfj7-8cjw-p6xm build-tool findings require an exact accepted scope or a verified compatible fix before publication; prior exceptions for other hotfixes are not automatically extended. Full reports remain operator artifacts outside commits.
+
+No runtime rollout or numeric production release is established by these local checks. Delivery requires the infra runbook gates and separate authority. Integration evidence must identify source and published develop SHAs and verify semantic content and regressions before this hotfix is declared integrated.

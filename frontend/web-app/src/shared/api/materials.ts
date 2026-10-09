@@ -1,7 +1,7 @@
-import { authConfig, clearTokens } from "./auth";
+import { authConfig, getCredentialGeneration } from "./auth";
 import { apiErrorFromResponse, apiFetch, isApiStatus } from "./errors";
 import { validateHtmlGameUpload } from "./htmlGameUploadPolicy";
-import { apiJson, authorizedOptions } from "./http";
+import { apiJson, authorizedOptions, assertAuthorizedResponse } from "./http";
 import type {
   LessonMaterial,
   LessonMaterialAnnotation,
@@ -155,13 +155,12 @@ export async function fetchMaterialAssetObjectUrl(
   config = authConfig,
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
     headers: authorized.headers,
   });
 
-  if (response.status === 401) {
-    clearTokens();
-  }
+  assertAuthorizedResponse(response, authorized, generation);
 
   if (response.status !== 200) {
     throw await apiErrorFromResponse(
@@ -170,7 +169,9 @@ export async function fetchMaterialAssetObjectUrl(
     );
   }
 
-  return URL.createObjectURL(await response.blob());
+  const body = await response.blob();
+  assertAuthorizedResponse(response, authorized, generation);
+  return URL.createObjectURL(body);
 }
 
 export async function updateMaterialAsset(
@@ -213,6 +214,7 @@ export async function uploadMaterialDocument(
   config = authConfig,
 ): Promise<MaterialDocumentUpload> {
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const body = new FormData();
   body.append("file", file);
   const response = await apiFetch(`/api/materials/${materialId}/assets/documents`, {
@@ -220,11 +222,13 @@ export async function uploadMaterialDocument(
     headers: { ...authorized.headers, "Idempotency-Key": idempotencyKey },
     body,
   });
-  if (response.status === 401) clearTokens();
+  assertAuthorizedResponse(response, authorized, generation);
   if (response.status !== 201) {
     throw await apiErrorFromResponse(response, `Document upload failed with HTTP ${response.status}.`);
   }
-  return (await response.json()) as MaterialDocumentUpload;
+  const data = (await response.json()) as MaterialDocumentUpload;
+  assertAuthorizedResponse(response, authorized, generation);
+  return data;
 }
 
 export async function fetchMaterialDocumentUpload(
@@ -339,16 +343,17 @@ export async function fetchMaterialAssetText(
   config = authConfig,
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
     headers: authorized.headers,
   });
-  if (response.status === 401) {
-    clearTokens();
-  }
+  assertAuthorizedResponse(response, authorized, generation);
   if (response.status !== 200) {
     throw await apiErrorFromResponse(response, `Material asset content request failed with HTTP ${response.status}.`);
   }
-  return response.text();
+  const body = await response.text();
+  assertAuthorizedResponse(response, authorized, generation);
+  return body;
 }
 
 export async function appendMaterialImagePage(
@@ -405,21 +410,22 @@ async function uploadImagePage<T>(
   }
 
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch(path, {
     body: formData,
     headers: authorized.headers,
     method: "POST",
   });
 
-  if (response.status === 401) {
-    clearTokens();
-  }
+  assertAuthorizedResponse(response, authorized, generation);
 
   if (response.status !== 201) {
     throw await apiErrorFromResponse(response, `Image page upload failed with HTTP ${response.status}.`);
   }
 
-  return (await response.json()) as T;
+  const data = (await response.json()) as T;
+  assertAuthorizedResponse(response, authorized, generation);
+  return data;
 }
 
 async function uploadMaterialAsset(
@@ -430,18 +436,19 @@ async function uploadMaterialAsset(
   const formData = new FormData();
   formData.append("file", file);
   const authorized = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
   const response = await apiFetch(path, {
     body: formData,
     headers: authorized.headers,
     method: "POST",
   });
-  if (response.status === 401) {
-    clearTokens();
-  }
+  assertAuthorizedResponse(response, authorized, generation);
   if (response.status !== 201) {
     throw await apiErrorFromResponse(response, `Material asset upload failed with HTTP ${response.status}.`);
   }
-  return (await response.json()) as LessonMaterialAsset;
+  const data = (await response.json()) as LessonMaterialAsset;
+  assertAuthorizedResponse(response, authorized, generation);
+  return data;
 }
 
 export async function fetchScheduledLessonMaterialSubmission(

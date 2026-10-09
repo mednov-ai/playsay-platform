@@ -96,7 +96,8 @@ describe("session recovery through the app controller", () => {
     Object.defineProperty(window.crypto, "subtle", { configurable: true, value: { digest } });
     let continuation: Promise<void> | undefined;
     try {
-      act(() => { continuation = view.result.current.continueSessionLogin(); });
+      expect(view.result.current.continueSessionLogin).toBeTypeOf("function");
+      act(() => { continuation = view.result.current.continueSessionLogin?.(); });
       await act(async () => { await Promise.resolve(); });
       expect(digest).toHaveBeenCalledTimes(1);
       expect(view.result.current.recoveryPhase).toBe("recovering");

@@ -7,3 +7,5 @@ The compatible lockfile update of MCP SDK 1.30.0 to 1.32.1 removes GHSA-6qxp-vcc
 Retain full raw audit and resolved-version evidence with the release artifacts. Neither omit-dev scans nor this frontend acceptance extend the expired JVM exceptions. Release scope must exclude unrelated develop changes and retain exact-source DEV, schema-convergence, backup and GitOps acceptance.
 
 Sources: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm ; https://github.com/micromatch/braces/pull/87 ; https://github.com/advisories/GHSA-6qxp-vccf-f47h
+
+The production-based .16 candidate has no installed MCP SDK; its full audit verifies the SDK finding is absent. Develop keeps the compatible1.32.1 update. Both candidate and develop retain only the exact separately accepted braces-chain advisory, with unchanged expiry.

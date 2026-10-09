@@ -84,6 +84,7 @@ const renewalBudgetMs = 25_000;
 export function getCredentialGeneration(): number { return credentialGeneration; }
 export function markSessionVerified(): void {
   window.sessionStorage.removeItem(recoveryStorageKey);
+  window.sessionStorage.removeItem(flowStorageKey);
   reportSessionRecovery("ready");
 }
 export function resetSilentRecovery(): void { window.sessionStorage.removeItem(recoveryStorageKey); }
@@ -163,7 +164,8 @@ export function storeTokens(tokens: TokenSet): void {
 }
 
 export async function startLogin(config = authConfig): Promise<void> {
-  // Reserve interactive recovery before PKCE yields or the active room is released.
+  // Explicit login supersedes old requests before PKCE or local room departure.
+  invalidateCredentials();
   reportSessionRecovery("recovering");
   resetSilentRecovery();
   window.sessionStorage.removeItem(skipSilentLoginStorageKey);

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { webcrypto } from "node:crypto";
 import { apiJson, authorizedRequest } from "./http";
 import { getSessionRecoveryDiagnostics, reportSessionRecovery } from "./sessionRecovery";
-import { clearTokens, getValidAccessToken, readTokens, storeTokens, authConfig, recoverSession, markSessionVerified, skipSilentLoginOnce, safeReturnPath, completeLogin } from "./auth";
+import { clearTokens, getValidAccessToken, readTokens, storeTokens, authConfig, recoverSession, markSessionVerified, skipSilentLoginOnce, safeReturnPath, completeLogin, startLogin } from "./auth";
 
 describe("session recovery regressions", () => {
   beforeEach(() => { sessionStorage.clear(); clearTokens(); });
@@ -120,6 +120,21 @@ describe("session recovery regressions", () => {
     await expect(recoverSession()).rejects.toMatchObject({ errorCode: "SESSION_REJECTED" });
     expect(assign).toHaveBeenCalledOnce();
     markSessionVerified(); await recoverSession(); expect(assign).toHaveBeenCalledTimes(2);
+  });
+  it("explicit login supersedes an older pending renewal without losing its flow", async () => {
+    const assign = stubNavigation();
+    storeTokens({ accessToken: "old", refreshToken: "refresh", expiresAt: 0 });
+    const pending = deferred<Response>(); vi.stubGlobal("fetch", vi.fn(() => pending.promise));
+    const renewal = getValidAccessToken().catch((error: unknown) => error);
+    await startLogin();
+    const flow = sessionStorage.getItem("playsay.auth.loginFlow");
+    pending.resolve(tokenResponse("late"));
+    expect(await renewal).toMatchObject({ errorCode: "SESSION_CHANGED" });
+    expect(readTokens()).toBeNull();
+    expect(sessionStorage.getItem("playsay.auth.loginFlow")).toBe(flow);
+    expect(assign).toHaveBeenCalledOnce();
+    markSessionVerified();
+    expect(sessionStorage.getItem("playsay.auth.loginFlow")).toBeNull();
   });
   it("does not silently recover explicit logout", async () => {
     const assign = stubNavigation(); skipSilentLoginOnce();

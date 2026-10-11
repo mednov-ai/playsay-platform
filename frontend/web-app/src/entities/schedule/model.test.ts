@@ -6,6 +6,7 @@ import {
   formatLessonType,
   formatParticipantCount,
   isJoinableScheduledLesson,
+  isArchivedScheduleLesson,
   isScheduledLessonReadyToStart,
   isTeacherLessonActionable,
   isWeeklyRecurrenceValid,
@@ -221,5 +222,23 @@ describe("schedule model", () => {
     expect(stepDurationMinutes("5", -10)).toBe("10");
     expect(stepDurationMinutes("190", 10)).toBe("180");
     expect(stepDurationMinutes("", 10)).toBe("55");
+  });
+});
+
+
+describe("schedule visibility is independent of entry", () => {
+  const now = Date.parse("2026-10-11T09:00:00Z");
+  it.each([
+    ["tomorrow", "SCHEDULED", "2026-10-12T09:05:00Z", "2026-10-12T10:00:00Z", true, false],
+    ["planned inside window", "SCHEDULED", "2026-10-11T09:05:00Z", "2026-10-11T10:00:00Z", true, false],
+    ["active inside window", "IN_PROGRESS", "2026-10-11T09:05:00Z", "2026-10-11T10:00:00Z", true, true],
+    ["cancelled", "CANCELLED", "2026-10-11T09:05:00Z", "2026-10-11T10:00:00Z", false, false],
+    ["completed", "COMPLETED", "2026-10-11T09:05:00Z", "2026-10-11T10:00:00Z", false, false],
+    ["extended past scheduled end", "IN_PROGRESS", "2026-10-11T08:00:00Z", "2026-10-11T09:10:00Z", true, true],
+    ["exact extended cutoff", "IN_PROGRESS", "2026-10-11T08:00:00Z", "2026-10-11T09:00:00Z", false, false],
+  ] as const)("%s", (_name, status, scheduledStart, accessEndsAt, visible, joinable) => {
+    const value = lesson({ status, scheduledStart, scheduledEnd: "2026-10-11T08:45:00Z", accessEndsAt });
+    expect(!isArchivedScheduleLesson(value, now)).toBe(visible);
+    expect(isJoinableScheduledLesson(value, now)).toBe(joinable);
   });
 });

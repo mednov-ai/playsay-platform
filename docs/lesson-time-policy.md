@@ -11,3 +11,11 @@ The additive migration stores extension seconds (default zero) and a monotonic a
 The frontend anchors server time to performance.now at receipt and never uses the device wall clock for lesson availability. On resume/reconnect it refreshes the anchor, and at expiry it reconciles the current server policy before closing. A five-second network bound and the last trusted anchor handle unavailable synchronization without inventing extra time. An offline participant cannot learn a new extension until connectivity recovers. Expiry need not overwrite the stored historical lesson status: accessAllowed and the deadline remain authoritative.
 
 Implementation acceptance requires skewed device clocks, repeated extensions, concurrent requests, stale events, missed realtime delivery, reload/sleep, lost responses and authorized teacher/student rejoin. Real browser/DEV/production acceptance must be reported independently from local unit/integration results.
+
+## Student schedule visibility
+
+An assigned planned lesson is visible from creation, including before its access window opens and before the teacher starts it. Visibility in the schedule does not grant classroom admission. Join controls retain the existing status, roster, admission and server-time checks.
+
+Student schedule cleanup excludes only closed or expired lessons, using the effective deadline including accepted extensions after valid server-time synchronization. It must not use join eligibility to filter the lesson list. Initial load, reload, schedule change recovery, reconnect and subsequent clock ticks preserve eligible planned lessons; rescheduling an active lesson into the future closes its classroom but keeps the planned card. Teacher/admin archive behavior is unchanged.
+
+Regression acceptance includes teacher creation for tomorrow with an already-open student schedule, several clock ticks, reload and reconnect without first entry. Verify that the card remains visible and early room-token/direct-route attempts remain denied; also cover teacher start, future reschedule, closure, roster removal and the exact extended cutoff.

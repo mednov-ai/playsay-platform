@@ -1,6 +1,6 @@
 import { serverNowMs, invalidateServerClock, serverClockSynchronized } from "../../shared/lib/serverClock";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { isArchivedScheduleLesson, isJoinableScheduledLesson } from "../../entities/schedule/model";
+import { isArchivedScheduleLesson } from "../../entities/schedule/model";
 import {
   buildLessonRealtimeUrl,
   isRoomSessionExpired,
@@ -133,7 +133,7 @@ export function useLessonRealtime({
 
     const canManageSchedule = profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ?? false;
     if (!canManageSchedule) {
-      if (serverClockSynchronized()) setScheduledLessons((current) => current.filter((lesson) => isJoinableScheduledLesson(lesson, nowMs)));
+      if (serverClockSynchronized()) setScheduledLessons((current) => current.filter((lesson) => !isArchivedScheduleLesson(lesson, nowMs)));
     }
 
     if (roomSession && isRoomSessionExpired(roomSession, nowMs)) {

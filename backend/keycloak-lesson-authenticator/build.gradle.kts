@@ -11,19 +11,19 @@ java {
 
 dependencies {
     // Match the dependency management of the pinned Keycloak server image.
-    compileOnly(platform("org.keycloak:keycloak-parent:26.7.3"))
-    testImplementation(platform("org.keycloak:keycloak-parent:26.7.3"))
-    compileOnly("org.keycloak:keycloak-server-spi:26.7.3")
-    compileOnly("org.keycloak:keycloak-server-spi-private:26.7.3")
-    compileOnly("org.keycloak:keycloak-services:26.7.3")
+    compileOnly(platform("org.keycloak:keycloak-parent:26.8.1"))
+    testImplementation(platform("org.keycloak:keycloak-parent:26.8.1"))
+    compileOnly("org.keycloak:keycloak-server-spi:26.8.1")
+    compileOnly("org.keycloak:keycloak-server-spi-private:26.8.1")
+    compileOnly("org.keycloak:keycloak-services:26.8.1")
     compileOnly("com.fasterxml.jackson.core:jackson-databind")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
     testImplementation("org.mockito:mockito-core:5.15.2")
-    testImplementation("org.keycloak:keycloak-server-spi:26.7.3")
-    testImplementation("org.keycloak:keycloak-server-spi-private:26.7.3")
-    testImplementation("org.keycloak:keycloak-services:26.7.3")
+    testImplementation("org.keycloak:keycloak-server-spi:26.8.1")
+    testImplementation("org.keycloak:keycloak-server-spi-private:26.8.1")
+    testImplementation("org.keycloak:keycloak-services:26.8.1")
     testImplementation("com.fasterxml.jackson.core:jackson-databind")
 }
 

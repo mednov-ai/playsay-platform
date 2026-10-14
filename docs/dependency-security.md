@@ -38,6 +38,10 @@ On 2026-10-14 the owner explicitly renewed only CVE-2026-53914 for one calendar 
 
 The two existing exact false-positive rules for dependency-management-plugin 1.1.7 and Spring Boot loader-tools 4.0.8 were independently revalidated and renewed through the same UTC deadline. Their artifact and advisory sets are unchanged. Other suppressions are not renewed. This is separate from accepting the unresolved Kotlin vulnerability.
 
+## Keycloak upgrade candidate — 2026-10-14
+
+The owner authorized combined DEV/PROD delivery, but the Keycloak 26.8.1 candidate is not publication-ready until native acceptance and the Netty 4.1.139 security-release discrepancy are resolved. Provider compile/test security clearance does not replace inspection of the server image. See [candidate scope, findings and gates](security/keycloak-upgrade-2026-10-14.md). The expired CVE-2026-62380 acceptance is removed after verifying its specific remediation in the candidate runtime; the additional vendor security fixes are still an open gate.
+
 ## Sources
 
 - [OWASP Gradle plugin](https://github.com/dependency-check/dependency-check-gradle)

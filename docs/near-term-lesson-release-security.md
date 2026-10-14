@@ -1,0 +1,7 @@
+# Near-term lesson creation hotfix security
+
+On 2026-10-14 the owner explicitly confirmed applying the existing CVE-2026-93687 / GHSA-vfj7-8cjw-p6xm exception to hotfix-near-term-lesson-scheduling develop integration/DEV publication and numeric release/01.007.19 build/merge-back. The exact six-package chain and 2026-12-05T10:46:15Z expiry are unchanged in `security/node-dependency-security-accepted-risks.json`. Production promotion remains separately unauthorized; expired JVM exceptions are not renewed.
+
+Fresh full current-develop audit retains six High package nodes for this one advisory and no other findings: braces 3.0.3, chokidar 3.6.0, fast-glob 3.3.3, micromatch 4.0.8, tailwindcss 3.4.19, tailwindcss-animate 1.0.7. The official advisory still lists no patched braces version: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm. These tools process controlled source/build patterns and are not copied into the static nginx runtime image.
+
+Gate: passed-with-accepted-risks, not a clean scan or a vulnerability fix. Retain fresh full audit/lockfile evidence for every published source; new findings, changed versions, scope mismatch, audit errors or expiry block publication. Local reports are retained outside source under `hotfix-results/near-term-scheduling-20261013/reports/`; CI evidence must independently verify its actual lockfile and reports before accepting the release.

@@ -8,7 +8,7 @@ Honey School uses OWASP Dependency-Check 13.0.0 to check resolved JVM dependenci
 
 The full entry point discovers JVM projects instead of maintaining an allowlist. A module selector scans the selected project and recursively referenced project dependencies, plus build-logic. Every resolvable configuration is included, covering compileOnly through compileClasspath, runtime, test and tool dependencies; buildscript classpaths are also scanned. Inventory resolution is strict and accounts for empty configurations. Included builds are scanned explicitly rather than assumed to participate in the backend aggregate.
 
-An unsuppressed CVSS score >= 7.0 fails verification unless an explicit, unexpired risk acceptance covers the exact CVE, Maven PURL/version and build/module. Lower-severity and unscored findings remain in reports for review. Dependency resolution errors, advisory update failures and analysis errors fail verification; they are not a clean scan. There is no CI bypass or broad suppression baseline. Confirmed vulnerabilities with compatible fixes are remediated regardless of severity. Unavailable or incompatible fixes remain documented as unresolved; only an explicit bounded owner acceptance may temporarily permit release.
+An unsuppressed CVSS score >= 7.0 fails verification unless an explicit, unexpired risk acceptance covers the exact CVE, Maven PURL/version and build/module, or the owner-authorized runtime-scope policy proves the exact finding is outside server runtime. Lower-severity and unscored findings remain in reports for review. Dependency resolution errors, advisory update failures and analysis errors fail verification; they are not a clean scan. There is no CI bypass or broad suppression baseline. Confirmed vulnerabilities with compatible fixes are remediated regardless of severity. Unavailable or incompatible fixes remain documented as unresolved; only an explicit bounded owner acceptance may temporarily permit release.
 
 ## Temporary accepted risks
 
@@ -38,8 +38,16 @@ On 2026-10-14 the owner explicitly renewed only CVE-2026-53914 for one calendar 
 
 The two existing exact false-positive rules for dependency-management-plugin 1.1.7 and Spring Boot loader-tools 4.0.8 were independently revalidated and renewed through the same UTC deadline. Their artifact and advisory sets are unchanged. Other suppressions are not renewed. This is separate from accepting the unresolved Kotlin vulnerability.
 
+## Keycloak upgrade candidate — 2026-10-14
+
+The owner authorized combined DEV/PROD delivery, but the Keycloak 26.8.1 candidate is not publication-ready until native acceptance and the Netty 4.1.139 security-release discrepancy are resolved. Provider compile/test security clearance does not replace inspection of the server image. See [candidate scope, findings and gates](security/keycloak-upgrade-2026-10-14.md). The expired CVE-2026-62380 acceptance is removed after verifying its specific remediation in the candidate runtime; the additional vendor security fixes are still an open gate.
+
 ## Sources
 
 - [OWASP Gradle plugin](https://github.com/dependency-check/dependency-check-gradle)
 - [Scanner configuration](https://dependency-check.github.io/DependencyCheck/dependency-check-gradle/configuration.html)
 - [Official feed support and caveats](https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html)
+
+## Outside server runtime — owner policy 2026-10-14
+
+Components proven absent from server runtime do not block release under the owner instruction recorded in AGENTS.md. Full coverage, fresh advisory updates and raw findings remain mandatory. Exact scope and inventory evidence are recorded separately as `gate.json.outsideRuntime`; this is not risk renewal, false-positive suppression or remediation. Unknown scope, runtime presence or missing evidence fails closed. The current exact Docker transport/Keycloak rule, packaged runtime checks and optimized startup boundary are documented in [the candidate evidence](security/keycloak-upgrade-2026-10-14.md#outside-server-runtime). Existing Kotlin acceptance and other gates remain unchanged.

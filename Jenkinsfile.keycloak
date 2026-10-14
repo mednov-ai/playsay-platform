@@ -139,6 +139,7 @@ spec:
         container('gradle') {
           withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
             timeout(time: 45, unit: 'MINUTES') {
+              sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-runtime-scope.test.groovy "$PWD"'
               sh './scripts/ci/check-jvm-dependencies.sh keycloak-lesson-authenticator'
               archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: false
             }
@@ -205,7 +206,7 @@ EOF
       when { expression { env.DEPLOY_TO_DEV == 'true' } }
       steps {
         container('tools') {
-          sh 'apk add --no-cache jq kubectl && APP=keycloak ALLOW_MISSING_DEPLOYMENT=true ./scripts/ci/wait-for-argocd-rollout.sh'
+          sh 'apk add --no-cache jq kubectl && ./scripts/ci/wait-for-keycloak-rollout.sh'
         }
       }
     }

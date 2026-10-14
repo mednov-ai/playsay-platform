@@ -241,4 +241,18 @@
     <packageUrl>pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.0.21</packageUrl>
     <cve>CVE-2020-29582</cve>
   </suppress>
+  <suppress until="2026-11-14Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. Independently reviewed 2026-10-14: MariaDB C/C++ server daemon, SQL parser/replication and server-listener CVEs are wrongly assigned to this exact Quarkus Java JDBC configuration extension. The reviewed JAR contains 11 Quarkus runtime/Graal integration classes and no MariaDB server implementation; SHA-256 f0ad4ac958fae14fbeda6f4c18f6324c08dcb895335d3d5120b1b551031e1873. This is not a driver or server risk waiver. Evidence: https://github.com/quarkusio/quarkus/tree/3.40.1/extensions/jdbc/jdbc-mariadb/runtime and https://github.com/MariaDB/server/commit/0b5a5258abbeaf8a0c3a18c7e753699787fdf46e ; see docs/security/keycloak-upgrade-2026-10-14.md and retained advisory/artifact review.]]></notes>
+    <packageUrl>pkg:maven/io.quarkus/quarkus-jdbc-mariadb@3.40.1</packageUrl>
+    <cve>CVE-2014-0001</cve>
+    <cve>CVE-2015-2325</cve>
+    <cve>CVE-2017-15365</cve>
+    <cve>CVE-2017-15945</cve>
+    <cve>CVE-2017-3302</cve>
+    <cve>CVE-2020-28912</cve>
+    <cve>CVE-2021-46669</cve>
+    <cve>CVE-2022-27385</cve>
+    <cve>CVE-2022-27449</cve>
+    <cve>CVE-2023-5157</cve>
+  </suppress>
 </suppressions>

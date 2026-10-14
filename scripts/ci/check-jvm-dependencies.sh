@@ -97,6 +97,9 @@ else
   backend_status=0
   run_gradle dependencySecurity --continue || backend_status=$?
   [ "$tooling_status" -eq 0 ] && [ "$backend_status" -eq 0 ] || { echo 'state=failed' >> "$reports/status.txt"; exit 1; }
+  if [ -f "$reports/build-logic/outside-runtime-findings.txt" ] || [ -f "$reports/backend/outside-runtime-findings.txt" ]; then
+    echo 'runtime_scope=outside-server-runtime-findings-retained' >> "$reports/status.txt"
+  fi
   if [ -f "$reports/build-logic/accepted-risks.txt" ] || [ -f "$reports/backend/accepted-risks.txt" ]; then
     echo 'state=passed-with-accepted-risks' >> "$reports/status.txt"
   else

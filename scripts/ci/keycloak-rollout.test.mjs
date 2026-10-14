@@ -16,7 +16,7 @@ function run(change=()=>{},inputDigest=digest) {
   change(state,pods);
   writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));writeFileSync(path.join(dir,'pods.json'),JSON.stringify(pods));writeFileSync(path.join(dir,'image-digest.txt'),inputDigest);
   writeFileSync(path.join(dir,'bin/kubectl'),'#!/bin/sh\ncase "$*" in *"get statefulset"*) cat "$WORKSPACE/state.json";; *"get pods"*) cat "$WORKSPACE/pods.json";; *) exit 9;; esac\n',{mode:0o755});
-  return spawnSync('sh',[script],{encoding:'utf8',env:{...process.env,PATH:dir+'/bin:'+process.env.PATH,WORKSPACE:dir,BUILD_LABEL:'fixture',PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:'1',PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:'1'},timeout:10000});
+  return spawnSync(script,[],{encoding:'utf8',env:{...process.env,PATH:dir+'/bin:'+process.env.PATH,WORKSPACE:dir,BUILD_LABEL:'fixture',PLAYSAY_DEV_ROLLOUT_TIMEOUT_SECONDS:'1',PLAYSAY_DEV_ROLLOUT_POLL_SECONDS:'1'},timeout:10000});
  } finally {rmSync(dir,{recursive:true,force:true});}
 }
 test('Keycloak gate accepts the exact ready digest and zero-restart pods',{skip:!jqAvailable},()=>{const r=run();assert.equal(r.status,0,r.stderr);});

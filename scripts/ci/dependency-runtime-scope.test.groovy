@@ -19,6 +19,7 @@ rules.each { r ->
     assert !classify(r.build, r.project, dep, r.cves[0], configs + [serverRuntime: configs.serverAugmentation], rules)
     assert !classify(r.build, r.project, dep + [fileName: 'httpclient5-5.5.1.jar'], r.cves[0], configs, rules)
     assert !classify(r.build, r.project, dep, r.cves[0], [serverAugmentation: [[coordinate: r.parentCoordinate, file: r.parentFile, sha256: '0' * 64]]], rules)
-    checks += 11
+    assert !classify(r.build, r.project, dep, r.cves[0], [serverAugmentation: [[coordinate: r.parentCoordinate, file: r.parentFile, sha256: null, directory: true]]], rules)
+    checks += 12
 }
 println "Runtime scope checks: ${checks} passed"

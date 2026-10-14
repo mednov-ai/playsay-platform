@@ -148,7 +148,8 @@ gradle.projectsEvaluated {
                     // Strict resolution: a partial graph must never be a successful inventory.
                     def artifacts = c.resolvedConfiguration.resolvedArtifacts.collect { a ->
                         [coordinate: a.moduleVersion.id.toString(), file: a.file.name,
-                         sha256: java.security.MessageDigest.getInstance('SHA-256').digest(a.file.bytes).encodeHex().toString()]
+                         sha256: a.file.isFile() ? java.security.MessageDigest.getInstance('SHA-256').digest(a.file.bytes).encodeHex().toString() : null,
+                         directory: a.file.isDirectory()]
                     }.unique().sort { it.coordinate }
                     def edges = c.incoming.resolutionResult.allDependencies.collect { d ->
                         [from: d.from.id.displayName, requested: d.requested.displayName,

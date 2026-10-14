@@ -32,12 +32,14 @@ COPY --chown=1000:0 --from=server-runtime-build /workspace/server-runtime/target
 COPY --chown=1000:0 --from=provider-build /workspace/build/libs/keycloak-lesson-authenticator-1.0.0.jar /opt/keycloak/providers/keycloak-lesson-authenticator-1.0.0.jar
 # These build-time options match both existing environment charts and avoid
 # reaugmentation during a memory-constrained native DEV startup.
-RUN JAVA_OPTS_KC_HEAP="-Xms128m -Xmx512m" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true --cache=local \
+RUN touch -m --date=@1743465600 /opt/keycloak/providers/keycloak-lesson-authenticator-1.0.0.jar \
+    && JAVA_OPTS_KC_HEAP="-Xms128m -Xmx512m" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true --cache=local --http-relative-path=/keycloak/ \
     && cd /opt/keycloak && sha256sum -c server-runtime-sha256.txt
 
 FROM quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
 RUN rm -rf /opt/keycloak/lib
 COPY --chown=1000:0 --from=keycloak-build /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 server-runtime/entrypoint.sh /opt/keycloak/bin/playsay-entrypoint.sh
-RUN chmod 755 /opt/keycloak/bin/playsay-entrypoint.sh
+RUN chmod 755 /opt/keycloak/bin/playsay-entrypoint.sh \
+    && touch -m --date=@1743465600 /opt/keycloak/providers/keycloak-lesson-authenticator-1.0.0.jar
 ENTRYPOINT ["/opt/keycloak/bin/playsay-entrypoint.sh"]

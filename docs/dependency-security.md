@@ -32,6 +32,12 @@ False-positive suppressions, if needed, require exact finding/artifact scope, ev
 
 Operational commands, credentials provisioning and CI activation procedures belong to [the infra runbook](../../playsay-infra/docs/runbook.md#jvm-dependency-security). Local implementation does not execute remote CI or deploy dependency updates.
 
+## Kotlin tooling renewal — 2026-10-14
+
+On 2026-10-14 the owner explicitly renewed only CVE-2026-53914 for one calendar month after the official upstream check. The unchanged exact artifact/build/module matrix is valid until 2026-11-14 00:00 UTC (03:00 MSK). Latest Detekt alpha.6 still embeds affected Kotlin 2.4.10; application Kotlin 2.4.20 does not replace tool-owned compilers. CVE-2026-62380 remains expired; frontend acceptance retains its separate scope and deadline. Evidence: docs/security/jvm-risk-renewal-2026-10-14.md. Fresh scans and all other gates remain mandatory; this risk renewal does not authorize production promotion.
+
+The two existing exact false-positive rules for dependency-management-plugin 1.1.7 and Spring Boot loader-tools 4.0.8 were independently revalidated and renewed through the same UTC deadline. Their artifact and advisory sets are unchanged. Other suppressions are not renewed. This is separate from accepting the unresolved Kotlin vulnerability.
+
 ## Sources
 
 - [OWASP Gradle plugin](https://github.com/dependency-check/dependency-check-gradle)

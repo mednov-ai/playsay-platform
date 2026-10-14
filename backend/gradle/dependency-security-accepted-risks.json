@@ -5,11 +5,11 @@
       "id": "WAIT-KOTLIN-2026-09",
       "cve": "CVE-2026-53914",
       "owner": "Honey School platform maintainers",
-      "approvedBy": "Project owner, explicit user instruction on 2026-09-08",
-      "approvedOn": "2026-09-08",
-      "expires": "2026-10-08",
-      "reason": "Await a compatible Gradle/Detekt/ABI-tooling fix; application Kotlin is updated, latest Detekt trial still embeds an affected compiler and fails existing lint.",
-      "evidence": "docs/security/dependency-remediation-2026-09-08.md",
+      "approvedBy": "Project owner, explicit conditional one-month renewal in hotfix-near-term-lesson-scheduling chat on 2026-10-14",
+      "approvedOn": "2026-10-14",
+      "expires": "2026-11-14",
+      "reason": "Application Kotlin is already 2.4.20; latest published Detekt alpha.6 still embeds affected Kotlin 2.4.10. Existing Gradle/Detekt/ABI tooling findings remain within the previously accepted exact artifacts and build/module scopes.",
+      "evidence": "docs/security/jvm-risk-renewal-2026-10-14.md",
       "artifacts": [
         {
           "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-assignment-compiler-plugin-embeddable@2.0.21",

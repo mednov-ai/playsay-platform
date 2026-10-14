@@ -206,7 +206,7 @@ EOF
       when { expression { env.DEPLOY_TO_DEV == 'true' } }
       steps {
         container('tools') {
-          sh 'apk add --no-cache jq kubectl && APP=keycloak ALLOW_MISSING_DEPLOYMENT=true ./scripts/ci/wait-for-argocd-rollout.sh'
+          sh 'apk add --no-cache jq kubectl && ./scripts/ci/wait-for-keycloak-rollout.sh'
         }
       }
     }

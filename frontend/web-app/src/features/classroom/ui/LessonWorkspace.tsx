@@ -36,14 +36,12 @@ import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyLessonDialog } from "../../vocabulary/ui/VocabularyLessonDialog";
 import { VocabularyLiveStage } from "../../vocabulary/ui/VocabularyLiveStage";
-import type { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
+import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
-import { documentMaterialsEnabled } from "../../../shared/config/documentMaterials";
 import { LessonActivityRail } from "./LessonActivityRail";
 
 export function LessonWorkspace({
   displayName,
-  liveVocabulary,
   materials,
   onAssignMaterial,
   onPresentationModeChange,
@@ -52,7 +50,6 @@ export function LessonWorkspace({
   session,
 }: {
   displayName: string;
-  liveVocabulary: ReturnType<typeof useLiveVocabularyPractice>;
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
   onPresentationModeChange: (mode: LessonPresentationMode) => void;
@@ -69,18 +66,20 @@ export function LessonWorkspace({
     material,
     materialError,
     materialLoading,
-    readyDocumentMaterials,
     liveActivePageId,
     selectedMaterialId,
     setSelectedMaterialId,
     uploadImagePage,
     uploadHtmlGamePage,
-    uploadDocumentPage,
     uploadingImagePage,
     uploadingHtmlGamePage,
-    uploadingDocumentPage,
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
+  const liveVocabulary = useLiveVocabularyPractice({
+    enabled: vocabularyFeatures.live,
+    lessonId: session.lessonId,
+    ownerSubject: canMonitorSubmissions ? undefined : profile?.subject,
+  });
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
   const isParallelWork = session.workMode === "PARALLEL" &&
     session.participants.length > 1 &&
@@ -96,7 +95,6 @@ export function LessonWorkspace({
   const [activeStudentSubject, setActiveStudentSubject] = useState<string | null>(null);
   const [teacherTaskVisible, setTeacherTaskVisible] = useState(false);
   const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
-  const [vocabularyStartError, setVocabularyStartError] = useState(false);
   const [activityRailOpen, setActivityRailOpen] = useState(() => (
     vocabularyFeatures.personalPracticeV2
     && typeof window !== "undefined"
@@ -107,7 +105,6 @@ export function LessonWorkspace({
   async function startVocabularyPractice() {
     if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
     setStartingVocabularyPractice(true);
-    setVocabularyStartError(false);
     try {
       liveVocabulary.setPractice(await createVocabularyPractice({
         delivery: "LIVE",
@@ -116,8 +113,6 @@ export function LessonWorkspace({
         ownerSubjects: session.participants.map((participant) => participant.subject),
         wordLimit: 10,
       }));
-    } catch {
-      setVocabularyStartError(true);
     } finally {
       setStartingVocabularyPractice(false);
     }
@@ -134,12 +129,8 @@ export function LessonWorkspace({
   const activeParticipant = canMonitorSubmissions
     ? teacherWorkParticipants.find((participant) => participant.subject === activeStudentSubject) ?? teacherWorkParticipants[0] ?? null
     : null;
-  const availableMaterials = useMemo(
-    () => [...readyDocumentMaterials, ...materials.filter((item) => !readyDocumentMaterials.some((ready) => ready.id === item.id))],
-    [materials, readyDocumentMaterials],
-  );
   const activeAssignedMaterial = canMonitorSubmissions && isParallelWork && activeParticipant?.materialId
-    ? availableMaterials.find((item) => item.id === activeParticipant.materialId) ?? null
+    ? materials.find((item) => item.id === activeParticipant.materialId) ?? null
     : null;
   const visibleMaterial = activeAssignedMaterial ?? material;
   const {
@@ -153,7 +144,7 @@ export function LessonWorkspace({
   const activeStudentSubmission = canMonitorSubmissions
     ? submissionSnapshots.find((item) => item.userSubject === activeParticipant?.subject) ?? null
     : null;
-  const selectableMaterials = availableMaterials.filter((item) => item.status !== "ARCHIVED");
+  const selectableMaterials = materials.filter((item) => item.status !== "ARCHIVED");
   const lessonScore = canMonitorSubmissions && activeParticipant
     ? activeStudentSubmission?.score ?? null
     : canMonitorSubmissions
@@ -212,7 +203,6 @@ export function LessonWorkspace({
     [teacherAnnotationWorkspace.htmlGameSync],
   );
   const teacherViewportSync = useMemo(() => ({
-    canPublish: true,
     clientId: teacherAnnotationWorkspace.workspaceClientId,
     publish: teacherAnnotationWorkspace.setMaterialViewport,
     ready: teacherAnnotationWorkspace.connected,
@@ -298,21 +288,18 @@ export function LessonWorkspace({
           activeStudentSubject={activeParticipant?.subject ?? null}
           assigningMaterial={assigningMaterial}
           canManageMaterial={canManageMaterial}
-          canUploadDocument={canAssignLessons(profile) && documentMaterialsEnabled()}
           currentMaterialId={session.materialId}
           compact={vocabularyFeatures.personalPracticeV2}
           materials={selectableMaterials}
           onAssignMaterial={() => void assignMaterial()}
           onSelectMaterial={setSelectedMaterialId}
           onSelectStudent={selectStudentWork}
-          onUploadHtmlGamePage={isParallelWork ? undefined : (file) => void uploadHtmlGamePage(file)}
-          onUploadImagePage={isParallelWork ? undefined : (file) => void uploadImagePage(file)}
-          onUploadDocumentPage={documentMaterialsEnabled() ? (file) => void uploadDocumentPage(file) : undefined}
+          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={(file) => void uploadImagePage(file)}
           participants={teacherWorkParticipants}
           selectedMaterialId={selectedMaterialId}
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
-          uploadingDocumentPage={uploadingDocumentPage}
           vocabularyAction={(
             <VocabularyLessonDialog
               ownerLabel={activeParticipantLabel}
@@ -389,9 +376,6 @@ export function LessonWorkspace({
           </div>
         )}
 
-        {vocabularyFeatures.live && (liveVocabulary.error || vocabularyStartError) ? (
-          <div role="alert"><p>{t(vocabularyStartError ? "vocabulary.practice.errors.start" : "vocabulary.practice.errors.save")}</p><Button onClick={() => void (vocabularyStartError ? startVocabularyPractice() : liveVocabulary.refresh())}>{t("vocabulary.practice.actions.retry")}</Button></div>
-        ) : null}
         {vocabularyFeatures.live && liveVocabulary.practice ? (
           <VocabularyLiveStage
             activeStudentSubject={activeParticipant?.subject}
@@ -534,9 +518,8 @@ export function LessonWorkspace({
           }}
           onSelectMaterial={setSelectedMaterialId}
           onSelectStudent={selectStudentWork}
-          onUploadHtmlGamePage={isParallelWork ? undefined : (file) => void uploadHtmlGamePage(file)}
-          onUploadImagePage={isParallelWork ? undefined : (file) => void uploadImagePage(file)}
-          onUploadDocumentPage={documentMaterialsEnabled() ? (file) => void uploadDocumentPage(file) : undefined}
+          onUploadHtmlGamePage={(file) => void uploadHtmlGamePage(file)}
+          onUploadImagePage={(file) => void uploadImagePage(file)}
           open={activityRailOpen}
           owners={session.participants.map((participant) => ({
             name: participant.displayName ?? participant.username ?? participant.subject,
@@ -549,7 +532,6 @@ export function LessonWorkspace({
           selectedStudentSubject={activeParticipant?.subject ?? null}
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
-          uploadingDocumentPage={uploadingDocumentPage}
         />
       ) : null}
       </div>

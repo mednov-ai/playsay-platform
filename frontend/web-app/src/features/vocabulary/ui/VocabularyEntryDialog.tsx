@@ -212,7 +212,7 @@ export function VocabularyEntryForm({
   recipientSubjects = [],
 }: {
   controller: VocabularyEntryFormController;
-  inputRef?: RefObject<HTMLInputElement | null>;
+  inputRef?: RefObject<HTMLInputElement>;
   recipientSubjects?: string[];
 }) {
   const { t } = useAppTranslation();

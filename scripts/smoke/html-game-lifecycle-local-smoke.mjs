@@ -59,7 +59,7 @@ try {
       const requestUrl=new URL(route.request().url());
       if(requestUrl.pathname.endsWith('/token')) {
        const actor=new URL(route.request().frame().url()).searchParams.get('actor') || 'Teacher';
-       const token=await new SignJWT({documentId:room,lessonId:'synthetic',materialId:room,documentKind:'MATERIAL',scope:'GROUP',yjsDocumentId,canPublishMaterialViewport:actor!=='Student'}).setProtectedHeader({alg:'HS256'}).setSubject(actor).setIssuer('playsay-api-gateway').setExpirationTime('1h').sign(new TextEncoder().encode(secret));
+       const token=await new SignJWT({documentId:room,lessonId:'synthetic',materialId:room,documentKind:'MATERIAL',scope:'GROUP',yjsDocumentId}).setProtectedHeader({alg:'HS256'}).setSubject(actor).setIssuer('playsay-api-gateway').setExpirationTime('1h').sign(new TextEncoder().encode(secret));
        await route.fulfill({json:{token,yjsDocumentId,websocketUrl:`ws://127.0.0.1:${collabPort}`}});
       } else if(requestUrl.pathname.endsWith('/assets')) await route.fulfill({json:[{id:'asset',materialId:'game',kind:'HTML_GAME',contentUrl:'/api/materials/game/assets/asset/content',metadata:{},createdAt:''}]});
       else if(requestUrl.pathname.endsWith('/content')) await route.fulfill({contentType:'text/html',body:mode==='sdk'?sdkHtml:legacy});

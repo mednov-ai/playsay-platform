@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, stopHtmlGameRun, stoppedRunsMap } from "./htmlGameLifecycle.js";
+import { assertGameLifecycleUpdate, stopHtmlGameRun, stoppedRunsMap } from "./htmlGameLifecycle.js";
 function setup() {
   const doc = new Y.Doc();
   doc.getMap("htmlGamePresentation").set("activeBlockId", "game");
@@ -10,18 +10,6 @@ function setup() {
   return { doc, peers, stop: { type: "stop", blockId: "game", runId: "run-a", launchId: "launch-a" } };
 }
 describe("server-owned HTML game termination", () => {
-  it("routes lifecycle stops separately from existing type-3 viewport commands", () => {
-    expect(isHtmlGameStopMessage(encodeGameLifecycle(setup().stop))).toBe(true);
-    expect(isHtmlGameStopMessage(encodeGameLifecycle({ presentationChanged: true, viewport: { pageId: "page" } }))).toBe(false);
-    expect(isHtmlGameStopMessage(encodeGameLifecycle({ type: "result", result: "stopped" }))).toBe(false);
-    expect(isHtmlGameStopMessage(new Uint8Array([1]))).toBe(false);
-  });
-
-  it("rejects oversized or concatenated command envelopes before dispatch", () => {
-    expect(() => isHtmlGameStopMessage(encodeGameLifecycle({ viewport: "x".repeat(16 * 1024) }))).toThrow();
-    const frame = encodeGameLifecycle(setup().stop);
-    expect(() => isHtmlGameStopMessage(new Uint8Array([...frame, 0]))).toThrow();
-  });
   it("accepts participant stop idempotently and persists terminal state without changing answers", () => {
     const { doc, peers, stop } = setup();
     doc.getMap("materialAnswerFields").set("answer", "kept");

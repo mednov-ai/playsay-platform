@@ -9,7 +9,7 @@ import {
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
 import { MaterialImageProgress } from "./MaterialImageProgress";
 
-type MaterialReaderPresentationMode = "default" | "html-game-focus" | "image-focus" | "document-focus" | "external-activity-focus";
+type MaterialReaderPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
 
 export function MaterialReaderPreview({
   form,
@@ -40,7 +40,6 @@ export function MaterialReaderPreview({
         data-presentation-mode={presentationMode}
       >
         <LessonMaterialDocumentView
-          canControlDocuments
           material={materialPreviewFromForm(form)}
           mode="teacherPreview"
           onAssetTagsChange={onUpdateAssetTags}

@@ -17,7 +17,6 @@ export function materialDocumentAssetIds(document: MaterialEditorDocument): stri
       if (blockAssetId) {
         ids.add(blockAssetId);
       }
-      if (block.documentAssetId) ids.add(block.documentAssetId);
       const worksheetAssetId = materialAssetIdFromUrl(block.sourceAsset);
       if (worksheetAssetId) {
         ids.add(worksheetAssetId);

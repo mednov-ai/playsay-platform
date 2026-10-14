@@ -469,7 +469,7 @@ describe("useExternalActivitySession", () => {
     const idleIndex = decodedMessages().findIndex(({ type }, index) => type === "HOST_IDLE" && index > stopIndex);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
     expect(idleIndex).toBeGreaterThan(stopIndex);
-    await waitFor(() => expect(result.current.active).toBeNull());
+    expect(result.current.active).toBeNull();
   });
 
   it("waits for STOPPED delivery before publishing HOST_IDLE", async () => {

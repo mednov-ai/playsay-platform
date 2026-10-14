@@ -40,7 +40,6 @@ class CollaborationTokenService(
         authentication: JwtAuthenticationToken,
         document: CollaborationDocumentEntity,
         origin: String?,
-        canPublishMaterialViewport: Boolean,
     ): CollaborationTokenResponse {
         val secretBytes = tokenSecret.trim().toByteArray(StandardCharsets.UTF_8)
         if (secretBytes.size < 32) {
@@ -59,7 +58,6 @@ class CollaborationTokenService(
             .claim("scope", document.collaborationScope)
             .claim("yjsDocumentId", document.yjsDocumentId)
             .claim("room", document.yjsDocumentId)
-            .claim("canPublishMaterialViewport", canPublishMaterialViewport)
             .notBeforeTime(Date.from(now.minusSeconds(5)))
             .expirationTime(Date.from(expiresAt))
             .build()
@@ -183,12 +181,7 @@ class CollaborationDocumentService(
         origin: String? = null,
     ): CollaborationTokenResponse {
         val document = visibleDocument(authentication, lessonId, documentId)
-        return tokenService.createToken(
-            authentication = authentication,
-            document = document,
-            origin = origin,
-            canPublishMaterialViewport = lessonAuthorizationService.canManageLesson(authentication, lessonId),
-        )
+        return tokenService.createToken(authentication, document, origin)
     }
 
     fun requireDocumentAccess(

@@ -26,24 +26,14 @@ import { assertRoomMatchesClaims } from "./rooms.js";
 import { disconnectLessonSubject } from "./disconnect.js";
 import { externalActivityRealtimeSubprotocol } from "./externalActivityProtocol.js";
 import { relayExternalActivityFrame } from "./externalActivityRelay.js";
-import {
-  assertAwarenessClientOwnership,
-  authorizeAwarenessUpdate,
-  awarenessClientIds,
-} from "./awarenessAuthorization.js";
-import {
-  applyMaterialViewportCommand,
-  assertSyncMessageDoesNotModifyMaterialViewport,
-} from "./materialViewportAuthorization.js";
 
-import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, messageHtmlGameLifecycle, stopHtmlGameRun } from "./htmlGameLifecycle.js";
+import { assertGameLifecycleUpdate, encodeGameLifecycle, messageHtmlGameLifecycle, stopHtmlGameRun } from "./htmlGameLifecycle.js";
 
 import { decodeProbe, encodeRecovery, messageRecovery } from "./recoveryProtocol.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
-const messageMaterialViewport = 3;
 const maxEphemeralPayloadBytes = 64 * 1024;
 
 interface CollaborationRoom {
@@ -504,7 +494,7 @@ function handleMessage(
   const decoder = decoding.createDecoder(bytes);
   const messageType = decoding.readVarUint(decoder);
 
-  if (messageType === messageHtmlGameLifecycle && isHtmlGameStopMessage(bytes)) {
+  if (messageType === messageHtmlGameLifecycle) {
     if (!connectionClaims.has(ws) || !room.connections.has(ws)) throw new Error("unauthorized game stop");
     const payload = decoding.readVarString(decoder);
     if (payload.length > 1024 || decoding.hasContent(decoder)) throw new Error("invalid game stop size");
@@ -514,13 +504,7 @@ function handleMessage(
   }
 
   if (messageType === messageSync) {
-    const claims = connectionClaims.get(ws);
-    if (!claims) {
-      throw new Error("missing collaboration claims");
-    }
-    if (!claims.canPublishMaterialViewport) {
-      assertSyncMessageDoesNotModifyMaterialViewport(room.doc, bytes);
-    }
+    // Validate terminal-state ownership before applying an incoming sync step 2/update.
     const validationDecoder = decoding.createDecoder(bytes);
     decoding.readVarUint(validationDecoder);
     const syncType = decoding.readVarUint(validationDecoder);
@@ -544,32 +528,8 @@ function handleMessage(
     return;
   }
 
-  if (messageType === messageMaterialViewport) {
-    const claims = connectionClaims.get(ws);
-    if (!claims?.canPublishMaterialViewport) {
-      throw new Error("material viewport publication is forbidden");
-    }
-    applyMaterialViewportCommand(
-      room.doc,
-      decoding.readVarUint8Array(decoder),
-      claims.materialId,
-      room.connections.get(ws) ?? new Set(),
-    );
-    return;
-  }
-
   if (messageType === messageAwareness) {
-    const update = decoding.readVarUint8Array(decoder);
-    assertAwarenessClientOwnership(ws, awarenessClientIds(update), room.connections);
-    const claims = connectionClaims.get(ws);
-    if (!claims) {
-      throw new Error("missing collaboration claims");
-    }
-    awarenessProtocol.applyAwarenessUpdate(
-      room.awareness,
-      authorizeAwarenessUpdate(update, claims.canPublishMaterialViewport),
-      ws,
-    );
+    awarenessProtocol.applyAwarenessUpdate(room.awareness, decoding.readVarUint8Array(decoder), ws);
     return;
   }
 

@@ -544,36 +544,3 @@ Repository helpers for repeatable evidence: `scripts/smoke/vocabulary-student-ui
 ## Vocabulary hotfix recovery supplement
 
 For entry/list recovery changes, also execute the defect scenarios and synthetic fixture plan in [2026-09-05 local hotfix evidence](evidence/2026-09-05-dev-vocabulary-hotfix-local.md). A passing mock UI smoke is not a deployed dev pass. Retest initial-load and history failures separately, last-visible-word archive/undo, mutation retry, partial group save, manual translation during provider latency, and existing VA-001–004 acceptance on the exact delivered revisions.
-
-
-## 9. Vocabulary practice recovery regression (2026-09-19)
-
-Track this matrix under OpenSpec `restore-vocabulary-practice-reliability`. Existing scenario IDs remain authoritative for the broad flows above. Use teacher-demo, student-demo and student-demo-2 only in dev, with an independently unauthorized actor for denial checks. Prefix new fixtures with `manual-vocab-20260919-recovery-`; preserve pre-existing records. Record local regression and authenticated real-API evidence separately.
-
-| ID | Action | Required result |
-|---|---|---|
-| VR-01 | Submit a wrong answer and the last answer in self, live and homework | Feedback survives the parent session update; Continue advances to the next task or summary. |
-| VR-02 | Submit twice while pending; retry after a lost response | One pending request, original payload/attempt ID on retry, one accepted evidence credit. |
-| VR-03 | Preview/publish all four homework policies with non-default thresholds | Preview and assignment agree; changed settings block stale publication; prior snapshots remain immutable. |
-| VR-04 | Lose the last accepted response and retry; try a foreign session | Original outcome after completion, no extra evidence; foreign access denied. |
-| VR-05 | Hint/pause while typing; fail a command; switch lesson during refresh | Draft remains, error/retry is visible, previous context never overwrites current practice. |
-| VR-06 | Exclude a learner, switch inspected owner and refresh recipients | Explicit exclusion remains; unavailable recipients cannot be published. |
-| VR-07 | Compare forgotten list/preview with LAPSED and AGAIN fixtures | Same eligible category before planner limits/exclusions; indexed and in-memory selection agree. |
-| VR-08 | Leave a generating card open; finish/fail generation | Bounded refresh reaches the allowed terminal state; text practice remains usable. |
-
-Complete the existing dictionary CRUD/group-partial-failure, recipes, all exercise types, live two-student isolation/continuation, homework review/progress retry, Key whole-word/n-gram/mixed and media privacy/reuse scenarios as well. Attach build/source/image identities, viewport/locale, expected/actual, PASS/FAIL/BLOCKED and sanitized evidence per scenario. Mock tests and healthy pods do not close real-API acceptance.
-
-### Additional findings from DEV browser acceptance (2026-09-19)
-
-- Matching feedback must show source/translation pairs, including retry after a lost final response; internal matching IDs are never learner-facing text.
-- A fresh Key login must retain vocabularySessionId and the allowlisted return context; the ordinary bundled set must not replace the requested vocabulary set after OIDC.
-- DUE list, dashboard due date and practice selection use the earliest due date among available skills, including SPELLING. Unavailable CONTEXT is excluded.
-- DEV runtime acceptance includes checking vocabulary restart count after image/Key use; observed OOMKilled at the former 512 MiB limit is tracked separately from application regressions.
-- Teacher RETURN creates a child snapshot with mistaken items, or the entire frozen set if all were correct; verify both learners finish and the teacher accepts the new snapshots, while repeated RETURN and late old callbacks preserve the current generation.
-
-- Live without a material: join a lesson with no material, then start vocabulary. Learners must discover the practice without reload; pausing keeps the workspace and draft visible.
-
-- Reconnect while typing: restore the vocabulary subscription on a new WebSocket and retain the current draft; verify a subsequent teacher hint is visible despite newer learner revisions.
-- Deleting a recipe referenced by an immutable plan archives it: repeated DELETE succeeds, it disappears from future selection and prior plans/history stay unchanged.
-
-Final delivered build identities, acceptance results and cleanup: [DEV recovery evidence](evidence/2026-09-19-vocabulary-practice-recovery.md).

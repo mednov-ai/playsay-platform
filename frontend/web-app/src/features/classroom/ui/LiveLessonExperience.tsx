@@ -23,8 +23,6 @@ import { useAppTranslation } from "../../../shared/i18n";
 import type { MediaTransportEvidence } from "../model/mediaTransportEvidence";
 import type { ClassroomMediaRecoveryPhase } from "../model/mediaRecovery";
 import { Button } from "../../../components/ui/button";
-import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
-import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -106,12 +104,7 @@ export function LiveLessonExperience({
     : session.participants.some((participant) => participant.subject === session.identity)
       ? "student"
       : null;
-  const liveVocabulary = useLiveVocabularyPractice({
-    enabled: vocabularyFeatures.live,
-    lessonId: session.lessonId,
-    ownerSubject: canManageLesson ? undefined : profile?.subject,
-  });
-  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice;
+  const videoOnly = !session.materialId && !canManageLesson;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
@@ -281,7 +274,6 @@ export function LiveLessonExperience({
         {showWorkspace ? (
           <LessonWorkspace
             displayName={displayName}
-            liveVocabulary={liveVocabulary}
             materials={materials}
             onAssignMaterial={onAssignMaterial}
             onPresentationModeChange={setPresentationMode}

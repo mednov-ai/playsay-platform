@@ -7,20 +7,11 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      "@napi-rs/canvas": resolve(projectRoot, "src/shims/napiCanvas.ts"),
-      "ai": resolve(projectRoot, "src/shims/aiDisabled.ts"),
-    },
-  },
   build: {
     rollupOptions: {
       input: {
         app: resolve(projectRoot, "index.html"),
         chatServiceWorker: resolve(projectRoot, "src/service-worker/chatServiceWorker.ts"),
-        ...(process.env.DOCUMENT_VIEWER_SMOKE_BUILD === "true"
-          ? { viewerHarness: resolve(projectRoot, "viewer-harness.html") }
-          : {}),
       },
       output: {
         entryFileNames: (chunk) => chunk.name === "chatServiceWorker"

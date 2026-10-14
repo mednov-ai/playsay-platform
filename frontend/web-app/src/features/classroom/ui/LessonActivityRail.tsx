@@ -25,7 +25,6 @@ export function LessonActivityRail({
   onSelectStudent,
   onUploadHtmlGamePage,
   onUploadImagePage,
-  onUploadDocumentPage,
   open,
   owners,
   practice,
@@ -33,7 +32,6 @@ export function LessonActivityRail({
   selectedStudentSubject,
   uploadingHtmlGamePage,
   uploadingImagePage,
-  uploadingDocumentPage,
 }: {
   assigningMaterial: boolean;
   currentMaterialId: string | null;
@@ -44,9 +42,8 @@ export function LessonActivityRail({
   onPracticeChange: (practice: VocabularyPractice | null) => void;
   onSelectMaterial: (materialId: string) => void;
   onSelectStudent: (subject: string) => void;
-  onUploadHtmlGamePage?: (file: File) => void;
-  onUploadImagePage?: (file: File) => void;
-  onUploadDocumentPage?: (file: File) => void;
+  onUploadHtmlGamePage: (file: File) => void;
+  onUploadImagePage: (file: File) => void;
   open: boolean;
   owners: PersonalPracticeOwner[];
   practice: VocabularyPractice | null;
@@ -54,7 +51,6 @@ export function LessonActivityRail({
   selectedStudentSubject: string | null;
   uploadingHtmlGamePage: boolean;
   uploadingImagePage: boolean;
-  uploadingDocumentPage: boolean;
 }) {
   const { t } = useAppTranslation();
   const [tab, setTab] = useState<"MATERIALS" | "PERSONAL">("PERSONAL");
@@ -69,12 +65,11 @@ export function LessonActivityRail({
   async function changeStatus(status: "ACTIVE" | "PAUSED" | "COMPLETED") {
     if (!practice) return;
     setSaving(true);
-    setDeliveryError(null);
     try {
       onPracticeChange(await updateVocabularyPracticeStatus(practice.id, status));
       setDeliveryError(null);
-    } catch {
-      setDeliveryError(t("vocabulary.practice.errors.save"));
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
     } finally {
       setSaving(false);
     }
@@ -83,15 +78,12 @@ export function LessonActivityRail({
   async function hint() {
     if (!practice || !selectedSession) return;
     setSaving(true);
-    setDeliveryError(null);
     try {
       const updated = await giveVocabularyPracticeHint(selectedSession.id);
       onPracticeChange({
         ...practice,
         sessions: practice.sessions.map((session) => session.id === updated.id ? updated : session),
       });
-    } catch {
-      setDeliveryError(t("vocabulary.practice.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -102,7 +94,6 @@ export function LessonActivityRail({
     const remaining = practice.sessions.filter((session) => session.completedItems < session.totalItems);
     if (!remaining.length) return;
     setSaving(true);
-    setDeliveryError(null);
     try {
       await createVocabularyHomeworkAssignment({
         mode: practice.mode,
@@ -113,8 +104,8 @@ export function LessonActivityRail({
       });
       setContinuedHome(true);
       setDeliveryError(null);
-    } catch {
-      setDeliveryError(t("vocabulary.practice.errors.save"));
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
     } finally {
       setSaving(false);
     }
@@ -140,8 +131,8 @@ export function LessonActivityRail({
         wordLimit: 30,
       });
       setContinuedHome(true);
-    } catch {
-      setDeliveryError(t("vocabulary.practice.errors.save"));
+    } catch (caught) {
+      setDeliveryError(caught instanceof Error ? caught.message : t("vocabulary.live.deliveryDelayed"));
     } finally {
       setSaving(false);
     }
@@ -175,7 +166,7 @@ export function LessonActivityRail({
                 <Button disabled={saving} onClick={() => setClosing(false)} type="button" variant="outline">{t("common.actions.cancel")}</Button>
               </div>
             ) : null}
-            {deliveryError ? <p role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs font-bold text-destructive">{t("vocabulary.live.deliveryRecoverable")} {deliveryError}</p> : null}
+            {deliveryError ? <p aria-live="assertive" className="rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs font-bold text-destructive">{t("vocabulary.live.deliveryRecoverable")} {deliveryError}</p> : null}
             {practice.sessions.map((session) => (
               <button
                 className="rounded-2xl border border-border bg-white p-3 text-left"
@@ -186,7 +177,7 @@ export function LessonActivityRail({
               >
                 <span className="flex items-center justify-between gap-2">
                   <strong className="truncate">{session.ownerName ?? session.ownerSubject}</strong>
-                  {session.completedItems === session.totalItems ? <Check className="h-4 w-4 text-[#197a45]" /> : <Users className="h-4 w-4 text-primary" />}
+                  {session.status === "COMPLETED" ? <Check className="h-4 w-4 text-[#197a45]" /> : <Users className="h-4 w-4 text-primary" />}
                 </span>
                 <span className="mt-2 block text-xs font-bold text-muted-foreground">
                   {t("vocabulary.live.studentProgress", {
@@ -250,10 +241,8 @@ export function LessonActivityRail({
                   <TeacherAddMaterialMenu
                     onUploadHtmlGamePage={onUploadHtmlGamePage}
                     onUploadImagePage={onUploadImagePage}
-                    onUploadDocumentPage={onUploadDocumentPage}
                     uploadingHtmlGamePage={uploadingHtmlGamePage}
                     uploadingImagePage={uploadingImagePage}
-                    uploadingDocumentPage={uploadingDocumentPage}
                   />
                 </div>
               ) : (

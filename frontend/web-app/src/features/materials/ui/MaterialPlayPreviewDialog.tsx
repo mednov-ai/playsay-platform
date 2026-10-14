@@ -12,7 +12,7 @@ import {
 } from "../model/materialDocument";
 import { LessonMaterialDocumentView } from "./LessonMaterialDocumentView";
 
-type MaterialPreviewPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus" | "document-focus";
+type MaterialPreviewPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus";
 
 export function MaterialPlayPreviewDialog({
   material,
@@ -96,7 +96,6 @@ export function MaterialPlayPreviewDialog({
           <LessonMaterialDocumentView
             allowVideoFullscreen
             answers={answers}
-            canControlDocuments
             material={material}
             mode="classroom"
             onAnswerChange={updateAnswer}

@@ -119,10 +119,7 @@ class VocabularyIndexedSelectionLookup(
                         occurrences.findEntryIdsByOwnerSubjectAndCreatedAtAfter(ownerSubject, since)
                 }
                 VocabularySelectionSource.DUE -> states.findDueEntryIds(ownerSubject, now)
-                VocabularySelectionSource.FORGOTTEN -> (
-                    states.findEntryIdsByReviewReason(ownerSubject, MemoryReviewReason.LAPSED.name) +
-                        states.findEntryIdsByLastRating(ownerSubject, com.playsay.vocabulary.dto.PracticeRating.AGAIN)
-                    ).distinct()
+                VocabularySelectionSource.FORGOTTEN -> states.findEntryIdsByReviewReason(ownerSubject, MemoryReviewReason.LAPSED.name)
                 VocabularySelectionSource.DIFFICULT -> (
                     states.findEntryIdsByReviewReason(ownerSubject, MemoryReviewReason.DIFFICULT.name) +
                         states.findDifficultEntryIds(ownerSubject, BigDecimal("0.5500"))

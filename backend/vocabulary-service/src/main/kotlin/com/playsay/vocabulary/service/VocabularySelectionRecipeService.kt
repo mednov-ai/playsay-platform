@@ -20,7 +20,7 @@ class VocabularySelectionRecipeService(
     private val objectMapper: ObjectMapper,
 ) {
     fun list(ownerSubject: String): List<VocabularySelectionRecipeResponse> =
-        recipes.findAllByOwnerSubjectAndArchivedAtIsNullOrderByUpdatedAtDesc(ownerSubject).map(::response)
+        recipes.findAllByOwnerSubjectOrderByUpdatedAtDesc(ownerSubject).map(::response)
 
     fun get(ownerSubject: String, id: UUID): VocabularySelectionRecipeResponse = response(requireOwned(ownerSubject, id))
 
@@ -40,13 +40,7 @@ class VocabularySelectionRecipeService(
     }
 
     fun delete(ownerSubject: String, id: UUID) {
-        val entity = recipes.findByIdAndOwnerSubject(id, ownerSubject)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Vocabulary selection recipe was not found.")
-        if (entity.archivedAt != null) return
-        entity.archivedAt = Instant.now()
-        entity.updatedAt = requireNotNull(entity.archivedAt)
-        entity.revision += 1
-        recipes.save(entity)
+        recipes.delete(requireOwned(ownerSubject, id))
     }
 
     fun resolveSettings(ownerSubject: String, request: VocabularyPracticeSettingsRequest): VocabularyPracticeSettingsRequest {
@@ -74,7 +68,7 @@ class VocabularySelectionRecipeService(
     }
 
     private fun requireOwned(ownerSubject: String, id: UUID): VocabularySelectionRecipeEntity =
-        recipes.findByIdAndOwnerSubject(id, ownerSubject)?.takeIf { it.archivedAt == null }
+        recipes.findByIdAndOwnerSubject(id, ownerSubject)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Vocabulary selection recipe was not found.")
 
     private fun response(entity: VocabularySelectionRecipeEntity): VocabularySelectionRecipeResponse {

@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   FileCode2,
-  FileText,
   ImagePlus,
   Loader2,
   Plus,
@@ -26,7 +25,6 @@ export function TeacherLessonToolbar({
   activeStudentSubject,
   assigningMaterial,
   canManageMaterial,
-  canUploadDocument,
   currentMaterialId,
   materials,
   onAssignMaterial,
@@ -34,12 +32,10 @@ export function TeacherLessonToolbar({
   onSelectStudent,
   onUploadHtmlGamePage,
   onUploadImagePage,
-  onUploadDocumentPage,
   participants,
   selectedMaterialId,
   uploadingHtmlGamePage,
   uploadingImagePage,
-  uploadingDocumentPage,
   vocabularyAction,
   activityRailAction,
   compact = false,
@@ -47,20 +43,17 @@ export function TeacherLessonToolbar({
   activeStudentSubject: string | null;
   assigningMaterial: boolean;
   canManageMaterial: boolean;
-  canUploadDocument: boolean;
   currentMaterialId: string | null;
   materials: LessonMaterial[];
   onAssignMaterial: () => void;
   onSelectMaterial: (materialId: string) => void;
   onSelectStudent: (subject: string) => void;
-  onUploadHtmlGamePage?: (file: File) => void;
-  onUploadImagePage?: (file: File) => void;
-  onUploadDocumentPage?: (file: File) => void;
+  onUploadHtmlGamePage: (file: File) => void;
+  onUploadImagePage: (file: File) => void;
   participants: LessonParticipant[];
   selectedMaterialId: string;
   uploadingHtmlGamePage: boolean;
   uploadingImagePage: boolean;
-  uploadingDocumentPage: boolean;
   vocabularyAction: ReactNode;
   activityRailAction?: ReactNode;
   compact?: boolean;
@@ -136,14 +129,12 @@ export function TeacherLessonToolbar({
       <div className="playsay-teacher-toolbar-actions">
         {vocabularyAction}
         {activityRailAction}
-        {(canManageMaterial || canUploadDocument) && !compact ? (
+        {canManageMaterial && !compact ? (
           <TeacherAddMaterialMenu
-            onUploadHtmlGamePage={canManageMaterial ? onUploadHtmlGamePage : undefined}
-            onUploadImagePage={canManageMaterial ? onUploadImagePage : undefined}
-            onUploadDocumentPage={onUploadDocumentPage}
+            onUploadHtmlGamePage={onUploadHtmlGamePage}
+            onUploadImagePage={onUploadImagePage}
             uploadingHtmlGamePage={uploadingHtmlGamePage}
             uploadingImagePage={uploadingImagePage}
-            uploadingDocumentPage={uploadingDocumentPage}
           />
         ) : null}
       </div>
@@ -154,17 +145,13 @@ export function TeacherLessonToolbar({
 export function TeacherAddMaterialMenu({
   onUploadHtmlGamePage,
   onUploadImagePage,
-  onUploadDocumentPage,
   uploadingHtmlGamePage,
   uploadingImagePage,
-  uploadingDocumentPage,
 }: {
-  onUploadHtmlGamePage?: (file: File) => void;
-  onUploadImagePage?: (file: File) => void;
-  onUploadDocumentPage?: (file: File) => void;
+  onUploadHtmlGamePage: (file: File) => void;
+  onUploadImagePage: (file: File) => void;
   uploadingHtmlGamePage: boolean;
   uploadingImagePage: boolean;
-  uploadingDocumentPage: boolean;
 }) {
   const { t } = useAppTranslation();
   const [open, setOpen] = useState(false);
@@ -173,7 +160,6 @@ export function TeacherAddMaterialMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
@@ -277,7 +263,7 @@ export function TeacherAddMaterialMenu({
           onKeyDown={handleMenuKeyDown}
           role="menu"
         >
-          {onUploadImagePage ? <button
+          <button
             disabled={uploadingImagePage}
             onClick={() => imageInputRef.current?.click()}
             role="menuitem"
@@ -285,17 +271,8 @@ export function TeacherAddMaterialMenu({
           >
             {uploadingImagePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             {uploadingImagePage ? t("classroom.actions.uploadingImagePage") : t("classroom.actions.addImagePage")}
-          </button> : null}
-          {onUploadDocumentPage ? <button
-            disabled={uploadingDocumentPage}
-            onClick={() => documentInputRef.current?.click()}
-            role="menuitem"
-            type="button"
-          >
-            {uploadingDocumentPage ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            {uploadingDocumentPage ? t("classroom.actions.uploadingDocumentPage") : t("classroom.actions.addDocumentPage")}
-          </button> : null}
-          {onUploadHtmlGamePage ? <button
+          </button>
+          <button
             disabled={uploadingHtmlGamePage}
             onClick={() => htmlInputRef.current?.click()}
             role="menuitem"
@@ -303,11 +280,11 @@ export function TeacherAddMaterialMenu({
           >
             {uploadingHtmlGamePage ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode2 className="h-4 w-4" />}
             {uploadingHtmlGamePage ? t("classroom.actions.uploadingHtmlGamePage") : t("classroom.actions.addHtmlGamePage")}
-          </button> : null}
+          </button>
         </div>
       ) : null}
 
-      {onUploadImagePage ? <input
+      <input
         accept="image/jpeg,image/png,image/webp,image/svg+xml"
         aria-hidden="true"
         className="sr-only"
@@ -316,18 +293,8 @@ export function TeacherAddMaterialMenu({
         ref={imageInputRef}
         tabIndex={-1}
         type="file"
-      /> : null}
-      {onUploadDocumentPage ? <input
-        accept="application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pdf,.pptx"
-        aria-hidden="true"
-        className="sr-only"
-        disabled={uploadingDocumentPage}
-        onChange={(event) => handleFileSelect(event, onUploadDocumentPage)}
-        ref={documentInputRef}
-        tabIndex={-1}
-        type="file"
-      /> : null}
-      {onUploadHtmlGamePage ? <input
+      />
+      <input
         accept="text/html,.html"
         aria-hidden="true"
         className="sr-only"
@@ -336,7 +303,7 @@ export function TeacherAddMaterialMenu({
         ref={htmlInputRef}
         tabIndex={-1}
         type="file"
-      /> : null}
+      />
     </div>
   );
 }

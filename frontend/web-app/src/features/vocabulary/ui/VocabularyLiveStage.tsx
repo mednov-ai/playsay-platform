@@ -37,18 +37,14 @@ export function VocabularyLiveStage({
   const effectiveSelectedSubject = selectedStudentSubject ?? selectedSubject;
   const [saving, setSaving] = useState(false);
   const [continuedHome, setContinuedHome] = useState(false);
-  const [commandError, setCommandError] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
   const selected = practice.sessions.find((session) => session.ownerSubject === effectiveSelectedSubject) ?? practice.sessions[0] ?? null;
   const own = practice.sessions.find((session) => session.ownerSubject === profileSubject) ?? null;
 
   async function changeStatus(status: "ACTIVE" | "PAUSED" | "COMPLETED") {
-    setCommandError(false);
     setSaving(true);
     try {
       onPracticeChange(await updateVocabularyPracticeStatus(practice.id, status));
-    } catch {
-      setCommandError(true);
     } finally {
       setSaving(false);
     }
@@ -57,7 +53,6 @@ export function VocabularyLiveStage({
   async function continueAtHome() {
     const remaining = practice.sessions.filter((session) => session.completedItems < session.totalItems);
     if (remaining.length === 0) return;
-    setCommandError(false);
     setSaving(true);
     setContinueError(null);
     try {
@@ -69,8 +64,8 @@ export function VocabularyLiveStage({
         wordLimit: 30,
       });
       setContinuedHome(true);
-    } catch {
-      setContinueError(t("vocabulary.practice.errors.publish"));
+    } catch (caught) {
+      setContinueError(caught instanceof Error ? caught.message : t("vocabulary.practice.errors.publish"));
     } finally {
       setSaving(false);
     }
@@ -78,13 +73,10 @@ export function VocabularyLiveStage({
 
   async function giveHint() {
     if (!selected) return;
-    setCommandError(false);
     setSaving(true);
     try {
       const updated = await giveVocabularyPracticeHint(selected.id);
       onPracticeChange(replaceSession(practice, updated));
-    } catch {
-      setCommandError(true);
     } finally {
       setSaving(false);
     }
@@ -92,13 +84,10 @@ export function VocabularyLiveStage({
 
   async function requestHelp() {
     if (!own) return;
-    setCommandError(false);
     setSaving(true);
     try {
       const updated = await requestVocabularyPracticeHelp(own.id);
       onPracticeChange(replaceSession(practice, updated));
-    } catch {
-      setCommandError(true);
     } finally {
       setSaving(false);
     }
@@ -107,14 +96,13 @@ export function VocabularyLiveStage({
   if (!canManage) {
     return own ? (
       <div className="grid gap-3">
-        {commandError ? <p role="alert">{t("vocabulary.practice.errors.save")}</p> : null}
         {practice.status === "PAUSED" ? (
           <p className="rounded-2xl border border-primary/20 bg-[#fff7f0] p-3 text-center text-sm font-black text-primary">{t("vocabulary.live.pausedForStudent")}</p>
         ) : null}
         <VocabularyPracticePlayer
           initialSession={own}
           onSessionChange={(session) => onPracticeChange(replaceSession(practice, session))}
-          readOnly={practice.status === "PAUSED" || practice.status === "COMPLETED" || practice.status === "CANCELLED"}
+          readOnly={practice.status === "PAUSED"}
         />
         <Button
           disabled={saving || own.helpRequested || own.status === "COMPLETED" || practice.status === "PAUSED"}
@@ -146,7 +134,7 @@ export function VocabularyLiveStage({
     ) : null;
   }
 
-  const completed = practice.sessions.filter((session) => session.completedItems === session.totalItems).length;
+  const completed = practice.sessions.filter((session) => session.status === "COMPLETED").length;
   return (
     <section className="grid gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4">
@@ -176,7 +164,6 @@ export function VocabularyLiveStage({
           ) : null}
         </div>
       </header>
-      {commandError ? <p role="alert">{t("vocabulary.practice.errors.save")}</p> : null}
       {continueError ? <p className="rounded-2xl border border-destructive/25 bg-destructive/5 p-3 text-sm font-bold text-destructive">{continueError}</p> : null}
 
       <div className="grid gap-3 lg:grid-cols-[minmax(17rem,22rem)_1fr]">
@@ -223,6 +210,7 @@ function replaceSession(practice: VocabularyPractice, session: VocabularyPractic
   return {
     ...practice,
     sessions: practice.sessions.map((current) => current.id === session.id ? session : current),
+    updatedAt: session.updatedAt,
   };
 }
 

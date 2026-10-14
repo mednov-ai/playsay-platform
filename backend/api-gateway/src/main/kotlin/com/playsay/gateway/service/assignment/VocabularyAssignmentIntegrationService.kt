@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.VocabularyAssignmentPreparationResponse
 import com.playsay.gateway.dto.VocabularyAssignmentProgressUpdateRequest
-import com.playsay.gateway.client.VocabularyAssignmentClient
-import com.playsay.gateway.dto.VocabularyHomeworkReworkRequest
 import com.playsay.gateway.dto.VocabularyHomeworkRequest
 import com.playsay.gateway.dto.VocabularyHomeworkReviewAction
 import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
@@ -33,7 +31,6 @@ class VocabularyAssignmentIntegrationService(
     private val assignmentIntegrationOutboxRepo: AssignmentIntegrationOutboxRepo,
     private val appUserRepo: AppUserRepo,
     private val assignmentEventPublisher: AssignmentEventPublisher,
-    private val vocabularyClient: VocabularyAssignmentClient,
     private val progressEvents: VocabularyAssignmentProgressEventRepo,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
@@ -108,13 +105,9 @@ class VocabularyAssignmentIntegrationService(
         val assignment = assignmentRepo.findById(assignmentId).orElseThrow(::assignmentNotFound)
         if (assignment.contentKind != MetaData.AssignmentContentKinds.VOCABULARY_PRACTICE) throw assignmentNotFound()
         val user = appUserRepo.findByKeycloakSubject(request.ownerSubject) ?: throw assignmentNotFound()
-        val recipient = assignmentRecipientRepo.lockByAssignmentIdAndStudentUserId(assignmentId, user.id)
+        val recipient = assignmentRecipientRepo.findByAssignmentIdAndStudentUserId(assignmentId, user.id)
             ?: throw assignmentNotFound()
-        if (recipient.activityRef != request.sessionId) {
-            if (progressEvents.existsByAssignmentIdAndSessionId(assignmentId, request.sessionId)) return
-            throw assignmentNotFound()
-        }
-        if (recipient.reviewState == "ACCEPT") return
+        if (recipient.activityRef != request.sessionId) throw assignmentNotFound()
         if (request.revision <= recipient.activityRevision) {
             progressEvents.save(VocabularyAssignmentProgressEventEntity(request.eventId, assignmentId, request.sessionId, request.revision))
             return
@@ -157,30 +150,10 @@ class VocabularyAssignmentIntegrationService(
             throw assignmentNotFound()
         }
         val student = appUserRepo.findByKeycloakSubject(studentSubject) ?: throw assignmentNotFound()
-        val recipient = assignmentRecipientRepo.lockByAssignmentIdAndStudentUserId(assignmentId, student.id)
+        val recipient = assignmentRecipientRepo.findByAssignmentIdAndStudentUserId(assignmentId, student.id)
             ?: throw assignmentNotFound()
-        val legacyReturn = request.action == VocabularyHomeworkReviewAction.RETURN && recipient.reviewState == "RETURN" &&
-            recipient.completionRatio?.compareTo(java.math.BigDecimal.ONE) == 0
-        if (recipient.reviewState == request.action.name && !legacyReturn) return
-        if (recipient.reviewState != "AWAITING_REVIEW" && !legacyReturn) {
+        if (request.action == VocabularyHomeworkReviewAction.ACCEPT && recipient.reviewState != "AWAITING_REVIEW") {
             throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.INVALID_REQUEST)
-        }
-        if (request.action == VocabularyHomeworkReviewAction.RETURN) {
-            val rework = vocabularyClient.rework(
-                VocabularyHomeworkReworkRequest(assignmentId, requireNotNull(recipient.activityRef), studentSubject, actorSubject),
-            )
-            recipient.activityRef = rework.sessionId
-            recipient.learnerSnapshotId = rework.sessionId
-            recipient.activityRevision = 0
-            recipient.completionRatio = null
-            recipient.accuracy = null
-            recipient.difficultWordCount = null
-            recipient.distinctGradedPrompts = 0
-            recipient.distinctEntries = 0
-            recipient.hintsUsed = 0
-            recipient.activeDurationMs = 0
-            recipient.masteryRatio = null
-            recipient.activityUpdatedAt = null
         }
         val now = Instant.now()
         recipient.reviewState = request.action.name

@@ -209,7 +209,7 @@ class VocabularyPracticeQueryService(
             candidates = eligible.map { entry ->
                 VocabularySelectionCandidate(
                     id = entry.id,
-                    dueAt = vocabularyEntryDueAt(entry, statesByEntry[entry.id].orEmpty()),
+                    dueAt = entryDueAt(entry, statesByEntry[entry.id].orEmpty()),
                     stage = aggregateVocabularyStage(statesByEntry[entry.id].orEmpty()),
                     updatedAt = entry.updatedAt,
                 )
@@ -283,7 +283,7 @@ class VocabularyPracticeQueryService(
             }
             .map { entry ->
                 val entryStates = statesByEntry[entry.id].orEmpty()
-                val dueAt = vocabularyEntryDueAt(entry, entryStates)
+                val dueAt = entryDueAt(entry, entryStates)
                 responseMapper.learningEntry(
                     entry = entry,
                     states = entryStates,
@@ -302,7 +302,7 @@ class VocabularyPracticeQueryService(
             totalCount = ownerEntries.size,
             dueCount = ownerEntries.count { entry ->
                 !entry.practicePaused && !entry.translation.isNullOrBlank() &&
-                    !vocabularyEntryDueAt(entry, statesByEntry[entry.id].orEmpty()).isAfter(now)
+                    !entryDueAt(entry, statesByEntry[entry.id].orEmpty()).isAfter(now)
             },
             learningCount = allStages.values.count { it in setOf(LearningStage.NEW, LearningStage.LEARNING, LearningStage.REVIEW) },
             masteredCount = allStages.values.count { it == LearningStage.MASTERED },
@@ -336,6 +336,13 @@ class VocabularyPracticeQueryService(
     private fun sessionEntity(sessionId: UUID): VocabularyPracticeSessionEntity =
         sessions.findById(sessionId).orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
 
+    private fun entryDueAt(entry: VocabularyEntryEntity, states: List<VocabularySkillStateEntity>): Instant {
+        val required = states.filter { state ->
+            state.skill in setOf(VocabularySkill.MEANING, VocabularySkill.FORM) ||
+                (state.skill == VocabularySkill.CONTEXT && hasExactVocabularyContext(entry))
+        }
+        return required.minOfOrNull(VocabularySkillStateEntity::dueAt) ?: entry.createdAt
+    }
 }
 
 private val queryTerminalSessionStatuses = setOf(SessionStatus.COMPLETED, SessionStatus.CANCELLED)

@@ -223,7 +223,6 @@ function StudentVocabularyPanel() {
   const [startFailed, setStartFailed] = useState(false);
   const [wordFilter, setWordFilter] = useState<StudentEntryFilter>("ALL");
   const [wordQuery, setWordQuery] = useState("");
-  const wordSearchRef = useRef<HTMLInputElement>(null);
   const dashboardQuery = useQuery({
     queryFn: ({ signal }) => fetchVocabularyDashboard(undefined, "", undefined, signal),
     queryKey: ["vocabulary-dashboard", "self"],
@@ -244,7 +243,7 @@ function StudentVocabularyPanel() {
       if (wordFilter === "ALL") return true;
       if (wordFilter === "RECENT") return Date.parse(item.entry.updatedAt) >= recentThreshold;
       if (wordFilter === "DUE") return item.overdue;
-      if (wordFilter === "FORGOTTEN") return item.skills.some((skill) => (skill.reviewReason === "LAPSED" || skill.lastRating === "AGAIN"));
+      if (wordFilter === "FORGOTTEN") return item.skills.some((skill) => skill.reviewReason === "LAPSED");
       if (wordFilter === "DIFFICULT") return item.skills.some((skill) => skill.reviewReason === "DIFFICULT" || (skill.difficultyScore ?? 0) >= 0.55);
       if (wordFilter === "NEW") return item.stage === "NEW";
       return item.entry.favorite === true;
@@ -323,7 +322,6 @@ function StudentVocabularyPanel() {
               aria-label={t("vocabulary.search")}
               className={`playsay-input vocabulary-search-field__input${wordQuery ? " vocabulary-search-field__input--clearable" : ""}`}
               data-testid="vocabulary-word-search"
-              ref={wordSearchRef}
               onChange={(event) => setWordQuery(event.target.value)}
               placeholder={t("vocabulary.search")}
               type="search"
@@ -333,7 +331,7 @@ function StudentVocabularyPanel() {
               <button
                 aria-label={t("vocabulary.actions.clearSearch")}
                 className="vocabulary-search-field__clear"
-                onClick={() => { setWordQuery(""); wordSearchRef.current?.focus(); }}
+                onClick={() => setWordQuery("")}
                 type="button"
               >
                 <X aria-hidden className="h-4 w-4" />

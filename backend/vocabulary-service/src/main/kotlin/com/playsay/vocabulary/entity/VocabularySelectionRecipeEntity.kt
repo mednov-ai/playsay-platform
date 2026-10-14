@@ -24,6 +24,4 @@ class VocabularySelectionRecipeEntity(
     @Column(name = "settings_json", nullable = false, columnDefinition = "TEXT") var settingsJson: String = "{}",
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(),
-) {
-    @Column(name = "archived_at") var archivedAt: Instant? = null
-}
+)

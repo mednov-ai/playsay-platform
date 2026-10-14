@@ -1,21 +1,9 @@
 import * as Y from "yjs";
 import * as encoding from "lib0/encoding";
-import * as decoding from "lib0/decoding";
 
 export const messageHtmlGameLifecycle = 3;
 export const stoppedRunsMap = "htmlGameStoppedRuns";
 export type GameStopResult = "stopped" | "stale" | "incompatible";
-
-// Develop already uses type 3 for viewport commands. Preserve both wire formats
-// and dispatch by the lifecycle envelope instead of changing existing clients.
-export function isHtmlGameStopMessage(bytes: Uint8Array): boolean {
-  const decoder = decoding.createDecoder(bytes);
-  if (decoding.readVarUint(decoder) !== messageHtmlGameLifecycle) return false;
-  const payload = decoding.readVarUint8Array(decoder);
-  if (payload.length > 16 * 1024 || decoding.hasContent(decoder)) throw new Error("invalid command envelope");
-  const value = JSON.parse(new TextDecoder().decode(payload)) as { type?: unknown } | null;
-  return value?.type === "stop";
-}
 
 export function encodeGameLifecycle(payload: Record<string, unknown>): Uint8Array {
   const encoder = encoding.createEncoder();

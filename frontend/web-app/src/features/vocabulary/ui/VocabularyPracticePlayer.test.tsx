@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { useState } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VocabularyPracticeSession } from "../../../shared/api/playsay";
@@ -12,7 +11,6 @@ const recordVocabularyAttempt = vi.fn();
 const fetchVocabularyPracticeSession = vi.fn();
 
 vi.mock("../../../shared/api/playsay", () => ({
-  isApiStatus: () => false,
   fetchVocabularyPracticeSession: (...args: unknown[]) => fetchVocabularyPracticeSession(...args),
   recordVocabularyAttempt: (...args: unknown[]) => recordVocabularyAttempt(...args),
   revealVocabularyPracticeItem: (...args: unknown[]) => revealVocabularyPracticeItem(...args),
@@ -32,51 +30,6 @@ beforeEach(() => {
 });
 
 describe("VocabularyPracticePlayer", () => {
-  it("retains corrective feedback through parent updates including the final answer", async () => {
-    const initial = { ...session({ exerciseType: "FORM_INPUT", prompt: "Write steady" }), totalItems: 2 };
-    function Parent() {
-      const [value, setValue] = useState(initial);
-      return <VocabularyPracticePlayer initialSession={value} onSessionChange={setValue} />;
-    }
-    recordVocabularyAttempt.mockResolvedValueOnce({ correct: false, expectedAnswer: "steady", session: {
-      ...initial, revision: 1, completedItems: 1, currentItem: { ...initial.currentItem!, id: "item-2", prompt: "Next" },
-    }}).mockResolvedValueOnce({ correct: true, expectedAnswer: "done", session: {
-      ...initial, revision: 2, completedItems: 2, currentItem: null, status: "COMPLETED",
-    }});
-    render(<Parent />);
-    fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "wrong" } });
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.check"));
-    await waitFor(() => expect(screen.getByText("steady")).toBeInTheDocument());
-    expect(screen.queryByText("Next")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.continue"));
-    fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "done" } });
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.check"));
-    await waitFor(() => expect(screen.getByText("vocabulary.practice.actions.continue")).toBeInTheDocument());
-    expect(screen.queryByText("vocabulary.practice.complete.title")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.continue"));
-    expect(screen.getByText("vocabulary.practice.complete.title")).toBeInTheDocument();
-  });
-
-  it("blocks repeated form submissions while pending", () => {
-    recordVocabularyAttempt.mockImplementation(() => new Promise(() => {}));
-    render(<VocabularyPracticePlayer initialSession={session({ exerciseType: "FORM_INPUT" })} />);
-    const input = screen.getByLabelText("vocabulary.practice.answerLabel");
-    fireEvent.change(input, { target: { value: "steady" } });
-    fireEvent.submit(input.closest("form")!);
-    fireEvent.submit(input.closest("form")!);
-    expect(recordVocabularyAttempt).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps a draft on same-item hints and ignores old revisions", () => {
-    const initial = session({ exerciseType: "FORM_INPUT" });
-    const { rerender } = render(<VocabularyPracticePlayer initialSession={initial} />);
-    fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "draft" } });
-    rerender(<VocabularyPracticePlayer initialSession={{ ...initial, revision: 2, teacherHint: "hint" }} />);
-    expect(screen.getByLabelText("vocabulary.practice.answerLabel")).toHaveValue("draft");
-    rerender(<VocabularyPracticePlayer initialSession={{ ...initial, revision: 1 }} />);
-    expect(screen.getByText("vocabulary.practice.teacherHint")).toBeInTheDocument();
-  });
-
   it("reveals a flashcard answer only through the authorized reveal request", async () => {
     render(<VocabularyPracticePlayer initialSession={session({
       exerciseType: "FLASHCARD",
@@ -114,26 +67,6 @@ describe("VocabularyPracticePlayer", () => {
     expect(screen.getByRole("button", { name: "cat" })).toBeEnabled();
   });
 
-  it("shows matching labels after a lost final response instead of internal pair IDs", async () => {
-    const initial = session({ exerciseType: "MATCHING", content: {
-      type: "MATCHING", left: [{ id: "left-id", label: "cat" }], right: [{ id: "right-id", label: "кот" }],
-    } });
-    const completed = { ...initial, revision: 1, currentItem: null, status: "COMPLETED" as const, completedItems: 1 };
-    recordVocabularyAttempt.mockRejectedValueOnce(new Error("response lost"))
-      .mockResolvedValueOnce({ correct: true, expectedAnswer: "left-id:right-id", session: completed });
-    fetchVocabularyPracticeSession.mockResolvedValue(completed);
-    render(<VocabularyPracticePlayer initialSession={initial} />);
-    fireEvent.click(screen.getByRole("button", { name: "cat" }));
-    fireEvent.click(screen.getByRole("button", { name: "кот" }));
-    fireEvent.click(screen.getByText("vocabulary.practice.matching.connect"));
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.check"));
-    await waitFor(() => expect(screen.getByText("vocabulary.practice.actions.retry")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.retry"));
-    await waitFor(() => expect(screen.getByText("cat ↔ кот")).toBeInTheDocument());
-    expect(screen.queryByText("left-id:right-id")).not.toBeInTheDocument();
-    expect(screen.getByText("vocabulary.practice.actions.continue")).toBeInTheDocument();
-  });
-
   it("uses phrase chips once and lets the learner remove one chip", () => {
     render(<VocabularyPracticePlayer initialSession={session({
       exerciseType: "PHRASE_BUILDER",
@@ -160,7 +93,7 @@ describe("VocabularyPracticePlayer", () => {
     fireEvent.change(screen.getByLabelText("vocabulary.practice.answerLabel"), { target: { value: "steady" } });
     fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.check" }));
     await waitFor(() => expect(fetchVocabularyPracticeSession).toHaveBeenCalledWith("session-1"));
-    fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.check" }));
     await waitFor(() => expect(recordVocabularyAttempt).toHaveBeenCalledTimes(2));
 
     expect(recordVocabularyAttempt.mock.calls[0][1].clientAttemptId)
@@ -186,9 +119,7 @@ describe("VocabularyPracticePlayer", () => {
       rating: "GOOD",
       session: { ...session({}), attemptCount: 1, completedItems: 1, correctCount: 1, currentItem: null, status: "COMPLETED" },
     });
-    await waitFor(() => expect(screen.getByText("vocabulary.practice.actions.continue")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("vocabulary.practice.actions.continue"));
-    expect(screen.getByText("vocabulary.practice.complete.title")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("vocabulary.practice.complete.title")).toBeInTheDocument());
   });
 });
 

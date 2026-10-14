@@ -211,7 +211,6 @@ const claims: CollaborationClaims = {
   documentKind: "MATERIAL_WORK",
   scope: "GROUP",
   yjsDocumentId: "lesson:22222222-2222-4222-8222-222222222222:material:33333333-3333-4333-8333-333333333333:group:kind:MATERIAL_WORK",
-  canPublishMaterialViewport: false,
 };
 
 const config = { playsayApiBaseUrl: "https://api.example.test", collaborationServiceToken: "service-token-01234567890123456789", snapshotIntervalMs: 10_000 };

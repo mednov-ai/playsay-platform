@@ -50,11 +50,7 @@ class MaterialAssetService(
 ) {
     fun list(materialId: UUID): List<MaterialAssetResponse> =
         materialAssetRepo.findByMaterialIdOrderByCreatedAtDesc(materialId)
-            .filterNot { asset -> asset.kind == "DOCUMENT_SOURCE" }
             .map { asset -> asset.toResponse(objectMapper) }
-
-    fun isDocumentSource(materialId: UUID, assetId: UUID): Boolean =
-        findAsset(assetId)?.let { asset -> asset.materialId == materialId && asset.kind == "DOCUMENT_SOURCE" } == true
 
     fun content(materialId: UUID, assetId: UUID): ResponseEntity<ByteArray> {
         val asset = findAsset(assetId)
@@ -413,7 +409,7 @@ class MaterialAssetService(
     }
 }
 
-internal fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): MaterialAssetResponse =
+private fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): MaterialAssetResponse =
     MaterialAssetResponse(
         id = id,
         materialId = materialId,

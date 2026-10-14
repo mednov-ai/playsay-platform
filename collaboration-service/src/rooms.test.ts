@@ -8,7 +8,6 @@ const baseClaims = {
   materialId: "33333333-3333-4333-8333-333333333333",
   documentKind: "MATERIAL_WORK",
   yjsDocumentId: "ignored-by-room-builder",
-  canPublishMaterialViewport: false,
 };
 
 describe("collaborationRoomName", () => {

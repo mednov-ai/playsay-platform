@@ -1,6 +1,6 @@
 # HTML-game hotfix release security, 2026-10-05
 
-Status: passed-with-accepted-risks under explicit owner acceptance on 2026-10-05; release/01.007.13 production promotion was explicitly authorized and completed on 2026-10-05 after zero-active-lesson, backup, schema and exact-source DEV acceptance gates. Production browser acceptance passed on both online origins.
+Status: passed-with-accepted-risks under explicit owner acceptance on 2026-10-05; build-only authorization. Production promotion remains on hold.
 
 Fresh full frontend audit found 30 affected packages including a Critical Orval finding. Compatible lockfile updates and API client regeneration reduce this to five High package entries for one advisory, GHSA-vfj7-8cjw-p6xm / CVE-2026-93687. The primary advisory lists braces <=3.0.3 and no patched version: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm. npm suggests a major Tailwind 4 migration, which changes the styling/build pipeline and needs separate regression coverage. These findings are not covered by the existing JVM exceptions.
 

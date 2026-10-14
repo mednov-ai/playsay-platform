@@ -3,7 +3,6 @@ package com.playsay.vocabulary.service
 import com.playsay.vocabulary.dto.LearningStage
 import com.playsay.vocabulary.dto.PracticeRating
 import com.playsay.vocabulary.dto.VocabularySkill
-import com.playsay.vocabulary.entity.VocabularyEntryEntity
 import com.playsay.vocabulary.entity.VocabularySkillStateEntity
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -110,7 +109,3 @@ internal fun selectPracticeEntryIds(
         }
     return selected.take(limit).map { it.id }
 }
-
-internal fun vocabularyEntryDueAt(entry: VocabularyEntryEntity, states: List<VocabularySkillStateEntity>): Instant =
-    states.filter(VocabularySkillStateEntity::skillAvailable)
-        .minOfOrNull(VocabularySkillStateEntity::dueAt) ?: entry.createdAt

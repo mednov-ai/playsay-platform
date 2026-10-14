@@ -26,7 +26,7 @@ spec:
       tty: true
       env:
         - name: NODE_OPTIONS
-          value: "--max-old-space-size=2048"
+          value: "--max-old-space-size=1024"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /cache/npm
@@ -37,7 +37,7 @@ spec:
           memory: 768Mi
         limits:
           cpu: "1"
-          memory: 3Gi
+          memory: 1536Mi
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]
@@ -199,7 +199,6 @@ spec:
             sh '''
               if [ "$DEPLOY_TO_DEV" = "true" ]; then
                 export VITE_EXTERNAL_ACTIVITY_ENABLED=true
-                export VITE_DOCUMENT_MATERIALS_ENABLED=true
                 export VITE_VOCABULARY_PRACTICE_ENABLED=true
                 export VITE_VOCABULARY_HOMEWORK_ENABLED=true
                 export VITE_VOCABULARY_LIVE_ENABLED=true

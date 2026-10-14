@@ -1420,25 +1420,6 @@ export interface MaterialAssetResponse {
   createdAt: string;
 }
 
-export interface MaterialDocumentPageManifestResponse {
-  id: string;
-  index: number;
-  width: number;
-  height: number;
-}
-
-export interface MaterialDocumentUploadResponse {
-  uploadId: string;
-  status: string;
-  format: string;
-  /** @nullable */
-  revision?: string | null;
-  displayAsset?: MaterialAssetResponse | null;
-  pageManifest: MaterialDocumentPageManifestResponse[];
-  /** @nullable */
-  errorCode?: string | null;
-}
-
 export interface MaterialAnswerSuggestionsRequest {
   /** @maxLength 80 */
   blockId: string;
@@ -2289,10 +2270,6 @@ export type UploadMaterialImageAssetBody = {
 };
 
 export type UploadMaterialHtmlGameAssetBody = {
-  file: Blob | File;
-};
-
-export type UploadMaterialDocumentBody = {
   file: Blob | File;
 };
 
@@ -7605,55 +7582,6 @@ if(uploadMaterialHtmlGameAssetBody?.file !== undefined) {
 
 
 
-export type uploadMaterialDocumentResponse200 = {
-  data: MaterialDocumentUploadResponse
-  status: 200
-}
-
-export type uploadMaterialDocumentResponseSuccess = (uploadMaterialDocumentResponse200) & {
-  headers: Headers;
-};
-;
-
-export type uploadMaterialDocumentResponse = (uploadMaterialDocumentResponseSuccess)
-
-export const getUploadMaterialDocumentUrl = (materialId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets/documents`
-}
-
-/**
- * Validates the source and creates an immutable sanitized display revision.
- * @summary Upload a PDF or PPTX document
- */
-export const uploadMaterialDocument = async (materialId: string,
-    uploadMaterialDocumentBody?: UploadMaterialDocumentBody, options?: RequestInit): Promise<uploadMaterialDocumentResponse> => {
-    const formData = new FormData();
-if(uploadMaterialDocumentBody?.file !== undefined) {
- formData.append(`file`, uploadMaterialDocumentBody.file);
- }
-
-  const res = await fetch(getUploadMaterialDocumentUrl(materialId),
-  {
-    ...options,
-    method: 'POST'
-    ,
-    body: formData
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: uploadMaterialDocumentResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as uploadMaterialDocumentResponse
-}
-
-
-
 export type suggestMaterialAcceptedAnswersResponse200 = {
   data: MaterialAnswerSuggestionsResponse
   status: 200
@@ -11077,51 +11005,6 @@ export const getMaterialAssetContent = async (materialId: string,
 
   const data: getMaterialAssetContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
   return { data, status: res.status, headers: res.headers } as getMaterialAssetContentResponse
-}
-
-
-
-export type getMaterialDocumentUploadResponse200 = {
-  data: MaterialDocumentUploadResponse
-  status: 200
-}
-
-export type getMaterialDocumentUploadResponseSuccess = (getMaterialDocumentUploadResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMaterialDocumentUploadResponse = (getMaterialDocumentUploadResponseSuccess)
-
-export const getGetMaterialDocumentUploadUrl = (materialId: string,
-    uploadId: string,) => {
-
-
-
-
-  return `/api/materials/${materialId}/assets/document-uploads/${uploadId}`
-}
-
-/**
- * @summary Get PDF or PPTX validation status
- */
-export const getMaterialDocumentUpload = async (materialId: string,
-    uploadId: string, options?: RequestInit): Promise<getMaterialDocumentUploadResponse> => {
-
-  const res = await fetch(getGetMaterialDocumentUploadUrl(materialId,uploadId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-)
-
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getMaterialDocumentUploadResponse['data'] = body ? JSON.parse(body) : {}
-  return { data, status: res.status, headers: res.headers } as getMaterialDocumentUploadResponse
 }
 
 

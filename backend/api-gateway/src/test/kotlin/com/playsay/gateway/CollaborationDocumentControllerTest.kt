@@ -339,7 +339,6 @@ class CollaborationDocumentControllerTest @Autowired constructor(
             document.id,
             "https://dev.online.honeyschool.ru",
         )
-        val teacherToken = collaborationController.token(teacher, classroom.lessonId, document.id)
 
         assertEquals(document.id, token.documentId)
         assertEquals(document.yjsDocumentId, token.yjsDocumentId)
@@ -351,8 +350,6 @@ class CollaborationDocumentControllerTest @Autowired constructor(
         val regionalClaims = SignedJWT.parse(regionalToken.token).jwtClaimsSet
         listOf("sub", "documentId", "lessonId", "materialId", "documentKind", "scope", "yjsDocumentId", "room")
             .forEach { claim -> assertEquals(directClaims.getClaim(claim), regionalClaims.getClaim(claim)) }
-        assertEquals(false, directClaims.getBooleanClaim("canPublishMaterialViewport"))
-        assertEquals(true, SignedJWT.parse(teacherToken.token).jwtClaimsSet.getBooleanClaim("canPublishMaterialViewport"))
     }
 
     private fun classroom(teacher: JwtAuthenticationToken, participantSubjects: List<String>): ClassroomFixture {

@@ -5,23 +5,13 @@ import {
   fetchVocabularyPracticeSession,
   recordVocabularyAttempt,
   revealVocabularyPracticeItem,
-  type VocabularyAttemptInput,
-  isApiStatus,
   type VocabularyAttemptResult,
   type VocabularyPracticeRating,
   type VocabularyPracticeSession,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
 
-export function VocabularyPracticePlayer(props: {
-  initialSession: VocabularyPracticeSession;
-  onSessionChange?: (session: VocabularyPracticeSession) => void;
-  readOnly?: boolean;
-}) {
-  return <PracticePlayerSession key={props.initialSession.id} {...props} />;
-}
-
-function PracticePlayerSession({
+export function VocabularyPracticePlayer({
   initialSession,
   onSessionChange,
   readOnly = false,
@@ -41,36 +31,22 @@ function PracticePlayerSession({
   const [feedback, setFeedback] = useState<VocabularyAttemptResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const pendingAttempt = useRef<VocabularyAttemptInput | null>(null);
-  const pendingItem = useRef<VocabularyPracticeSession["currentItem"]>(null);
-  const inFlight = useRef(false);
-  const mounted = useRef(true);
-  const sessionRef = useRef(session);
-  const [unavailable, setUnavailable] = useState(false);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const blocked = readOnly || ["PAUSED", "COMPLETED", "CANCELLED"].includes(session.status);
-
-  function acceptSession(next: VocabularyPracticeSession) {
-    if (!mounted.current || next.id !== sessionRef.current.id || next.revision < sessionRef.current.revision) return;
-    sessionRef.current = next;
-    setSession(next);
-  }
+  const attemptIdRef = useRef<string | null>(null);
   const item = session.currentItem;
   const matchingContent = item?.content && "left" in item.content && "right" in item.content ? item.content : null;
   const phraseContent = item?.content && "tokens" in item.content ? item.content : null;
 
   useEffect(() => {
-    acceptSession(initialSession);
-  }, [initialSession]);
-
-  useEffect(() => {
+    setSession(initialSession);
     setAnswer("");
     setPhrase([]);
     setMatchingPairs([]);
     setMatchingSelection({});
+    setFeedback(null);
     setRevealed(false);
     setRevealedAnswer(null);
-  }, [item?.id]);
+    attemptIdRef.current = null;
+  }, [initialSession.id, initialSession.revision]);
 
   useEffect(() => {
     if (item?.exerciseType !== "KEYBOARD" || readOnly) return undefined;
@@ -78,8 +54,8 @@ function PracticePlayerSession({
     async function refreshAfterKey() {
       if (document.visibilityState === "hidden") return;
       const refreshed = await fetchVocabularyPracticeSession(session.id).catch(() => null);
-      if (cancelled || !refreshed || refreshed.revision <= sessionRef.current.revision) return;
-      acceptSession(refreshed);
+      if (cancelled || !refreshed || refreshed.revision === session.revision) return;
+      setSession(refreshed);
       onSessionChange?.(refreshed);
     }
     function onVisibilityChange() {
@@ -102,49 +78,35 @@ function PracticePlayerSession({
   );
 
   async function submit(rating?: VocabularyPracticeRating, value = answer) {
-    if (inFlight.current || unavailable || (!pendingAttempt.current && (!item || blocked))) return;
-    inFlight.current = true;
+    if (!item || readOnly) return;
     setSaving(true);
     setMessage(null);
-    if (!pendingAttempt.current) pendingItem.current = item;
-    const request = pendingAttempt.current ?? {
-      answer: value,
-      clientAttemptId: crypto.randomUUID(),
-      hintsUsed: session.teacherHint ? 1 : 0,
-      itemId: item!.id,
-      rating,
-      sessionRevision: session.revision,
-    };
-    pendingAttempt.current = request;
     try {
-      const result = await recordVocabularyAttempt(session.id, request);
-      if (!mounted.current) return;
-      pendingAttempt.current = null;
-      setFeedback({ ...result, expectedAnswer: readableAnswer(result.expectedAnswer, pendingItem.current) });
-      pendingItem.current = null;
-      acceptSession(result.session);
-      onSessionChange?.(sessionRef.current);
+      const clientAttemptId = attemptIdRef.current ?? crypto.randomUUID();
+      attemptIdRef.current = clientAttemptId;
+      const result = await recordVocabularyAttempt(session.id, {
+        answer: value,
+        clientAttemptId,
+        hintsUsed: session.teacherHint ? 1 : 0,
+        itemId: item.id,
+        rating,
+        sessionRevision: session.revision,
+      });
+      setFeedback(result);
+      setSession(result.session);
+      onSessionChange?.(result.session);
     } catch (caught) {
-      if (!mounted.current) return;
-      if (isApiStatus(caught, 403) || isApiStatus(caught, 404)) {
-        pendingAttempt.current = null;
-        setFeedback(null);
-        setUnavailable(true);
-      } else if (isApiStatus(caught, 409) || isApiStatus(caught, 400)) {
-        pendingAttempt.current = null;
-      }
-      setMessage(t("vocabulary.practice.errors.save"));
+      setMessage(caught instanceof Error ? caught.message : t("vocabulary.practice.errors.save"));
       try {
         const refreshed = await fetchVocabularyPracticeSession(session.id);
-        if (!mounted.current) return;
-        acceptSession(refreshed);
-        onSessionChange?.(sessionRef.current);
+        setSession(refreshed);
+        onSessionChange?.(refreshed);
+        if (refreshed.revision !== session.revision) attemptIdRef.current = null;
       } catch {
-        // Retry the unchanged pending payload when the outcome is unknown.
+        // Keep the current item so the learner can retry explicitly.
       }
     } finally {
-      inFlight.current = false;
-      if (mounted.current) setSaving(false);
+      setSaving(false);
     }
   }
 
@@ -156,43 +118,30 @@ function PracticePlayerSession({
     setMatchingSelection({});
     setRevealed(false);
     setRevealedAnswer(null);
-    pendingAttempt.current = null;
+    attemptIdRef.current = null;
   }
 
   async function revealFlashcard() {
-    if (!item || blocked || inFlight.current || item.exerciseType !== "FLASHCARD") return;
-    inFlight.current = true;
-    const revealedItemId = item.id;
+    if (!item || readOnly || item.exerciseType !== "FLASHCARD") return;
     setSaving(true);
     setMessage(null);
     try {
       const result = await revealVocabularyPracticeItem(session.id, item.id);
-      if (!mounted.current || sessionRef.current.currentItem?.id !== revealedItemId) return;
       setRevealedAnswer(result.expectedAnswer);
       setRevealed(true);
-    } catch {
-      if (mounted.current) setMessage(t("vocabulary.practice.errors.save"));
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : t("vocabulary.practice.errors.save"));
     } finally {
-      inFlight.current = false;
-      if (mounted.current) setSaving(false);
+      setSaving(false);
     }
   }
 
-  if (unavailable) return <p role="alert">{t("vocabulary.practice.errors.save")}</p>;
-
-  if (pendingAttempt.current && message) return (
-    <section role="alert" className="grid gap-3 p-4">
-      <p>{message}</p>
-      <Button disabled={saving} onClick={() => void submit()}>{t("vocabulary.practice.actions.retry")}</Button>
-    </section>
-  );
-
-  if (!feedback && (session.status === "COMPLETED" || session.status === "CANCELLED" || (!item && session.totalItems === session.completedItems))) {
+  if (session.status === "COMPLETED" || (!item && session.totalItems === session.completedItems)) {
     return (
       <section className="mx-auto grid max-w-xl place-items-center gap-4 rounded-3xl border border-border bg-white p-8 text-center shadow-sm">
         <span className="grid h-14 w-14 place-items-center rounded-full bg-[#effaf3] text-[#197a45]"><Check className="h-7 w-7" /></span>
         <div>
-          <h2 className="text-2xl font-black">{t(session.completedItems < session.totalItems ? "vocabulary.practice.complete.stopped" : "vocabulary.practice.complete.title")}</h2>
+          <h2 className="text-2xl font-black">{t("vocabulary.practice.complete.title")}</h2>
           <p className="mt-2 font-semibold text-muted-foreground">
             {t("vocabulary.practice.complete.result", {
               correct: session.correctCount,
@@ -214,7 +163,7 @@ function PracticePlayerSession({
   return (
     <section className="mx-auto w-full max-w-2xl rounded-3xl border border-border bg-white p-4 shadow-sm sm:p-6">
       <div aria-live="polite" className="flex items-center justify-between gap-3 text-sm font-extrabold text-muted-foreground">
-        <span>{t("vocabulary.practice.progress", { current: Math.min(session.completedItems + 1, session.totalItems), total: session.totalItems })}</span>
+        <span>{t("vocabulary.practice.progress", { current: session.completedItems + 1, total: session.totalItems })}</span>
         <span>{progress}%</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
@@ -255,23 +204,23 @@ function PracticePlayerSession({
                   {revealedAnswer}
                 </div>
               ) : (
-                <Button disabled={saving || blocked} onClick={() => void revealFlashcard()} type="button" variant="outline">
+                <Button disabled={saving || readOnly} onClick={() => void revealFlashcard()} type="button" variant="outline">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {t("vocabulary.practice.actions.reveal")}
                 </Button>
               )}
               {revealed ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <Button disabled={saving || blocked} onClick={() => void submit("AGAIN")} type="button" variant="outline">{t("vocabulary.practice.rating.AGAIN")}</Button>
-                  <Button disabled={saving || blocked} onClick={() => void submit("HARD")} type="button" variant="outline">{t("vocabulary.practice.rating.HARD")}</Button>
-                  <Button disabled={saving || blocked} onClick={() => void submit("GOOD")} type="button">{t("vocabulary.practice.rating.GOOD")}</Button>
+                  <Button disabled={saving || readOnly} onClick={() => void submit("AGAIN")} type="button" variant="outline">{t("vocabulary.practice.rating.AGAIN")}</Button>
+                  <Button disabled={saving || readOnly} onClick={() => void submit("HARD")} type="button" variant="outline">{t("vocabulary.practice.rating.HARD")}</Button>
+                  <Button disabled={saving || readOnly} onClick={() => void submit("GOOD")} type="button">{t("vocabulary.practice.rating.GOOD")}</Button>
                 </div>
               ) : null}
             </div>
           ) : item.exerciseType === "MEANING_CHOICE" ? (
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               {item.options.map((option) => (
-                <Button className="min-h-12 whitespace-normal" disabled={saving || blocked} key={option} onClick={() => void submit(undefined, option)} type="button" variant="outline">
+                <Button className="min-h-12 whitespace-normal" disabled={saving || readOnly} key={option} onClick={() => void submit(undefined, option)} type="button" variant="outline">
                   {option}
                 </Button>
               ))}
@@ -287,7 +236,7 @@ function PracticePlayerSession({
                       <Button
                         aria-pressed={selected}
                         className="min-h-12 whitespace-normal"
-                        disabled={blocked || saving || used}
+                        disabled={readOnly || used}
                         key={option.id}
                         onClick={() => setMatchingSelection((current) => ({ ...current, left: option }))}
                         type="button"
@@ -306,7 +255,7 @@ function PracticePlayerSession({
                       <Button
                         aria-pressed={selected}
                         className="min-h-12 whitespace-normal"
-                        disabled={blocked || saving || used}
+                        disabled={readOnly || used}
                         key={option.id}
                         onClick={() => setMatchingSelection((current) => ({ ...current, right: option }))}
                         type="button"
@@ -319,7 +268,7 @@ function PracticePlayerSession({
                 </div>
               </div>
               <Button
-                disabled={blocked || saving || !matchingSelection.left || !matchingSelection.right}
+                disabled={readOnly || !matchingSelection.left || !matchingSelection.right}
                 onClick={() => {
                   const left = matchingSelection.left;
                   const right = matchingSelection.right;
@@ -353,7 +302,7 @@ function PracticePlayerSession({
                 </div>
               ) : null}
               <Button
-                disabled={saving || blocked || matchingPairs.length !== matchingContent.left.length}
+                disabled={saving || readOnly || matchingPairs.length !== matchingContent.left.length}
                 onClick={() => void submit(undefined, matchingPairs
                   .slice()
                   .sort((first, second) => first.leftId.localeCompare(second.leftId))
@@ -386,7 +335,7 @@ function PracticePlayerSession({
               <div className="flex flex-wrap justify-center gap-2">
                 {(phraseContent?.tokens ?? item.options.map((label, index) => ({ id: `legacy-${index}`, label }))).map((part) => (
                   <Button
-                    disabled={blocked || saving || phrase.some((selected) => selected.id === part.id)}
+                    disabled={readOnly || phrase.some((selected) => selected.id === part.id)}
                     key={part.id}
                     onClick={() => setPhrase((current) => [...current, part])}
                     type="button"
@@ -395,16 +344,16 @@ function PracticePlayerSession({
                     {part.label}
                   </Button>
                 ))}
-                <Button aria-label={t("vocabulary.practice.phrase.reset")} disabled={blocked || saving || phrase.length === 0} onClick={() => setPhrase([])} type="button" variant="outline"><RotateCcw className="h-4 w-4" /></Button>
+                <Button aria-label={t("vocabulary.practice.phrase.reset")} disabled={readOnly || phrase.length === 0} onClick={() => setPhrase([])} type="button" variant="outline"><RotateCcw className="h-4 w-4" /></Button>
               </div>
-              <Button disabled={saving || blocked || phrase.length === 0} onClick={() => void submit(undefined, phrase.map((part) => part.label).join(" "))} type="button">
+              <Button disabled={saving || readOnly || phrase.length === 0} onClick={() => void submit(undefined, phrase.map((part) => part.label).join(" "))} type="button">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.practice.actions.check")}
               </Button>
             </div>
           ) : item.exerciseType === "KEYBOARD" ? (
             <div className="mt-6 grid gap-3">
-              <Button asChild disabled={blocked}>
-                <a href={blocked ? undefined : keyPracticeUrl(session.id)} aria-disabled={blocked} rel="noopener noreferrer" target="_blank">
+              <Button asChild>
+                <a href={keyPracticeUrl(session.id)} rel="noopener noreferrer" target="_blank">
                   <ExternalLink className="h-4 w-4" />{t("vocabulary.practice.actions.openKey")}
                 </a>
               </Button>
@@ -417,13 +366,13 @@ function PracticePlayerSession({
                 autoComplete="off"
                 autoFocus
                 className="playsay-input min-h-12 text-center text-lg font-bold"
-                disabled={blocked || saving}
+                disabled={readOnly}
                 id={`vocabulary-answer-${item.id}`}
                 onChange={(event) => setAnswer(event.target.value)}
                 placeholder={t("vocabulary.practice.answerPlaceholder")}
                 value={answer}
               />
-              <Button disabled={saving || blocked || !answer.trim()} type="submit">
+              <Button disabled={saving || readOnly || !answer.trim()} type="submit">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{t("vocabulary.practice.actions.check")}
               </Button>
             </form>
@@ -453,15 +402,4 @@ function keyboardOrigin(): string {
   current.port = localDevelopment ? "5175" : "";
   current.pathname = "";
   return current.origin;
-}
-
-function readableAnswer(answer: string, item: VocabularyPracticeSession["currentItem"]) {
-  const content = item?.content;
-  if (item?.exerciseType !== "MATCHING" || !content || !("left" in content) || !("right" in content)) return answer;
-  return (answer ?? "").split("|").flatMap((pair) => {
-    const [leftId, rightId] = pair.split(":");
-    const left = content.left.find((option) => option.id === leftId);
-    const right = content.right.find((option) => option.id === rightId);
-    return left && right ? [`${left.label} ↔ ${right.label}`] : [];
-  }).join(" · ");
 }

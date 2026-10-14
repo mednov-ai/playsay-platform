@@ -405,7 +405,7 @@ export function ScheduleCreateForm({
                       onBlur={clampDurationMinutes}
                       onChange={(event) => updateDurationMinutes(event.target.value)}
                       required
-                      step={10}
+                      step={1}
                       type="number"
                       value={form.durationMinutes}
                     />

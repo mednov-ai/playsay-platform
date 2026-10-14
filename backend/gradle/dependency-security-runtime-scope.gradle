@@ -1,0 +1,17 @@
+// Exact outside-runtime classification; scan and raw reports remain complete.
+return { String build, String project, Map dependency, String cve, Map configurations, List rules ->
+    rules.find { rule ->
+        def refs = dependency.projectReferences ?: []
+        def packages = (dependency.packages ?: []).collect { it.id }
+        def parent = configurations[rule.configuration]?.find {
+            it.coordinate == rule.parentCoordinate && it.file == rule.parentFile && it.sha256 == rule.parentSha256
+        }
+        def elsewhere = configurations.findAll { name, artifacts -> name != rule.configuration }.values().flatten().any {
+            it.coordinate == rule.parentCoordinate || it.sha256 == rule.parentSha256
+        }
+        rule.build == build && rule.project == project && rule.cves.contains(cve) &&
+            packages == [rule.packageUrl] && dependency.sha256 == rule.sha256 &&
+            dependency.fileName?.startsWith(rule.parentFile + ' (shaded: ') &&
+            refs == [project.substring(1) + ':' + rule.configuration] && parent && !elsewhere
+    }
+}

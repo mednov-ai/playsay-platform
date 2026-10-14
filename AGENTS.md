@@ -25,3 +25,7 @@ On 2026-10-14 the owner explicitly renewed only CVE-2026-53914 for one calendar 
 On 2026-10-14 the owner explicitly authorized the current near-term scheduling hotfix and Keycloak upgrade for DEV and PROD and invoked openspec-apply-change. Existing exact frontend package versions and expiry remain unchanged; fresh security, native DEV, backups/schema/drain, authenticated acceptance and both-repository release merge-back gates remain mandatory. No new Netty findings are accepted by this delivery instruction.
 
 The local Keycloak 26.8.1 upgrade candidate removes the expired CVE-2026-62380 approval after verifying the specific fixed runtime version and raw scanner report. Additional Netty 4.1.139 security fixes remain a separate open publication gate; removing the old approval is not global runtime security clearance.
+
+## Findings outside server runtime
+
+On 2026-10-14 the owner instructed: «Отсутствуют в серверном runtime - не обращаем внимание». Dependency findings in components proven absent from the shipped server runtime do not block DEV/PROD publication and do not require repeated risk approval. Retain full fresh scans and raw findings; record exact artifact/version, dependency scope and runtime inventory evidence separately as `outside-server-runtime`. This is neither a false-positive classification nor a claim of remediation. Recheck the boundary for every candidate; unknown or runtime-present artifacts, scan errors and missing evidence still block. This rule does not waive runtime vulnerabilities or the other delivery gates.

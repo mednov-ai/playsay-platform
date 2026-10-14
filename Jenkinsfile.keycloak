@@ -139,6 +139,7 @@ spec:
         container('gradle') {
           withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
             timeout(time: 45, unit: 'MINUTES') {
+              sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-runtime-scope.test.groovy "$PWD"'
               sh './scripts/ci/check-jvm-dependencies.sh keycloak-lesson-authenticator'
               archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: false
             }

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "build": "playsay-backend",
+      "project": ":keycloak-lesson-authenticator",
+      "configuration": "serverAugmentation",
+      "packageUrl": "pkg:maven/org.apache.httpcomponents.client5/httpclient5@5.5.1",
+      "sha256": "f381d1bde581bb36992f14674a9ac88f7362b3e35c48a99805bc56e1df931647",
+      "cves": [
+        "CVE-2026-71290"
+      ],
+      "parentCoordinate": "com.github.docker-java:docker-java-transport-zerodep:3.7.1",
+      "parentFile": "docker-java-transport-zerodep-3.7.1.jar",
+      "parentSha256": "b89bdb1754160323597f9ea32a7fe7a4a3aa8f5b3b43b88e8d71fff3b267ab21",
+      "evidence": "docs/security/keycloak-upgrade-2026-10-14.md#outside-server-runtime",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "build": "playsay-backend",
+      "project": ":keycloak-lesson-authenticator",
+      "configuration": "serverAugmentation",
+      "packageUrl": "pkg:maven/org.apache.httpcomponents.core5/httpcore5-h2@5.3.6",
+      "sha256": "95812c2bfbcf3ec1d67228a5407179a89852a14afd8d32184059ea9d25424d5b",
+      "cves": [
+        "CVE-2026-54399",
+        "CVE-2026-54428"
+      ],
+      "parentCoordinate": "com.github.docker-java:docker-java-transport-zerodep:3.7.1",
+      "parentFile": "docker-java-transport-zerodep-3.7.1.jar",
+      "parentSha256": "b89bdb1754160323597f9ea32a7fe7a4a3aa8f5b3b43b88e8d71fff3b267ab21",
+      "evidence": "docs/security/keycloak-upgrade-2026-10-14.md#outside-server-runtime",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "build": "playsay-backend",
+      "project": ":keycloak-lesson-authenticator",
+      "configuration": "serverAugmentation",
+      "packageUrl": "pkg:maven/org.apache.httpcomponents.core5/httpcore5@5.3.6",
+      "sha256": "8e37043c6fc40289fe3f0cafd33d0d7e1a10ace4f74495bbc5be39586614718f",
+      "cves": [
+        "CVE-2026-54399",
+        "CVE-2026-54428"
+      ],
+      "parentCoordinate": "com.github.docker-java:docker-java-transport-zerodep:3.7.1",
+      "parentFile": "docker-java-transport-zerodep-3.7.1.jar",
+      "parentSha256": "b89bdb1754160323597f9ea32a7fe7a4a3aa8f5b3b43b88e8d71fff3b267ab21",
+      "evidence": "docs/security/keycloak-upgrade-2026-10-14.md#outside-server-runtime",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    }
+  ]
+}

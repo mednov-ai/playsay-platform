@@ -15,6 +15,11 @@ val serverBuildTools by configurations.creating {
     isCanBeResolved = true
 }
 
+val serverAugmentation by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 val serverRuntime by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -53,7 +58,9 @@ dependencies {
     add(serverRuntime.name, enforcedPlatform("io.netty:netty-bom:4.1.139.Final"))
     add(serverRuntime.name, platform("org.keycloak:keycloak-parent:26.8.1"))
     add(serverRuntime.name, "org.keycloak:keycloak-quarkus-server:26.8.1")
-    add(serverRuntime.name, "org.keycloak:keycloak-quarkus-server-deployment:26.8.1")
+    add(serverAugmentation.name, enforcedPlatform("io.netty:netty-bom:4.1.139.Final"))
+    add(serverAugmentation.name, platform("org.keycloak:keycloak-parent:26.8.1"))
+    add(serverAugmentation.name, "org.keycloak:keycloak-quarkus-server-deployment:26.8.1")
     add(serverRuntime.name, "com.fasterxml.jackson.core:jackson-databind")
     add(serverRuntime.name, "com.fasterxml.jackson.core:jackson-core")
     add(serverRuntime.name, "io.mvnpm:importmap")

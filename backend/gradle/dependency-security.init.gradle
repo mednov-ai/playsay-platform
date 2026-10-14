@@ -35,6 +35,17 @@ gradle.projectsEvaluated {
                 }) throw new GradleException('Accepted risks cannot contain wildcard artifacts, versions or module scopes')
         }
     }
+    def runtimeScopeFile = new File(policyDir, 'dependency-security-runtime-scope.json')
+    def runtimeScope = new JsonSlurper().parse(runtimeScopeFile)
+    if (runtimeScope.schemaVersion != 1 || !(runtimeScope.rules instanceof List)) throw new GradleException('Invalid runtime-scope policy')
+    runtimeScope.rules.each { rule ->
+        if (!rule.owner || !rule.evidence || !rule.approvedOn || !rule.build || !rule.project || !rule.configuration ||
+            !rule.parentCoordinate || !rule.parentFile || !(rule.parentSha256 ==~ /[a-f0-9]{64}/) ||
+            !(rule.sha256 ==~ /[a-f0-9]{64}/) || !rule.packageUrl || !(rule.cves instanceof List) || rule.cves.empty) {
+            throw new GradleException('Runtime scope requires exact artifact hashes, configuration and owner evidence')
+        }
+    }
+    def classifyOutsideRuntime = new GroovyShell().evaluate(new File(policyDir, 'dependency-security-runtime-scope.gradle'))
     def suppressions = new File(policyDir, 'dependency-check-suppressions.xml')
     if (suppressions.isFile()) {
         new groovy.xml.XmlSlurper().parse(suppressions).suppress.each { rule ->
@@ -136,7 +147,8 @@ gradle.projectsEvaluated {
                 def configurations = p.configurations.findAll { it.canBeResolved }.sort { it.name }.collect { c ->
                     // Strict resolution: a partial graph must never be a successful inventory.
                     def artifacts = c.resolvedConfiguration.resolvedArtifacts.collect { a ->
-                        [coordinate: a.moduleVersion.id.toString(), file: a.file.name]
+                        [coordinate: a.moduleVersion.id.toString(), file: a.file.name,
+                         sha256: java.security.MessageDigest.getInstance('SHA-256').digest(a.file.bytes).encodeHex().toString()]
                     }.unique().sort { it.coordinate }
                     def edges = c.incoming.resolutionResult.allDependencies.collect { d ->
                         [from: d.from.id.displayName, requested: d.requested.displayName,
@@ -161,6 +173,8 @@ gradle.projectsEvaluated {
         doLast {
             def accepted = []
             def blocking = []
+            def outsideRuntime = []
+            def coverage = new JsonSlurper().parse(new File(reportRoot, 'coverage.json'))
             def today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
             selected.each { p ->
                 def moduleReports = new File(reportRoot, p.path == ':' ? 'root' : p.path.substring(1).replace(':', '/'))
@@ -172,6 +186,7 @@ gradle.projectsEvaluated {
                 }
                 def report = new JsonSlurper().parse(new File(moduleReports, 'dependency-check-report.json'))
                 if (!(report.dependencies instanceof List)) throw new GradleException('Invalid dependency report for ' + p.path)
+                def configurations = coverage.modules.find { it.project == p.path }.configurations.collectEntries { [(it.name): it.artifacts] }
                 report.dependencies.each { dependency ->
                     (dependency.vulnerabilities ?: []).each { vulnerability ->
                         def scores = ['cvssv2', 'cvssv3', 'cvssv4'].collect { vulnerability[it]?.baseScore }.findAll { it != null }
@@ -186,7 +201,12 @@ gradle.projectsEvaluated {
                             }
                             def finding = [project: p.path, dependency: dependency.fileName, packages: packages, cve: vulnerability.name, score: score]
                             if (approval) accepted.add(finding + [approval: approval.id, expires: approval.expires])
-                            else blocking.add(finding)
+                            else {
+                                def outside = classifyOutsideRuntime(root.name, p.path, dependency, vulnerability.name, configurations, runtimeScope.rules)
+                                if (outside) outsideRuntime.add(finding + [classification: 'outside-server-runtime', evidence: outside.evidence,
+                                    configuration: outside.configuration, parentSha256: outside.parentSha256])
+                                else blocking.add(finding)
+                            }
                         }
                     }
                 }
@@ -195,8 +215,10 @@ gradle.projectsEvaluated {
             new File(reportRoot, 'gate.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
                 state: state, threshold: 7.0, evaluatedAt: java.time.Instant.now().toString(),
                 policySha256: approvalsFile.isFile() ? java.security.MessageDigest.getInstance('SHA-256').digest(approvalsFile.bytes).encodeHex().toString() : null,
-                accepted: accepted, blocking: blocking
+                runtimeScopeSha256: java.security.MessageDigest.getInstance('SHA-256').digest(runtimeScopeFile.bytes).encodeHex().toString(),
+                accepted: accepted, outsideRuntime: outsideRuntime, blocking: blocking
             ]))
+            if (outsideRuntime) new File(reportRoot, 'outside-runtime-findings.txt').text = 'Confirmed findings outside server runtime; see gate.json and full raw reports.\n'
             if (accepted) new File(reportRoot, 'accepted-risks.txt').text = 'Known vulnerabilities accepted temporarily; see gate.json and raw OWASP reports.\n'
             if (blocking) throw new GradleException('Dependency security blocked: ' + blocking.collect { it.cve }.unique().sort().join(', '))
             logger.lifecycle('Dependency security: ' + state)

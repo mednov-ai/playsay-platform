@@ -101,8 +101,8 @@
     <packageUrl>pkg:maven/io.opentelemetry/opentelemetry-sdk@1.57.0</packageUrl>
     <cve>CVE-2026-54285</cve>
   </suppress>
-  <suppress until="2026-10-08Z">
-    <notes><![CDATA[Owner: Honey School platform maintainers. Gradle dependency-management-plugin is misidentified as Spring Framework 1.1.7; the artifact contains no org/springframework classes. Evidence: https://github.com/spring-gradle-plugins/dependency-management-plugin/tree/v1.1.7 . This excludes only the observed Spring Framework CVEs on this exact plugin version.]]></notes>
+  <suppress until="2026-11-14Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. Gradle dependency-management-plugin is misidentified as Spring Framework 1.1.7; the artifact contains no org/springframework classes. Evidence: https://github.com/spring-gradle-plugins/dependency-management-plugin/tree/v1.1.7 . This excludes only the observed Spring Framework CVEs on this exact plugin version. Revalidated 2026-10-14 against official advisories and unchanged Maven JARs; see docs/security/jvm-risk-renewal-2026-10-14.md.]]></notes>
     <packageUrl>pkg:maven/io.spring.gradle/dependency-management-plugin@1.1.7</packageUrl>
     <cve>CVE-2013-4152</cve>
     <cve>CVE-2013-7315</cve>
@@ -136,8 +136,8 @@
     <cve>CVE-2026-59283</cve>
     <cve>CVE-2026-59314</cve>
   </suppress>
-    <suppress until="2026-10-08Z">
-        <notes><![CDATA[Owner: Honey School platform maintainers. Spring Tools IDE YAML editors are a different product from Spring Boot loader tools. https://spring.io/security/cve-2022-31691/]]></notes>
+    <suppress until="2026-11-14Z">
+        <notes><![CDATA[Owner: Honey School platform maintainers. Spring Tools IDE YAML editors are a different product from Spring Boot loader tools. https://spring.io/security/cve-2022-31691/ Revalidated 2026-10-14 against official advisories and unchanged Maven JARs; see docs/security/jvm-risk-renewal-2026-10-14.md.]]></notes>
         <packageUrl>pkg:maven/org.springframework.boot/spring-boot-loader-tools@4.0.8</packageUrl>
         <cve>CVE-2022-31691</cve>
     </suppress>

@@ -189,6 +189,8 @@ export function createYjsWorkspaceRuntime({
       transientHtmlGameSdkEffects = appendBounded(transientHtmlGameSdkEffects, message.payload, 120);
       onHtmlGameSdkEffectsChange(transientHtmlGameSdkEffects);
       onHtmlGameSdkMessage({ effect: message.payload, kind: "effect" });
+    } else if (message.kind === "html-game-sdk-control" && (message.payload.kind === "resume" || message.payload.kind === "recovery-required")) {
+      onHtmlGameSdkMessage(message.payload);
     }
   };
   const publishEphemeral = (kind, payload) => {
@@ -345,6 +347,9 @@ export function createYjsWorkspaceRuntime({
     },
     publishHtmlGameSdkEffect(effect) {
       publishEphemeral("html-game-sdk-effect", effect);
+    },
+    publishHtmlGameSdkControl(message) {
+      publishEphemeral("html-game-sdk-control", { ...message, id: globalThis.crypto.randomUUID(), at: Date.now() });
     },
     publishHtmlGameSdkRequest(request) {
       publishEphemeral("html-game-sdk-request", request);

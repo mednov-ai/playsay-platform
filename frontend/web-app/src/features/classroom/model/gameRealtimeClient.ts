@@ -35,7 +35,7 @@ export function createGameRealtimeClient({
   fallback: (message: MaterialHtmlGameRealtimeMessage) => void;
   getActorId: () => string;
   getUrl: () => Promise<string>;
-}): MaterialHtmlGameRealtime & { close: () => void } {
+}): MaterialHtmlGameRealtime & { close: () => void; receiveFallback: (message: MaterialHtmlGameRealtimeMessage) => void } {
   const registrations = new Map<symbol, Registration>();
   const registrationsBySession = new Map<string, Set<Registration>>();
   const pendingRequests = new Map<string, MaterialHtmlGameRealtimeMessage>();
@@ -58,14 +58,8 @@ export function createGameRealtimeClient({
   const historyKey = (blockId: string, runId: string) => `${blockId}\u0000${runId}`;
   const registrationKey = historyKey;
 
-  const fallbackDataMessage = (message: MaterialHtmlGameRealtimeMessage) => {
-    if (
-      message.kind === "action-request"
-      || message.kind === "ordered-action"
-      || message.kind === "effect"
-    ) {
-      fallback(message);
-    }
+  const fallbackMessage = (message: MaterialHtmlGameRealtimeMessage) => {
+    fallback(message);
   };
 
   const sendFast = (message: MaterialHtmlGameRealtimeMessage): boolean => {
@@ -133,7 +127,7 @@ export function createGameRealtimeClient({
     }
     const sentFast = sendFast(message);
     if (!sentFast || mode === "shadow") {
-      fallbackDataMessage(message);
+      fallbackMessage(message);
     }
     const action = message.kind === "action-request"
       ? message.request
@@ -183,11 +177,11 @@ export function createGameRealtimeClient({
       missing.length > 0
       && missing[0]?.authorityRevision === message.lastRevision + 1
     ) {
-      missing.forEach((action) => sendFast({ action, kind: "ordered-action" }));
+      missing.forEach((action) => publish({ action, kind: "ordered-action" }));
       return;
     }
     if (authority.getRevision() > message.lastRevision) {
-      sendFast({
+      publish({
         blockId: message.blockId,
         kind: "recovery-required",
         requesterId: message.requesterId,
@@ -212,10 +206,10 @@ export function createGameRealtimeClient({
   };
 
   const sendResume = (registration: Registration) => {
-    if (registration.isAuthority || mode === null) {
+    if (registration.isAuthority) {
       return;
     }
-    sendFast({
+    publish({
       blockId: registration.blockId,
       kind: "resume",
       lastRevision: registration.getRevision(),
@@ -279,7 +273,7 @@ export function createGameRealtimeClient({
           mode = null;
           reportStatus("closed", "fallback");
           if (previousMode === "primary") {
-            pendingRequests.forEach(fallbackDataMessage);
+            pendingRequests.forEach(fallbackMessage);
           }
         }
         scheduleReconnect();
@@ -309,9 +303,8 @@ export function createGameRealtimeClient({
         window.clearTimeout(closeTimer);
         closeTimer = null;
       }
-      if (mode !== null) {
-        sendResume(stored);
-      } else {
+      sendResume(stored);
+      if (mode === null) {
         void connect();
       }
       return () => {
@@ -345,5 +338,6 @@ export function createGameRealtimeClient({
       actionHistory.clear();
     },
     publish,
+    receiveFallback: dispatch,
   };
 }

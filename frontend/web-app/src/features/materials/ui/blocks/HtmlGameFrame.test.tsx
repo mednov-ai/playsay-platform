@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import type { MaterialHtmlGameSync } from "../../model/materialDocument";
+import type { MaterialHtmlGameSync, MaterialHtmlGameSdkSessionRegistration } from "../../model/materialDocument";
 import {
   HtmlGameFrame,
   createSandboxedGameDocument,
@@ -353,9 +353,15 @@ describe("HTML game sandbox", () => {
     expect(publishInput).not.toHaveBeenCalled();
   });
 
-  it("acquires the fast lane only while this SDK game is presented", () => {
+  it("acquires the fast lane after iframe context and only while this SDK game is presented", () => {
     const release = vi.fn();
-    const attach = vi.fn(() => ({ handleOutbound: vi.fn(), release }));
+    const port1 = { close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null, postMessage: vi.fn(), start: vi.fn() };
+    vi.stubGlobal("MessageChannel", class { port1 = port1; port2 = { close: vi.fn(), postMessage: vi.fn(), start: vi.fn() }; });
+    const attach = vi.fn((registration: MaterialHtmlGameSdkSessionRegistration) => {
+      expect(registration.getPort()).toBe(port1);
+      registration.getPort()?.postMessage({ kind: "ordered-action", action: { authorityRevision: 1 } });
+      return { handleOutbound: vi.fn(), release };
+    });
     const sdkGame = `<html><head><script type="application/playsay-game+json">{
       "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
       "reducerVersion":"1","buildHash":"test"
@@ -395,7 +401,14 @@ describe("HTML game sandbox", () => {
         title="Game"
       />,
     );
+    expect(attach).not.toHaveBeenCalled();
+    const iframe = view.container.querySelector("iframe")!;
+    const channel = JSON.parse(iframe.getAttribute("srcdoc")!.match(/const channel = ("[^"]+");/)![1]) as string;
+    act(() => { window.dispatchEvent(new MessageEvent("message", { data: { channel, type: "sdkReady" }, source: iframe.contentWindow })); });
+    expect(attach).not.toHaveBeenCalled();
+    act(() => { port1.onmessage?.({ data: { kind: "hello", manifest: { protocol: "playsay-game-sync/v1", gameId: "quiz", stateVersion: "1", reducerVersion: "1", buildHash: "test" } } } as MessageEvent); });
     expect(attach).toHaveBeenCalledOnce();
+    expect(port1.postMessage.mock.calls.map(([message]) => message.kind)).toEqual(["context", "ordered-action"]);
 
     for (let index = 0; index < 100; index += 1) {
       view.rerender(

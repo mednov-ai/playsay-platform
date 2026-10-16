@@ -25,6 +25,8 @@ spec:
       command: ["cat"]
       tty: true
       env:
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m"
         - name: JAVA_TOOL_OPTIONS
           value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
@@ -173,7 +175,7 @@ spec:
       steps {
         container('gradle') {
           dir('backend') {
-            sh 'gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
+            sh 'gradle :vocabulary-service:detektMain :vocabulary-service:test :vocabulary-service:bootJar -PlowMemoryTests --no-daemon --stacktrace --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process'
           }
         }
       }

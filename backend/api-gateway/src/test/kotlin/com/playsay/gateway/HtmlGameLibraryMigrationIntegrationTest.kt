@@ -18,6 +18,25 @@ class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() 
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean private lateinit var jdbc: JdbcTemplate
 
     @Test
+    fun `drain rejects accessible lessons including extensions but leaves expired history untouched`() {
+        val teacher = authentication(subject = "teacher-1", role = "ROLE_TEACHER")
+        val scheduled = scheduleController.create(teacher, com.playsay.gateway.dto.ScheduledLessonRequest(scheduledStart = activeLessonStart(), scheduledEnd = activeLessonEnd(), participantSubjects = listOf("student-1"))).body!!
+        val row = lessonRepo.findById(scheduled.id).orElseThrow()
+        row.status = "IN_PROGRESS"
+        lessonRepo.saveAndFlush(row)
+        kotlin.test.assertFailsWith<com.playsay.gateway.error.ProjectResponseException> { migration.requireDrained() }
+        row.scheduledEnd = Instant.now().minusSeconds(1200)
+        row.accessExtensionSeconds = 900
+        lessonRepo.saveAndFlush(row)
+        kotlin.test.assertFailsWith<com.playsay.gateway.error.ProjectResponseException> { migration.requireDrained() }
+        row.accessExtensionSeconds = 0
+        lessonRepo.saveAndFlush(row)
+        migration.requireDrained()
+        assertEquals("IN_PROGRESS", lessonRepo.findById(row.id).orElseThrow().status)
+        assertEquals(0, lessonRepo.findById(row.id).orElseThrow().accessExtensionSeconds)
+    }
+
+    @Test
     fun `dry run and repeated migration preserve bytes IDs provenance and merge only verified copies`() {
         val teacher = authentication(subject = "teacher-1", role = "ROLE_TEACHER")
         val material = materialCrudController.create(teacher, LessonMaterialRequest(title = "Legacy", visibility = "PRIVATE")).body!!

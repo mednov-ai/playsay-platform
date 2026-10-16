@@ -61,7 +61,7 @@ npm --prefix frontend --workspace web-app run build
 npm --prefix frontend --workspace game-sync-sdk run test
 npm --prefix collaboration-service run build
 npm --prefix collaboration-service test
-node scripts/ci/html-game-library-contract.test.mjs
+node scripts/contracts/validate-html-game-library.mjs
 node scripts/ci/html-game-upload-limits.test.mjs
 node scripts/smoke/html-game-library-local-smoke.mjs
 ```

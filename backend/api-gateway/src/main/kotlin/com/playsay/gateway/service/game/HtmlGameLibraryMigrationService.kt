@@ -9,6 +9,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.game.HtmlGameRepository
 import com.playsay.gateway.service.MaterialObjectStorage
+import com.playsay.gateway.service.lessonAccessDeadline
 import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
@@ -31,10 +32,14 @@ class HtmlGameLibraryMigrationService(
     private val transaction = TransactionTemplate(transactionManager)
 
     fun requireDrained() {
-        val active = repository.jdbc.queryForObject("SELECT COUNT(*) FROM lesson WHERE status='IN_PROGRESS'", Long::class.java) ?: 0
+        val now = Instant.now()
+        val active = repository.jdbc.query("SELECT scheduled_end,access_extension_seconds FROM lesson WHERE status='IN_PROGRESS'", org.springframework.jdbc.core.RowMapper { rs, _ ->
+            val deadline = lessonAccessDeadline(rs.getTimestamp("scheduled_end")?.toInstant(), rs.getInt("access_extension_seconds"))
+            deadline == null || now.isBefore(deadline)
+        }).any { it }
         val jobs = repository.jdbc.queryForObject("SELECT (SELECT COUNT(*) FROM html_game_processing WHERE status IN ('PENDING','RUNNING')) + (SELECT COUNT(*) FROM material_game_adaptation WHERE status IN ('PENDING','RETRY','ANALYZING','PATCHING','VALIDATING')) + (SELECT COUNT(*) FROM material_html_game_enrichment WHERE status IN ('PENDING','RETRY','RUNNING'))", Long::class.java) ?: 0
         if (jobs != 0L) gameError(HttpStatus.CONFLICT, "GAME_MIGRATION_JOBS_NOT_DRAINED")
-        if (active != 0L) gameError(HttpStatus.CONFLICT, "GAME_MIGRATION_NOT_DRAINED")
+        if (active) gameError(HttpStatus.CONFLICT, "GAME_MIGRATION_NOT_DRAINED")
     }
 
     fun batch(dryRun: Boolean, after: UUID? = null, limit: Int = 25): HtmlGameMigrationResponse {

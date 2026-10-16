@@ -33,11 +33,11 @@ class HtmlGameLibraryMigrationService(
 
     fun requireDrained() {
         val now = Instant.now()
-        val active = repository.jdbc.query("SELECT scheduled_end,access_extension_seconds FROM lesson WHERE status='IN_PROGRESS'", org.springframework.jdbc.core.RowMapper { rs, _ ->
-            val deadline = lessonAccessDeadline(rs.getTimestamp("scheduled_end")?.toInstant(), rs.getInt("access_extension_seconds"))
+        val active = repository.migration.lessonWindows().any { window ->
+            val deadline = lessonAccessDeadline(window.scheduledEnd, window.extensionSeconds)
             deadline == null || now.isBefore(deadline)
-        }).any { it }
-        val jobs = repository.jdbc.queryForObject("SELECT (SELECT COUNT(*) FROM html_game_processing WHERE status IN ('PENDING','RUNNING')) + (SELECT COUNT(*) FROM material_game_adaptation WHERE status IN ('PENDING','RETRY','ANALYZING','PATCHING','VALIDATING')) + (SELECT COUNT(*) FROM material_html_game_enrichment WHERE status IN ('PENDING','RETRY','RUNNING'))", Long::class.java) ?: 0
+        }
+        val jobs = repository.migration.pendingJobs()
         if (jobs != 0L) gameError(HttpStatus.CONFLICT, "GAME_MIGRATION_JOBS_NOT_DRAINED")
         if (active) gameError(HttpStatus.CONFLICT, "GAME_MIGRATION_NOT_DRAINED")
     }
@@ -46,7 +46,7 @@ class HtmlGameLibraryMigrationService(
         if (!dryRun) requireDrained()
         requireLimit(limit)
         val outcomes = sourceIds(after, limit).map { id -> migrateSource(id, dryRun) }
-        val remaining = repository.jdbc.queryForObject("SELECT COUNT(*) FROM material_asset a WHERE a.kind='HTML_GAME' AND NOT EXISTS(SELECT 1 FROM html_game_legacy_alias x WHERE x.asset_id=a.id) AND NOT EXISTS(SELECT 1 FROM html_game_migration_checkpoint c WHERE c.asset_id=a.id AND c.outcome='CANDIDATE')", Long::class.java) ?: 0
+        val remaining = repository.migration.remaining()
         return HtmlGameMigrationResponse(dryRun, outcomes, remaining)
     }
 
@@ -77,7 +77,7 @@ class HtmlGameLibraryMigrationService(
 
     private fun retainCandidate(id: UUID, bytes: ByteArray, origin: LegacyGameOrigin) {
         val source = registration.register(origin.sourceAssetId ?: gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED"))
-        val existing = repository.jdbc.queryForList("SELECT retained_blob_id,source_sha256 FROM html_game_migration_checkpoint WHERE asset_id=? AND outcome='CANDIDATE'", id).firstOrNull()
+        val existing = repository.migration.retainedCandidate(id).firstOrNull()
         val retained = existing?.get("retained_blob_id") as? UUID
         val blob = if (retained != null && existing["source_sha256"] == gameHash(bytes)) { blobs.read(retained); retained }
             else blobs.put(source.gameId, bytes, "text/html")
@@ -98,13 +98,13 @@ class HtmlGameLibraryMigrationService(
     }
 
     private fun convertMaterial(id: UUID, dryRun: Boolean) {
-        val row = repository.jdbc.queryForMap("SELECT document,updated_at FROM lesson_material WHERE id=?", id)
+        val row = repository.migration.material(id)
         val original = row["document"].toString()
         val document = mapper.readTree(original)
         // Evaluate every block: any() would stop after the first converted occurrence.
         val changed = blocks(document).map { convertBlock(it, dryRun) }.any { it }
         if (!changed || dryRun) return
-        val count = repository.jdbc.update("UPDATE lesson_material SET document=?,updated_at=? WHERE id=? AND document=? AND updated_at=?", mapper.writeValueAsString(document), Timestamp.from(Instant.now()), id, original, row["updated_at"])
+        val count = repository.migration.convertMaterial(mapper.writeValueAsString(document), Timestamp.from(Instant.now()), id, original, row["updated_at"])
         if (count != 1) gameError(HttpStatus.CONFLICT, "GAME_MATERIAL_CONFLICT")
     }
 
@@ -158,7 +158,7 @@ class HtmlGameLibraryMigrationService(
             verifyPlayable(alias.revisionId, hash)
             return true
         }
-        val entry = repository.jdbc.queryForList("SELECT retained_blob_id,source_sha256 FROM html_game_migration_checkpoint WHERE asset_id=? AND outcome='CANDIDATE'", id).firstOrNull() ?: gameError(HttpStatus.CONFLICT, "GAME_REFERENCE_UNRESOLVED")
+        val entry = repository.migration.retainedCandidate(id).firstOrNull() ?: gameError(HttpStatus.CONFLICT, "GAME_REFERENCE_UNRESOLVED")
         if (entry["source_sha256"] != hash || gameHash(blobs.read(entry["retained_blob_id"] as UUID)) != hash) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
         if (provenance.inspect(asset, bytes).accepted) gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED")
         return false
@@ -182,13 +182,10 @@ class HtmlGameLibraryMigrationService(
 
     private fun blocks(document: JsonNode): List<JsonNode> = document.path("pages").flatMap { it.path("blocks").toList() }
     private fun requireLimit(limit: Int) { if (limit !in 1..100) gameError(HttpStatus.BAD_REQUEST, "GAME_MIGRATION_LIMIT_INVALID") }
-    private fun sourceIds(after: UUID?, limit: Int): List<UUID> = if (after == null) repository.jdbc.queryForList("SELECT id FROM material_asset WHERE kind='HTML_GAME' ORDER BY id LIMIT ?", UUID::class.java, limit).filterNotNull()
-        else repository.jdbc.queryForList("SELECT id FROM material_asset WHERE kind='HTML_GAME' AND id>? ORDER BY id LIMIT ?", UUID::class.java, after, limit).filterNotNull()
-    private fun materialRows(after: UUID?, limit: Int): List<Map<String, Any?>> = if (after == null) repository.jdbc.queryForList("SELECT id,document FROM lesson_material ORDER BY id LIMIT ?", limit)
-        else repository.jdbc.queryForList("SELECT id,document FROM lesson_material WHERE id>? ORDER BY id LIMIT ?", after, limit)
+    private fun sourceIds(after: UUID?, limit: Int): List<UUID> = repository.migration.sourceIds(after, limit)
+    private fun materialRows(after: UUID?, limit: Int): List<Map<String, Any?>> = repository.migration.materials(after, limit)
 
     private fun checkpoint(id: UUID, outcome: String, error: String?, hash: String? = null, retainedBlob: UUID? = null, evidence: String = "{}") {
-        repository.jdbc.update("DELETE FROM html_game_migration_checkpoint WHERE asset_id=?", id)
-        repository.jdbc.update("INSERT INTO html_game_migration_checkpoint(asset_id,outcome,error_code,source_sha256,retained_blob_id,provenance,updated_at) VALUES(?,?,?,?,?,?,?)", id, outcome, error, hash, retainedBlob, evidence, Timestamp.from(Instant.now()))
+        repository.migration.checkpoint(id, outcome, error, hash, retainedBlob, evidence, Timestamp.from(Instant.now()))
     }
 }

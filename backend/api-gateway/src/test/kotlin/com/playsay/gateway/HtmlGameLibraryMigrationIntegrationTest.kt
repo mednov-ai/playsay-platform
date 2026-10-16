@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
 
 class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() {
+    @Autowired private lateinit var gameMaterials: com.playsay.gateway.controller.HtmlGameMaterialController
     @Autowired private lateinit var migration: HtmlGameLibraryMigrationService
     @Autowired private lateinit var objects: MaterialObjectStorage
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean private lateinit var jdbc: JdbcTemplate
@@ -112,7 +113,7 @@ class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() 
         val oldVariant = games.get(teacher, acceptedTarget["game_id"] as UUID, acceptedTarget["revision_id"] as UUID)
         assertEquals("REVALIDATION_REQUIRED", oldVariant.validationStatus)
         assertTrue(adaptedBytes.contentEquals(games.content(teacher, oldVariant.id, oldVariant.revisionId, null).body!!))
-        val blocked = kotlin.test.assertFailsWith<com.playsay.gateway.error.ProjectResponseException> { games.attach(teacher, copy.id, com.playsay.gateway.dto.MaterialGameAttachRequest(oldVariant.id, oldVariant.revisionId, "new-attachment", copy.document.path("pages").first().path("id").asText(), copy.updatedAt)) }
+        val blocked = kotlin.test.assertFailsWith<com.playsay.gateway.error.ProjectResponseException> { gameMaterials.attach(teacher, copy.id, com.playsay.gateway.dto.MaterialGameAttachRequest(oldVariant.id, oldVariant.revisionId, "new-attachment", copy.document.path("pages").first().path("id").asText(), copy.updatedAt)) }
         assertEquals("GAME_ADAPTATION_NOT_ACCEPTED", blocked.errorCode)
         assertEquals(acceptedTarget, jdbc.queryForMap("SELECT game_id,revision_id FROM html_game_legacy_alias WHERE asset_id=?", copiedAsset))
         assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM html_game_legacy_alias WHERE asset_id=?", Long::class.java, candidate))

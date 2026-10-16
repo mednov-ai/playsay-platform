@@ -44,7 +44,7 @@ class LegacyGameProvenanceService(
     private fun adaptationOrigin(current: MaterialAssetEntity, parent: UUID?): LegacyGameOrigin {
         val source = mapper.readTree(current.metadata).path("sourceAssetId").asText().takeIf { it.isNotBlank() }?.let(::gameUuid)
         if (source == null) return LegacyGameOrigin(current, parent, null, true)
-        val jobs = repository.jdbc.queryForList("SELECT status,mechanics_validation FROM material_game_adaptation WHERE source_asset_id=? AND adapted_asset_id=?", source, current.id)
+        val jobs = repository.adaptationHistory(source, current.id)
         if (jobs.isEmpty() || !assets.existsById(source)) gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED")
         val accepted = jobs.any { it["status"] in setOf("APPLIED", "ROLLED_BACK") }
         return LegacyGameOrigin(current, parent, source, accepted, jobs.any { it["status"] == "APPLIED" })
@@ -52,7 +52,7 @@ class LegacyGameProvenanceService(
     internal fun evidence(origin: LegacyGameOrigin): String {
         val document = mapper.createObjectNode().put("sourceKind", "LEGACY_UPLOAD")
         origin.sourceAssetId?.let { source ->
-            val jobs = repository.jdbc.queryForList("SELECT status,mechanics_validation,validator_version,source_hash,validation_report,report,model,prompt_hash FROM material_game_adaptation WHERE source_asset_id=? AND adapted_asset_id=? ORDER BY updated_at", source, origin.root.id)
+            val jobs = repository.adaptationEvidence(source, origin.root.id)
             document.set<com.fasterxml.jackson.databind.JsonNode>("adaptation", mapper.valueToTree(jobs))
             val sourceBytes = assets.findById(source).orElse(null)?.let(::bytes)
             val verified = jobs.any { it["mechanics_validation"] == "PASSED" && it["validator_version"] == com.playsay.gateway.service.MaterialGameMechanicsValidation.CURRENT_VALIDATOR_VERSION && sourceBytes != null && it["source_hash"] == gameHash(sourceBytes) }

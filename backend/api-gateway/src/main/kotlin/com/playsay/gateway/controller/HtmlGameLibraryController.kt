@@ -4,12 +4,8 @@ import com.playsay.gateway.dto.HtmlGameEditRequest
 import com.playsay.gateway.dto.HtmlGameForkRequest
 import com.playsay.gateway.dto.HtmlGamePageResponse
 import com.playsay.gateway.dto.HtmlGameResponse
-import com.playsay.gateway.dto.LessonMaterialResponse
-import com.playsay.gateway.dto.MaterialGameAttachRequest
-import com.playsay.gateway.service.LessonMaterialCatalogService
 import com.playsay.gateway.service.game.HtmlGameContentService
 import com.playsay.gateway.service.game.HtmlGameLibraryService
-import com.playsay.gateway.service.game.MaterialGameReferenceService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -37,9 +33,6 @@ import org.springframework.web.multipart.MultipartFile
 class HtmlGameLibraryController(
     private val games: HtmlGameLibraryService,
     private val content: HtmlGameContentService,
-    private val references: MaterialGameReferenceService,
-    private val materials: LessonMaterialCatalogService,
-    private val processing: com.playsay.gateway.service.game.HtmlGameProcessingService,
 ) {
     @GetMapping("/games")
     @Operation(operationId = "listHtmlGames", summary = "Search the shared teacher HTML game catalog")
@@ -88,39 +81,5 @@ class HtmlGameLibraryController(
     @Operation(operationId = "getHtmlGameCover", summary = "Read a private cover under the same context permissions")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
     fun cover(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @PathVariable revisionId: UUID, @RequestParam(required = false) materialId: UUID?): ResponseEntity<ByteArray> = content.content(auth, gameId, revisionId, materialId, true)
-
-    @PostMapping("/materials/{materialId}/games")
-    @Operation(operationId = "attachHtmlGameToMaterial", summary = "Attach a pinned game occurrence idempotently to an editable material")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun attach(auth: JwtAuthenticationToken, @PathVariable materialId: UUID, @RequestBody request: MaterialGameAttachRequest): LessonMaterialResponse = references.attach(auth, materialId, request, materials)
-    @PostMapping("/games/{gameId}/materials")
-    @Operation(operationId = "createMaterialFromHtmlGame", summary = "Create a new material with a pinned game, idempotently")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun createMaterial(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @RequestBody request: com.playsay.gateway.dto.HtmlGameMaterialRequest): LessonMaterialResponse = references.createMaterial(auth, gameId, request, materials)
-
-    @PostMapping("/games/{gameId}/processing")
-    @Operation(operationId = "requestHtmlGameProcessing", summary = "Queue revision-bound enrichment or adaptation with idempotent command identity")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun process(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @RequestBody request: com.playsay.gateway.dto.HtmlGameProcessingRequest) = processing.request(auth, gameId, request)
-
-    @GetMapping("/games/{gameId}/processing/{jobId}")
-    @Operation(operationId = "getHtmlGameProcessing", summary = "Get game processing status without exposing private context")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun processingStatus(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @PathVariable jobId: UUID) = processing.status(auth, gameId, jobId)
-
-    @GetMapping("/games/{gameId}/processing/{jobId}/preview", produces = [MediaType.TEXT_HTML_VALUE])
-    @Operation(operationId = "previewHtmlGameCandidate", summary = "Local teacher preview of a validated candidate, without launch authority")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun candidate(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @PathVariable jobId: UUID): ResponseEntity<ByteArray> = ResponseEntity.ok().contentType(MediaType.TEXT_HTML).header("Cache-Control", "no-store").header("Content-Security-Policy", "sandbox; default-src 'none'").header("X-Content-Type-Options", "nosniff").body(processing.preview(auth, gameId, jobId))
-
-    @PostMapping("/games/{gameId}/processing/{jobId}/apply")
-    @Operation(operationId = "applyHtmlGameCandidate", summary = "Accept a validated candidate as a new immutable revision, checking current version")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun applyCandidate(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @PathVariable jobId: UUID, @RequestParam expectedVersion: Long) = processing.apply(auth, gameId, jobId, expectedVersion)
-
-    @PostMapping("/games/{gameId}/select-revision")
-    @Operation(operationId = "selectHtmlGameRevision", summary = "Explicitly select an existing playable revision without changing pinned references")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Success")
-    fun selectRevision(auth: JwtAuthenticationToken, @PathVariable gameId: UUID, @RequestBody request: com.playsay.gateway.dto.HtmlGameRevisionSelection) = processing.selectRevision(auth, gameId, request)
 
 }

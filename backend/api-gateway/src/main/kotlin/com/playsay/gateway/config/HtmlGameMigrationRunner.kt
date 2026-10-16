@@ -28,6 +28,7 @@ class HtmlGameMigrationRunner(
         var count = 0
         do {
             val batch = migration.batch(dryRun, after)
+            LoggerFactory.getLogger(javaClass).info("HTML game migration batch dryRun={} sources={} outcomes={}", dryRun, batch.outcomes.size, batch.outcomes.groupingBy { it.errorCode ?: it.outcome }.eachCount())
             count += batch.outcomes.size
             blocked += batch.outcomes.count { it.outcome == "BLOCKED" }
             after = batch.outcomes.lastOrNull()?.assetId

@@ -43,7 +43,8 @@ class HtmlGameStorageFailureIntegrationTest : MaterialControllerTestFixture() {
         val sql = "INSERT INTO html_game_command(command_key,payload_hash,game_id,revision_id) VALUES(?,?,?,?)"
         doThrow(IllegalStateException("synthetic database failure")).`when`(jdbc).update(eq(sql) ?: sql, anyString(), anyString(), any(), any())
         try {
-            assertFailsWith<IllegalStateException> { games.upload(teacher, htmlFile(), UUID.randomUUID()) }
+            val failure = assertFailsWith<org.springframework.dao.InvalidDataAccessApiUsageException> { games.upload(teacher, htmlFile(), UUID.randomUUID()) }
+            assertEquals("synthetic database failure", failure.mostSpecificCause.message)
             assertEquals(before, jdbc.queryForObject("SELECT COUNT(*) FROM html_game", Long::class.java))
             verify(objects, atLeastOnce()).deleteObject(anyString())
         } finally { reset(jdbc); clearInvocations(objects) }

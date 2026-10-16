@@ -29,11 +29,11 @@ class GameBlobStorageService(private val objects: MaterialObjectStorage, private
             if (gameHash(objects.getObject(key).bytes) != hash) gameError(HttpStatus.BAD_GATEWAY, "GAME_CONTENT_INVALID")
         } catch (error: com.playsay.gateway.error.ProjectResponseException) { throw error }
         catch (error: Exception) { gameError(HttpStatus.SERVICE_UNAVAILABLE, "GAME_STORAGE_UNAVAILABLE") }
-        repository.jdbc.update("INSERT INTO html_game_blob(id,storage_key,sha256,byte_size,content_type,created_at) VALUES(?,?,?,?,?,?)", id, key, hash, bytes.size, contentType, Timestamp.from(Instant.now()))
+        repository.insertBlob(id, key, hash, bytes.size, contentType, Timestamp.from(Instant.now()))
         return id
     }
     fun read(id: UUID): ByteArray {
-        val row = repository.jdbc.queryForList("SELECT storage_key,sha256 FROM html_game_blob WHERE id=?", id).firstOrNull() ?: gameError(HttpStatus.NOT_FOUND, "GAME_CONTENT_NOT_FOUND")
+        val row = repository.storedBlob(id).firstOrNull() ?: gameError(HttpStatus.NOT_FOUND, "GAME_CONTENT_NOT_FOUND")
         val bytes = readObject(row["storage_key"].toString())
         if (gameHash(bytes) != row["sha256"]) gameError(HttpStatus.BAD_GATEWAY, "GAME_CONTENT_INVALID")
         return bytes

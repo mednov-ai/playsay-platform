@@ -1,3 +1,4 @@
+import { gameContent, gameCover } from "../../../shared/api/games";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw, X } from "lucide-react";
 import { fetchMaterialAssetObjectUrl, fetchMaterialAssets, fetchMaterialAssetText, type LessonMaterial, type LessonMaterialAsset } from "../../../shared/api/playsay";
@@ -143,6 +144,44 @@ export function LessonMaterialDocumentView({
   const isStaticImagePage = page.layout === "STATIC_IMAGE";
   const isHtmlGamePage = page.layout === "HTML_GAME";
   const allBlocks = useMemo(() => document.pages.flatMap((item) => item.blocks), [document.pages]);
+  const libraryReferences = useMemo(() => allBlocks.filter((block) => block.type === "htmlGame" && block.gameId && block.gameRevisionId), [allBlocks]);
+  const libraryKey = JSON.stringify(libraryReferences.map((block) => [block.gameId, block.gameRevisionId]));
+  const [libraryHtml, setLibraryHtml] = useState<Record<string, string>>({});
+  const [libraryLoadState, setLibraryLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  useEffect(() => {
+    const refs = JSON.parse(libraryKey) as Array<[string, string]>;
+    const controller = new AbortController();
+    setLibraryHtml({});
+    if (!refs.length) { setLibraryLoadState("idle"); return () => controller.abort(); }
+    setLibraryLoadState("loading");
+    const unique = [...new Map(refs.map(([id, revision]) => [revision, [id, revision] as const])).values()];
+    void Promise.allSettled(unique.map(async ([id, revision]) => [revision, await withMaterialAssetLoadTimeout(gameContent(id, revision, material.id, controller.signal))] as const)).then((results) => {
+      if (controller.signal.aborted) return;
+      setLibraryHtml(Object.fromEntries(results.flatMap((result) => result.status === "fulfilled" ? [result.value] : [])));
+      setLibraryLoadState(results.every((result) => result.status === "fulfilled") ? "ready" : "error");
+    });
+    return () => controller.abort();
+  }, [libraryKey, material.id, material.updatedAt, assetReloadVersion]);
+  const [libraryCovers, setLibraryCovers] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    const urls: string[] = [];
+    setLibraryCovers({});
+    const refs = [...new Map((JSON.parse(libraryKey) as Array<[string, string]>).map(([id, revisionId]) => [revisionId, { id, revisionId }])).values()];
+    void Promise.all(refs.map(async (game) => {
+      try {
+        const blob = await gameCover(game, controller.signal, material.id);
+        if (controller.signal.aborted) return;
+        const url = URL.createObjectURL(blob); urls.push(url);
+        setLibraryCovers((current) => ({ ...current, [game.revisionId]: url }));
+      } catch { /* A cover is optional; playable content has a separate error state. */ }
+    }));
+    return () => { controller.abort(); urls.forEach((url) => URL.revokeObjectURL(url)); };
+  }, [libraryKey, material.id, material.updatedAt, assetReloadVersion]);
+  function htmlForGame(block: MaterialEditorBlock): string | undefined {
+    return block.gameId && block.gameRevisionId ? libraryHtml[block.gameRevisionId] : htmlAssets[materialAssetIdFromUrl(block.url) ?? ""];
+  }
+
   const focusedBlockValue = focusedBlock ? allBlocks.find((block) => block.id === focusedBlock.blockId) ?? null : null;
   const hasHtmlGameSync = Boolean(htmlGameSync);
   const presentedHtmlGameBlockId = htmlGameSync?.presentedBlockId ?? null;
@@ -365,8 +404,7 @@ export function LessonMaterialDocumentView({
   function requestBlockFocus(kind: "htmlGame" | "image" | "externalActivity" | "document", blockId: string) {
     if (kind === "htmlGame") {
       const block = allBlocks.find((candidate) => candidate.id === blockId && candidate.type === "htmlGame");
-      const assetId = block?.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
-      if (!assetId || !htmlAssets[assetId]) return;
+      if (!block || !htmlForGame(block)) return;
       if (gameLifecycle?.requests[blockId]) return;
       minimizedGamesRef.current.delete(launchKey(blockId));
       locallyStoppedGamesRef.current.delete(launchKey(blockId));
@@ -505,14 +543,15 @@ export function LessonMaterialDocumentView({
         className={`playsay-material-blocks${isStaticImagePage ? " playsay-material-blocks-static-image" : ""}${isHtmlGamePage ? " playsay-material-blocks-html-game" : ""}`}
       >
         {page.blocks.map((block) => {
-          const htmlGameAssetId = block.type === "htmlGame" ? materialAssetIdFromUrl(block.url) : null;
+          const htmlGameAssetId = block.type === "htmlGame" ? block.gameRevisionId ?? materialAssetIdFromUrl(block.url) : null;
+          const gameLoading = block.gameRevisionId ? libraryLoadState === "loading" || libraryLoadState === "idle" : assetLoadState === "loading" || (assetLoadState === "idle" && material.id !== "preview");
           const htmlGameContentState = block.type !== "htmlGame"
             ? undefined
             : !htmlGameAssetId
               ? "unavailable" as const
-              : htmlAssets[htmlGameAssetId]
+              : htmlForGame(block)
                 ? "ready" as const
-                : assetLoadState === "loading" || (assetLoadState === "idle" && material.id !== "preview")
+                : gameLoading
                   ? "loading" as const
                   : "unavailable" as const;
           return <RenderedMaterialBlock
@@ -521,7 +560,7 @@ export function LessonMaterialDocumentView({
             assetsLoading={assetLoadState === "loading"}
             assetTags={assetTags}
             assetUrls={assetUrls}
-            block={block}
+            block={block.gameId && block.gameRevisionId ? { ...block, gameIconUrl: libraryCovers[block.gameRevisionId] } : block}
             htmlGameContentState={htmlGameContentState}
             key={block.id}
             materialId={material.id}
@@ -601,11 +640,12 @@ export function LessonMaterialDocumentView({
         {allBlocks.filter((block) => block.type === "htmlGame" && launchedGameIds.has(block.id)).map((block) => {
           const assetId = materialAssetIdFromUrl(block.url);
           const active = focusedBlock?.kind === "htmlGame" && focusedBlock.blockId === block.id;
-          const html = assetId ? htmlAssets[assetId] : undefined;
-          const contentState = !assetId
+          const html = htmlForGame(block);
+          const contentState = !assetId && !block.gameRevisionId
             ? "unavailable" as const
             : html
               ? "ready" as const
+              : block.gameRevisionId ? libraryLoadState === "loading" ? "loading" as const : "unavailable" as const
               : assetLoadState === "loading" || (assetLoadState === "idle" && material.id !== "preview")
                 ? "loading" as const
                 : "unavailable" as const;

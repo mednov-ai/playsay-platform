@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playsay.local/contracts/material-game-reference.schema.json",
+  "title": "HTML game occurrence in a material document",
+  "type": "object",
+  "required": ["id", "type"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "type": { "const": "htmlGame" },
+    "gameId": { "type": "string", "format": "uuid" },
+    "gameRevisionId": { "type": "string", "format": "uuid" },
+    "url": { "type": "string" }
+  },
+  "dependentRequired": { "gameId": ["gameRevisionId"], "gameRevisionId": ["gameId"] },
+  "allOf": [{
+    "if": { "required": ["gameId"] },
+    "then": { "properties": { "url": { "maxLength": 0 } } },
+    "else": { "properties": { "url": { "pattern": "^(material-asset:[0-9a-fA-F-]{36})?$" } } }
+  }],
+  "additionalProperties": true,
+  "$comment": "Other document fields, title overrides and occurrence IDs must survive round trips. New writers cannot strip an existing canonical pair. Empty authoring placeholders are allowed."
+}

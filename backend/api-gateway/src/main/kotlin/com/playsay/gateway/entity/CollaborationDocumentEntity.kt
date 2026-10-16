@@ -11,14 +11,18 @@ import org.hibernate.type.SqlTypes
 
 @Entity
 @Table(name = "collaboration_document")
+// Constructor mirrors persistence fields or coordinates existing domain boundaries.
+@Suppress("LongParameterList")
 class CollaborationDocumentEntity(
     @Id
     @Column(name = "id", nullable = false)
     var id: UUID = UUID.randomUUID(),
     @Column(name = "lesson_id", nullable = false)
     var lessonId: UUID = UUID.randomUUID(),
-    @Column(name = "material_id", nullable = false)
-    var materialId: UUID = UUID.randomUUID(),
+    @Column(name = "material_id")
+    var materialId: UUID? = UUID.randomUUID(),
+    @Column(name = "game_launch_id")
+    var gameLaunchId: UUID? = null,
     @Column(name = "student_user_id")
     var studentUserId: UUID? = null,
     @Column(name = "document_kind", nullable = false, length = 40)

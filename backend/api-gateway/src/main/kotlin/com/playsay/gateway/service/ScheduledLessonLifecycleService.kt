@@ -22,10 +22,12 @@ class ScheduledLessonLifecycleService(
     private val authorizationService: ScheduledLessonAuthorizationService,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC(),
+    private val gameAvailability: com.playsay.gateway.service.game.GameLibraryAvailabilityService? = null,
 ) {
     @Transactional
     fun start(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse {
         authentication.requireLessonManager()
+        gameAvailability?.requireLessonAdmission()
         val lesson = lessonRepo.lockById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         if (!authorizationService.canManageLesson(authentication, lessonId)) {

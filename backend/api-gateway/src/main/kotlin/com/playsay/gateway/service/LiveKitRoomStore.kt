@@ -94,6 +94,8 @@ class LiveKitTokenService(
 }
 
 @Component
+// Constructor mirrors persistence fields or coordinates existing domain boundaries.
+@Suppress("LongParameterList")
 class LiveKitRoomStore(
     private val lessonRepo: LessonRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
@@ -103,9 +105,11 @@ class LiveKitRoomStore(
     private val tokenService: LiveKitTokenService,
     private val regionalMediaRoutingService: RegionalMediaRoutingService,
     private val clock: Clock = Clock.systemUTC(),
+    private val gameAvailability: com.playsay.gateway.service.game.GameLibraryAvailabilityService? = null,
 ) {
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID, origin: String? = null): LiveKitRoomTokenResponse {
+        gameAvailability?.requireLessonAdmission()
         if (admissionGuard.isKicked(lessonId, authentication)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }

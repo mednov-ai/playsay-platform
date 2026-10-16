@@ -473,7 +473,7 @@ export type CollaborationDocumentScope = "INDIVIDUAL" | "GROUP";
 export type CollaborationDocument = {
   id: string;
   lessonId: string;
-  materialId: string;
+  materialId: string | null;
   studentUserId?: string | null;
   studentSubject?: string | null;
   studentName?: string | null;

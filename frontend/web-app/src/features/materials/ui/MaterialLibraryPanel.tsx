@@ -1,3 +1,5 @@
+import { uploadedHtmlGameReference } from "../model/uploadedHtmlGameReference";
+import { requestGameProcessing } from "../../../shared/api/games";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type CourseLessonMap } from "../../../entities/schedule/model";
 import {
@@ -702,8 +704,9 @@ export function MaterialLibraryPanel({
       const gameTitle = typeof asset.metadata.gameTitle === "string" ? asset.metadata.gameTitle.trim() : fallbackTitle;
       const gameTitleSource = normalizeGameTitleSource(typeof asset.metadata.gameTitleSource === "string" ? asset.metadata.gameTitleSource : undefined);
       const gameSyncCompatibility = normalizeGameSyncCompatibility(asset.metadata.syncCompatibility);
+      const reference: Partial<MaterialEditorBlock> = kind === "htmlGame" ? uploadedHtmlGameReference(asset) : { url: `material-asset:${asset.id}` };
       const nextForm = materialFormWithBlockPatch(workingForm, blockId, {
-        url: `material-asset:${asset.id}`,
+        ...reference,
         ...(kind === "image"
           ? { alt: fallbackTitle, imageSize: workingForm.document.pages.flatMap((page) => page.blocks).find((block) => block.id === blockId)?.imageSize ?? "MEDIUM" }
           : {
@@ -728,7 +731,11 @@ export function MaterialLibraryPanel({
       syncMaterialAssets(saved, assets);
       if (kind === "htmlGame") {
         try {
-          await startHtmlGameEnrichment(materialId, asset.id, blockId);
+          if (reference.gameId && reference.gameRevisionId) {
+            await requestGameProcessing({ id: reference.gameId, revisionId: reference.gameRevisionId }, "ENRICH", asset.id);
+          } else {
+            await startHtmlGameEnrichment(materialId, asset.id, blockId);
+          }
           if (!isCurrentAttempt()) return;
         } catch {
           if (isCurrentAttempt()) setAssetUploadMessage(t("materials.messages.htmlGameUploadedIconFailed"));

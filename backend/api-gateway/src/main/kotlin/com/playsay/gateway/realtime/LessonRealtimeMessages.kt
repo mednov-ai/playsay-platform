@@ -8,6 +8,7 @@ import java.util.UUID
 import com.playsay.gateway.utils.MetaData
 
 data class LessonRealtimeInboundMessage(
+    val gameLibraryVersion: Int? = null,
     val type: String? = null,
     val lessonId: UUID? = null,
     val state: String? = null,

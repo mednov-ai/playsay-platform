@@ -315,7 +315,8 @@ export interface SaveCollaborationSnapshotRequest {
 export interface CollaborationDocumentResponse {
   id: string;
   lessonId: string;
-  materialId: string;
+  /** @nullable */
+  materialId?: string | null;
   /** @nullable */
   studentUserId?: string | null;
   /** @nullable */
@@ -1070,6 +1071,25 @@ export interface TeacherAssignmentDetailResponse {
   recipients: AssignmentRecipientProgressResponse[];
 }
 
+export interface LessonGameStartRequest {
+  gameId: string;
+  revisionId: string;
+  commandId: string;
+  protocolVersion: number;
+}
+
+export interface LessonGameLaunchResponse {
+  id: string;
+  lessonId: string;
+  gameId: string;
+  revisionId: string;
+  status: string;
+  /** @nullable */
+  documentId?: string | null;
+  createdAt: string;
+  presentationRevision: number;
+}
+
 export interface LessonAccessExtensionRequest {
   expectedAccessRevision: number;
 }
@@ -1345,6 +1365,14 @@ export interface MaterialGenerateImagesRequest {
   maxImages?: number | null;
   /** @nullable */
   regenerate?: boolean | null;
+}
+
+export interface MaterialGameAttachRequest {
+  gameId: string;
+  revisionId: string;
+  blockId: string;
+  pageId: string;
+  expectedUpdatedAt: string;
 }
 
 export interface MaterialHtmlGameEnrichmentRequest {
@@ -1623,6 +1651,57 @@ export interface VocabularyAssignmentProgressUpdateRequest {
   /** @nullable */
   completionPolicyVersion?: string | null;
   updatedAt: string;
+}
+
+export interface HtmlGameResponse {
+  id: string;
+  revisionId: string;
+  title: string;
+  topic: string;
+  /** @nullable */
+  cefrLevel?: string | null;
+  compatibility: string;
+  status: string;
+  canEdit: boolean;
+  hasCover: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  validationStatus?: string | null;
+}
+
+export interface HtmlGameRevisionSelection {
+  revisionId: string;
+  expectedVersion: number;
+}
+
+export interface HtmlGameProcessingRequest {
+  revisionId: string;
+  commandId: string;
+  kind: string;
+}
+
+export interface HtmlGameProcessingResponse {
+  id: string;
+  gameId: string;
+  sourceRevisionId: string;
+  kind: string;
+  status: string;
+  /** @nullable */
+  errorCode?: string | null;
+  /** @nullable */
+  appliedRevisionId?: string | null;
+}
+
+export interface HtmlGameMaterialRequest {
+  revisionId: string;
+  commandId: string;
+}
+
+export interface HtmlGameForkRequest {
+  revisionId: string;
+  commandId: string;
 }
 
 export type RegionalRouteDiagnosticEventRequestStage = typeof RegionalRouteDiagnosticEventRequestStage[keyof typeof RegionalRouteDiagnosticEventRequestStage];
@@ -2021,6 +2100,14 @@ export interface MaterialAssetUpdateRequest {
   tags?: string[] | null;
 }
 
+export interface HtmlGameEditRequest {
+  title: string;
+  topic: string;
+  /** @nullable */
+  cefrLevel?: string | null;
+  expectedVersion: number;
+}
+
 export type VocabularyHomeworkReviewRequestAction = typeof VocabularyHomeworkReviewRequestAction[keyof typeof VocabularyHomeworkReviewRequestAction];
 
 
@@ -2037,6 +2124,15 @@ export interface VocabularyHomeworkReviewRequest {
      * @nullable
      */
   note?: string | null;
+}
+
+export interface LessonGameStateResponse {
+  launch?: LessonGameLaunchResponse | null;
+  revision: number;
+  canControl: boolean;
+  protocolReady: boolean;
+  /** @nullable */
+  primaryKind?: string | null;
 }
 
 export interface LessonLobbyEntryResponse {
@@ -2138,6 +2234,13 @@ export interface HelloResponse {
   service: string;
   message: string;
   timestamp: string;
+}
+
+export interface HtmlGamePageResponse {
+  items: HtmlGameResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface ChatPushCapabilityResponse {
@@ -2296,6 +2399,31 @@ export type UploadMaterialDocumentBody = {
   file: Blob | File;
 };
 
+export type ListHtmlGamesParams = {
+search?: string;
+topic?: string;
+level?: string;
+compatibility?: string;
+page?: number;
+pageSize?: number;
+};
+
+export type UploadHtmlGameBody = {
+  file: Blob | File;
+};
+
+export type UploadHtmlGameRevisionParams = {
+expectedVersion: number;
+};
+
+export type UploadHtmlGameRevisionBody = {
+  file: Blob | File;
+};
+
+export type ApplyHtmlGameCandidateParams = {
+expectedVersion: number;
+};
+
 export type MessagesParams = {
 cursor?: string;
 limit?: number;
@@ -2311,8 +2439,20 @@ export type Delegations1Params = {
 status?: string;
 };
 
+export type GetHtmlGameParams = {
+revisionId?: string;
+};
+
 export type ListCollaborationDocumentsParams = {
 materialId: string;
+};
+
+export type GetHtmlGameCoverParams = {
+materialId?: string;
+};
+
+export type GetHtmlGameContentParams = {
+materialId?: string;
 };
 
 export type ListEmailDeliveriesParams = {
@@ -5635,6 +5775,193 @@ const res = await fetch(getCreateHomeworkFromScheduledLessonUrl(lessonId),
 
 
 
+export type startLessonLibraryGameResponse200 = {
+  data: LessonGameLaunchResponse
+  status: 200
+}
+
+export type startLessonLibraryGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type startLessonLibraryGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type startLessonLibraryGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type startLessonLibraryGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type startLessonLibraryGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type startLessonLibraryGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type startLessonLibraryGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type startLessonLibraryGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type startLessonLibraryGameResponseSuccess = (startLessonLibraryGameResponse200) & {
+  headers: Headers;
+};
+export type startLessonLibraryGameResponseError = (startLessonLibraryGameResponse400 | startLessonLibraryGameResponse401 | startLessonLibraryGameResponse403 | startLessonLibraryGameResponse404 | startLessonLibraryGameResponse409 | startLessonLibraryGameResponse413 | startLessonLibraryGameResponse422 | startLessonLibraryGameResponse503) & {
+  headers: Headers;
+};
+
+export type startLessonLibraryGameResponse = (startLessonLibraryGameResponseSuccess | startLessonLibraryGameResponseError)
+
+export const getStartLessonLibraryGameUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/game-launches`
+}
+
+/**
+ * @summary Start a pinned shared library game without changing the material
+ */
+export const startLessonLibraryGame = async (lessonId: string,
+    lessonGameStartRequest: LessonGameStartRequest, options?: RequestInit): Promise<startLessonLibraryGameResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getStartLessonLibraryGameUrl(lessonId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(lessonGameStartRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startLessonLibraryGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as startLessonLibraryGameResponse
+}
+
+
+
+export type stopLessonLibraryGameResponse200 = {
+  data: LessonGameLaunchResponse
+  status: 200
+}
+
+export type stopLessonLibraryGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type stopLessonLibraryGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type stopLessonLibraryGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type stopLessonLibraryGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type stopLessonLibraryGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type stopLessonLibraryGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type stopLessonLibraryGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type stopLessonLibraryGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type stopLessonLibraryGameResponseSuccess = (stopLessonLibraryGameResponse200) & {
+  headers: Headers;
+};
+export type stopLessonLibraryGameResponseError = (stopLessonLibraryGameResponse400 | stopLessonLibraryGameResponse401 | stopLessonLibraryGameResponse403 | stopLessonLibraryGameResponse404 | stopLessonLibraryGameResponse409 | stopLessonLibraryGameResponse413 | stopLessonLibraryGameResponse422 | stopLessonLibraryGameResponse503) & {
+  headers: Headers;
+};
+
+export type stopLessonLibraryGameResponse = (stopLessonLibraryGameResponseSuccess | stopLessonLibraryGameResponseError)
+
+export const getStopLessonLibraryGameUrl = (lessonId: string,
+    launchId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/game-launches/${launchId}/stop`
+}
+
+/**
+ * @summary Stop only the specified shared launch
+ */
+export const stopLessonLibraryGame = async (lessonId: string,
+    launchId: string, options?: RequestInit): Promise<stopLessonLibraryGameResponse> => {
+
+  const res = await fetch(getStopLessonLibraryGameUrl(lessonId,launchId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: stopLessonLibraryGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as stopLessonLibraryGameResponse
+}
+
+
+
 export type extendLessonAccessResponse200 = {
   data: ScheduledLessonResponse
   status: 200
@@ -7135,6 +7462,106 @@ const res = await fetch(getGenerateMaterialImagesUrl(materialId),
 
 
 
+export type attachHtmlGameToMaterialResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type attachHtmlGameToMaterialResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type attachHtmlGameToMaterialResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type attachHtmlGameToMaterialResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type attachHtmlGameToMaterialResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type attachHtmlGameToMaterialResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type attachHtmlGameToMaterialResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type attachHtmlGameToMaterialResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type attachHtmlGameToMaterialResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type attachHtmlGameToMaterialResponseSuccess = (attachHtmlGameToMaterialResponse200) & {
+  headers: Headers;
+};
+export type attachHtmlGameToMaterialResponseError = (attachHtmlGameToMaterialResponse400 | attachHtmlGameToMaterialResponse401 | attachHtmlGameToMaterialResponse403 | attachHtmlGameToMaterialResponse404 | attachHtmlGameToMaterialResponse409 | attachHtmlGameToMaterialResponse413 | attachHtmlGameToMaterialResponse422 | attachHtmlGameToMaterialResponse503) & {
+  headers: Headers;
+};
+
+export type attachHtmlGameToMaterialResponse = (attachHtmlGameToMaterialResponseSuccess | attachHtmlGameToMaterialResponseError)
+
+export const getAttachHtmlGameToMaterialUrl = (materialId: string,) => {
+
+
+
+
+  return `/api/materials/${materialId}/games`
+}
+
+/**
+ * @summary Attach a pinned game occurrence idempotently to an editable material
+ */
+export const attachHtmlGameToMaterial = async (materialId: string,
+    materialGameAttachRequest: MaterialGameAttachRequest, options?: RequestInit): Promise<attachHtmlGameToMaterialResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getAttachHtmlGameToMaterialUrl(materialId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(materialGameAttachRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: attachHtmlGameToMaterialResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as attachHtmlGameToMaterialResponse
+}
+
+
+
 export type getMaterialHtmlGameEnrichmentResponse200 = {
   data: MaterialHtmlGameEnrichmentResponse
   status: 200
@@ -8006,6 +8433,782 @@ const res = await fetch(getUpdateProgressUrl(assignmentId),
 
   const data: updateProgressResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as updateProgressResponse
+}
+
+
+
+export type listHtmlGamesResponse200 = {
+  data: HtmlGamePageResponse
+  status: 200
+}
+
+export type listHtmlGamesResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type listHtmlGamesResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type listHtmlGamesResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type listHtmlGamesResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type listHtmlGamesResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type listHtmlGamesResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type listHtmlGamesResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type listHtmlGamesResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type listHtmlGamesResponseSuccess = (listHtmlGamesResponse200) & {
+  headers: Headers;
+};
+export type listHtmlGamesResponseError = (listHtmlGamesResponse400 | listHtmlGamesResponse401 | listHtmlGamesResponse403 | listHtmlGamesResponse404 | listHtmlGamesResponse409 | listHtmlGamesResponse413 | listHtmlGamesResponse422 | listHtmlGamesResponse503) & {
+  headers: Headers;
+};
+
+export type listHtmlGamesResponse = (listHtmlGamesResponseSuccess | listHtmlGamesResponseError)
+
+export const getListHtmlGamesUrl = (params?: ListHtmlGamesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games?${stringifiedParams}` : `/api/games`
+}
+
+/**
+ * @summary Search the shared teacher HTML game catalog
+ */
+export const listHtmlGames = async (params?: ListHtmlGamesParams, options?: RequestInit): Promise<listHtmlGamesResponse> => {
+
+  const res = await fetch(getListHtmlGamesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listHtmlGamesResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listHtmlGamesResponse
+}
+
+
+
+export type uploadHtmlGameResponse201 = {
+  data: HtmlGameResponse
+  status: 201
+}
+
+export type uploadHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type uploadHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type uploadHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type uploadHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type uploadHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type uploadHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type uploadHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type uploadHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type uploadHtmlGameResponseSuccess = (uploadHtmlGameResponse201) & {
+  headers: Headers;
+};
+export type uploadHtmlGameResponseError = (uploadHtmlGameResponse400 | uploadHtmlGameResponse401 | uploadHtmlGameResponse403 | uploadHtmlGameResponse404 | uploadHtmlGameResponse409 | uploadHtmlGameResponse413 | uploadHtmlGameResponse422 | uploadHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type uploadHtmlGameResponse = (uploadHtmlGameResponseSuccess | uploadHtmlGameResponseError)
+
+export const getUploadHtmlGameUrl = () => {
+
+
+
+
+  return `/api/games`
+}
+
+/**
+ * @summary Upload a shared game, maximum 20 MiB, with idempotent command identity
+ */
+export const uploadHtmlGame = async (uploadHtmlGameBody?: UploadHtmlGameBody, options?: RequestInit): Promise<uploadHtmlGameResponse> => {
+    const formData = new FormData();
+if(uploadHtmlGameBody?.file !== undefined) {
+ formData.append(`file`, uploadHtmlGameBody.file);
+ }
+
+  const res = await fetch(getUploadHtmlGameUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadHtmlGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadHtmlGameResponse
+}
+
+
+
+export type selectHtmlGameRevisionResponse200 = {
+  data: HtmlGameResponse
+  status: 200
+}
+
+export type selectHtmlGameRevisionResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type selectHtmlGameRevisionResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type selectHtmlGameRevisionResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type selectHtmlGameRevisionResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type selectHtmlGameRevisionResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type selectHtmlGameRevisionResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type selectHtmlGameRevisionResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type selectHtmlGameRevisionResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type selectHtmlGameRevisionResponseSuccess = (selectHtmlGameRevisionResponse200) & {
+  headers: Headers;
+};
+export type selectHtmlGameRevisionResponseError = (selectHtmlGameRevisionResponse400 | selectHtmlGameRevisionResponse401 | selectHtmlGameRevisionResponse403 | selectHtmlGameRevisionResponse404 | selectHtmlGameRevisionResponse409 | selectHtmlGameRevisionResponse413 | selectHtmlGameRevisionResponse422 | selectHtmlGameRevisionResponse503) & {
+  headers: Headers;
+};
+
+export type selectHtmlGameRevisionResponse = (selectHtmlGameRevisionResponseSuccess | selectHtmlGameRevisionResponseError)
+
+export const getSelectHtmlGameRevisionUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/select-revision`
+}
+
+/**
+ * @summary Explicitly select an existing playable revision without changing pinned references
+ */
+export const selectHtmlGameRevision = async (gameId: string,
+    htmlGameRevisionSelection: HtmlGameRevisionSelection, options?: RequestInit): Promise<selectHtmlGameRevisionResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSelectHtmlGameRevisionUrl(gameId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(htmlGameRevisionSelection)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: selectHtmlGameRevisionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as selectHtmlGameRevisionResponse
+}
+
+
+
+export type uploadHtmlGameRevisionResponse201 = {
+  data: HtmlGameResponse
+  status: 201
+}
+
+export type uploadHtmlGameRevisionResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type uploadHtmlGameRevisionResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type uploadHtmlGameRevisionResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type uploadHtmlGameRevisionResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type uploadHtmlGameRevisionResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type uploadHtmlGameRevisionResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type uploadHtmlGameRevisionResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type uploadHtmlGameRevisionResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type uploadHtmlGameRevisionResponseSuccess = (uploadHtmlGameRevisionResponse201) & {
+  headers: Headers;
+};
+export type uploadHtmlGameRevisionResponseError = (uploadHtmlGameRevisionResponse400 | uploadHtmlGameRevisionResponse401 | uploadHtmlGameRevisionResponse403 | uploadHtmlGameRevisionResponse404 | uploadHtmlGameRevisionResponse409 | uploadHtmlGameRevisionResponse413 | uploadHtmlGameRevisionResponse422 | uploadHtmlGameRevisionResponse503) & {
+  headers: Headers;
+};
+
+export type uploadHtmlGameRevisionResponse = (uploadHtmlGameRevisionResponseSuccess | uploadHtmlGameRevisionResponseError)
+
+export const getUploadHtmlGameRevisionUrl = (gameId: string,
+    params: UploadHtmlGameRevisionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games/${gameId}/revisions?${stringifiedParams}` : `/api/games/${gameId}/revisions`
+}
+
+/**
+ * @summary Create a pinned immutable game revision; requires author or administrator
+ */
+export const uploadHtmlGameRevision = async (gameId: string,
+    params: UploadHtmlGameRevisionParams,
+    uploadHtmlGameRevisionBody?: UploadHtmlGameRevisionBody, options?: RequestInit): Promise<uploadHtmlGameRevisionResponse> => {
+    const formData = new FormData();
+if(uploadHtmlGameRevisionBody?.file !== undefined) {
+ formData.append(`file`, uploadHtmlGameRevisionBody.file);
+ }
+
+  const res = await fetch(getUploadHtmlGameRevisionUrl(gameId,params),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadHtmlGameRevisionResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadHtmlGameRevisionResponse
+}
+
+
+
+export type requestHtmlGameProcessingResponse200 = {
+  data: HtmlGameProcessingResponse
+  status: 200
+}
+
+export type requestHtmlGameProcessingResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type requestHtmlGameProcessingResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type requestHtmlGameProcessingResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type requestHtmlGameProcessingResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type requestHtmlGameProcessingResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type requestHtmlGameProcessingResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type requestHtmlGameProcessingResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type requestHtmlGameProcessingResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type requestHtmlGameProcessingResponseSuccess = (requestHtmlGameProcessingResponse200) & {
+  headers: Headers;
+};
+export type requestHtmlGameProcessingResponseError = (requestHtmlGameProcessingResponse400 | requestHtmlGameProcessingResponse401 | requestHtmlGameProcessingResponse403 | requestHtmlGameProcessingResponse404 | requestHtmlGameProcessingResponse409 | requestHtmlGameProcessingResponse413 | requestHtmlGameProcessingResponse422 | requestHtmlGameProcessingResponse503) & {
+  headers: Headers;
+};
+
+export type requestHtmlGameProcessingResponse = (requestHtmlGameProcessingResponseSuccess | requestHtmlGameProcessingResponseError)
+
+export const getRequestHtmlGameProcessingUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/processing`
+}
+
+/**
+ * @summary Queue revision-bound enrichment or adaptation with idempotent command identity
+ */
+export const requestHtmlGameProcessing = async (gameId: string,
+    htmlGameProcessingRequest: HtmlGameProcessingRequest, options?: RequestInit): Promise<requestHtmlGameProcessingResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestHtmlGameProcessingUrl(gameId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(htmlGameProcessingRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestHtmlGameProcessingResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestHtmlGameProcessingResponse
+}
+
+
+
+export type applyHtmlGameCandidateResponse200 = {
+  data: HtmlGameResponse
+  status: 200
+}
+
+export type applyHtmlGameCandidateResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type applyHtmlGameCandidateResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type applyHtmlGameCandidateResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type applyHtmlGameCandidateResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type applyHtmlGameCandidateResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type applyHtmlGameCandidateResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type applyHtmlGameCandidateResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type applyHtmlGameCandidateResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type applyHtmlGameCandidateResponseSuccess = (applyHtmlGameCandidateResponse200) & {
+  headers: Headers;
+};
+export type applyHtmlGameCandidateResponseError = (applyHtmlGameCandidateResponse400 | applyHtmlGameCandidateResponse401 | applyHtmlGameCandidateResponse403 | applyHtmlGameCandidateResponse404 | applyHtmlGameCandidateResponse409 | applyHtmlGameCandidateResponse413 | applyHtmlGameCandidateResponse422 | applyHtmlGameCandidateResponse503) & {
+  headers: Headers;
+};
+
+export type applyHtmlGameCandidateResponse = (applyHtmlGameCandidateResponseSuccess | applyHtmlGameCandidateResponseError)
+
+export const getApplyHtmlGameCandidateUrl = (gameId: string,
+    jobId: string,
+    params: ApplyHtmlGameCandidateParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games/${gameId}/processing/${jobId}/apply?${stringifiedParams}` : `/api/games/${gameId}/processing/${jobId}/apply`
+}
+
+/**
+ * @summary Accept a validated candidate as a new immutable revision, checking current version
+ */
+export const applyHtmlGameCandidate = async (gameId: string,
+    jobId: string,
+    params: ApplyHtmlGameCandidateParams, options?: RequestInit): Promise<applyHtmlGameCandidateResponse> => {
+
+  const res = await fetch(getApplyHtmlGameCandidateUrl(gameId,jobId,params),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: applyHtmlGameCandidateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as applyHtmlGameCandidateResponse
+}
+
+
+
+export type createMaterialFromHtmlGameResponse200 = {
+  data: LessonMaterialResponse
+  status: 200
+}
+
+export type createMaterialFromHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type createMaterialFromHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type createMaterialFromHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type createMaterialFromHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type createMaterialFromHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type createMaterialFromHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type createMaterialFromHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type createMaterialFromHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type createMaterialFromHtmlGameResponseSuccess = (createMaterialFromHtmlGameResponse200) & {
+  headers: Headers;
+};
+export type createMaterialFromHtmlGameResponseError = (createMaterialFromHtmlGameResponse400 | createMaterialFromHtmlGameResponse401 | createMaterialFromHtmlGameResponse403 | createMaterialFromHtmlGameResponse404 | createMaterialFromHtmlGameResponse409 | createMaterialFromHtmlGameResponse413 | createMaterialFromHtmlGameResponse422 | createMaterialFromHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type createMaterialFromHtmlGameResponse = (createMaterialFromHtmlGameResponseSuccess | createMaterialFromHtmlGameResponseError)
+
+export const getCreateMaterialFromHtmlGameUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/materials`
+}
+
+/**
+ * @summary Create a new material with a pinned game, idempotently
+ */
+export const createMaterialFromHtmlGame = async (gameId: string,
+    htmlGameMaterialRequest: HtmlGameMaterialRequest, options?: RequestInit): Promise<createMaterialFromHtmlGameResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateMaterialFromHtmlGameUrl(gameId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(htmlGameMaterialRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createMaterialFromHtmlGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createMaterialFromHtmlGameResponse
+}
+
+
+
+export type forkHtmlGameResponse200 = {
+  data: HtmlGameResponse
+  status: 200
+}
+
+export type forkHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type forkHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type forkHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type forkHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type forkHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type forkHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type forkHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type forkHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type forkHtmlGameResponseSuccess = (forkHtmlGameResponse200) & {
+  headers: Headers;
+};
+export type forkHtmlGameResponseError = (forkHtmlGameResponse400 | forkHtmlGameResponse401 | forkHtmlGameResponse403 | forkHtmlGameResponse404 | forkHtmlGameResponse409 | forkHtmlGameResponse413 | forkHtmlGameResponse422 | forkHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type forkHtmlGameResponse = (forkHtmlGameResponseSuccess | forkHtmlGameResponseError)
+
+export const getForkHtmlGameUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/fork`
+}
+
+/**
+ * @summary Create an independently editable derivative without copying immutable bytes
+ */
+export const forkHtmlGame = async (gameId: string,
+    htmlGameForkRequest: HtmlGameForkRequest, options?: RequestInit): Promise<forkHtmlGameResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getForkHtmlGameUrl(gameId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(htmlGameForkRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: forkHtmlGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as forkHtmlGameResponse
 }
 
 
@@ -9870,6 +11073,285 @@ const res = await fetch(getUpdateMaterialAssetUrl(materialId,assetId),
 
 
 
+export type getHtmlGameResponse200 = {
+  data: HtmlGameResponse
+  status: 200
+}
+
+export type getHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getHtmlGameResponseSuccess = (getHtmlGameResponse200) & {
+  headers: Headers;
+};
+export type getHtmlGameResponseError = (getHtmlGameResponse400 | getHtmlGameResponse401 | getHtmlGameResponse403 | getHtmlGameResponse404 | getHtmlGameResponse409 | getHtmlGameResponse413 | getHtmlGameResponse422 | getHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type getHtmlGameResponse = (getHtmlGameResponseSuccess | getHtmlGameResponseError)
+
+export const getGetHtmlGameUrl = (gameId: string,
+    params?: GetHtmlGameParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games/${gameId}?${stringifiedParams}` : `/api/games/${gameId}`
+}
+
+/**
+ * @summary Get game metadata for a teacher
+ */
+export const getHtmlGame = async (gameId: string,
+    params?: GetHtmlGameParams, options?: RequestInit): Promise<getHtmlGameResponse> => {
+
+  const res = await fetch(getGetHtmlGameUrl(gameId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getHtmlGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getHtmlGameResponse
+}
+
+
+
+export type archiveHtmlGameResponse204 = {
+  data: void
+  status: 204
+}
+
+export type archiveHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type archiveHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type archiveHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type archiveHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type archiveHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type archiveHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type archiveHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type archiveHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type archiveHtmlGameResponseSuccess = (archiveHtmlGameResponse204) & {
+  headers: Headers;
+};
+export type archiveHtmlGameResponseError = (archiveHtmlGameResponse400 | archiveHtmlGameResponse401 | archiveHtmlGameResponse403 | archiveHtmlGameResponse404 | archiveHtmlGameResponse409 | archiveHtmlGameResponse413 | archiveHtmlGameResponse422 | archiveHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type archiveHtmlGameResponse = (archiveHtmlGameResponseSuccess | archiveHtmlGameResponseError)
+
+export const getArchiveHtmlGameUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}`
+}
+
+/**
+ * @summary Archive a game while retaining existing references
+ */
+export const archiveHtmlGame = async (gameId: string, options?: RequestInit): Promise<archiveHtmlGameResponse> => {
+
+  const res = await fetch(getArchiveHtmlGameUrl(gameId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: archiveHtmlGameResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as archiveHtmlGameResponse
+}
+
+
+
+export type editHtmlGameResponse200 = {
+  data: HtmlGameResponse
+  status: 200
+}
+
+export type editHtmlGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type editHtmlGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type editHtmlGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type editHtmlGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type editHtmlGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type editHtmlGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type editHtmlGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type editHtmlGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type editHtmlGameResponseSuccess = (editHtmlGameResponse200) & {
+  headers: Headers;
+};
+export type editHtmlGameResponseError = (editHtmlGameResponse400 | editHtmlGameResponse401 | editHtmlGameResponse403 | editHtmlGameResponse404 | editHtmlGameResponse409 | editHtmlGameResponse413 | editHtmlGameResponse422 | editHtmlGameResponse503) & {
+  headers: Headers;
+};
+
+export type editHtmlGameResponse = (editHtmlGameResponseSuccess | editHtmlGameResponseError)
+
+export const getEditHtmlGameUrl = (gameId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}`
+}
+
+/**
+ * @summary Edit catalog metadata with optimistic concurrency
+ */
+export const editHtmlGame = async (gameId: string,
+    htmlGameEditRequest: HtmlGameEditRequest, options?: RequestInit): Promise<editHtmlGameResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getEditHtmlGameUrl(gameId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(htmlGameEditRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: editHtmlGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as editHtmlGameResponse
+}
+
+
+
 export type reviewVocabularyHomeworkAssignmentResponse200 = {
   data: TeacherAssignmentDetailResponse
   status: 200
@@ -10302,6 +11784,265 @@ export const listScheduledLessonMaterialSubmissions = async (lessonId: string, o
 
   const data: listScheduledLessonMaterialSubmissionsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listScheduledLessonMaterialSubmissionsResponse
+}
+
+
+
+export type getLessonGameDocumentResponse200 = {
+  data: CollaborationDocumentResponse
+  status: 200
+}
+
+export type getLessonGameDocumentResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getLessonGameDocumentResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getLessonGameDocumentResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getLessonGameDocumentResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getLessonGameDocumentResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getLessonGameDocumentResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getLessonGameDocumentResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getLessonGameDocumentResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getLessonGameDocumentResponseSuccess = (getLessonGameDocumentResponse200) & {
+  headers: Headers;
+};
+export type getLessonGameDocumentResponseError = (getLessonGameDocumentResponse400 | getLessonGameDocumentResponse401 | getLessonGameDocumentResponse403 | getLessonGameDocumentResponse404 | getLessonGameDocumentResponse409 | getLessonGameDocumentResponse413 | getLessonGameDocumentResponse422 | getLessonGameDocumentResponse503) & {
+  headers: Headers;
+};
+
+export type getLessonGameDocumentResponse = (getLessonGameDocumentResponseSuccess | getLessonGameDocumentResponseError)
+
+export const getGetLessonGameDocumentUrl = (lessonId: string,
+    launchId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/game-launches/${launchId}/document`
+}
+
+/**
+ * @summary Get the exact authorized lesson game collaboration binding
+ */
+export const getLessonGameDocument = async (lessonId: string,
+    launchId: string, options?: RequestInit): Promise<getLessonGameDocumentResponse> => {
+
+  const res = await fetch(getGetLessonGameDocumentUrl(lessonId,launchId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLessonGameDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLessonGameDocumentResponse
+}
+
+
+
+export type getLessonGameContentResponse200 = {
+  data: string
+  status: 200
+}
+
+export type getLessonGameContentResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getLessonGameContentResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getLessonGameContentResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getLessonGameContentResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getLessonGameContentResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getLessonGameContentResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getLessonGameContentResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getLessonGameContentResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getLessonGameContentResponseSuccess = (getLessonGameContentResponse200) & {
+  headers: Headers;
+};
+export type getLessonGameContentResponseError = (getLessonGameContentResponse400 | getLessonGameContentResponse401 | getLessonGameContentResponse403 | getLessonGameContentResponse404 | getLessonGameContentResponse409 | getLessonGameContentResponse413 | getLessonGameContentResponse422 | getLessonGameContentResponse503) & {
+  headers: Headers;
+};
+
+export type getLessonGameContentResponse = (getLessonGameContentResponseSuccess | getLessonGameContentResponseError)
+
+export const getGetLessonGameContentUrl = (lessonId: string,
+    launchId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/game-launches/${launchId}/content`
+}
+
+/**
+ * @summary Read pinned game content under current lesson admission and launch permissions
+ */
+export const getLessonGameContent = async (lessonId: string,
+    launchId: string, options?: RequestInit): Promise<getLessonGameContentResponse> => {
+
+  const res = await fetch(getGetLessonGameContentUrl(lessonId,launchId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLessonGameContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
+  return { data, status: res.status, headers: res.headers } as getLessonGameContentResponse
+}
+
+
+
+export type getCurrentLessonGameResponse200 = {
+  data: LessonGameStateResponse
+  status: 200
+}
+
+export type getCurrentLessonGameResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getCurrentLessonGameResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getCurrentLessonGameResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getCurrentLessonGameResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getCurrentLessonGameResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getCurrentLessonGameResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getCurrentLessonGameResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getCurrentLessonGameResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getCurrentLessonGameResponseSuccess = (getCurrentLessonGameResponse200) & {
+  headers: Headers;
+};
+export type getCurrentLessonGameResponseError = (getCurrentLessonGameResponse400 | getCurrentLessonGameResponse401 | getCurrentLessonGameResponse403 | getCurrentLessonGameResponse404 | getCurrentLessonGameResponse409 | getCurrentLessonGameResponse413 | getCurrentLessonGameResponse422 | getCurrentLessonGameResponse503) & {
+  headers: Headers;
+};
+
+export type getCurrentLessonGameResponse = (getCurrentLessonGameResponseSuccess | getCurrentLessonGameResponseError)
+
+export const getGetCurrentLessonGameUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/game-launches/current`
+}
+
+/**
+ * @summary Recover the active library game without a material assignment
+ */
+export const getCurrentLessonGame = async (lessonId: string, options?: RequestInit): Promise<getCurrentLessonGameResponse> => {
+
+  const res = await fetch(getGetCurrentLessonGameUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getCurrentLessonGameResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getCurrentLessonGameResponse
 }
 
 
@@ -11166,6 +12907,386 @@ export const getHello = async ( options?: RequestInit): Promise<getHelloResponse
 
   const data: getHelloResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHelloResponse
+}
+
+
+
+export type getHtmlGameCoverResponse200ImagePng = {
+  data: Blob
+  status: 200
+}
+
+export type getHtmlGameCoverResponse200ImageJpeg = {
+  data: Blob
+  status: 200
+}
+
+export type getHtmlGameCoverResponse200ImageWebp = {
+  data: Blob
+  status: 200
+}
+
+export type getHtmlGameCoverResponse200ImageSvgXml = {
+  data: Blob
+  status: 200
+}
+
+export type getHtmlGameCoverResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getHtmlGameCoverResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getHtmlGameCoverResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getHtmlGameCoverResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getHtmlGameCoverResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getHtmlGameCoverResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getHtmlGameCoverResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getHtmlGameCoverResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getHtmlGameCoverResponseSuccess = (getHtmlGameCoverResponse200ImagePng | getHtmlGameCoverResponse200ImageJpeg | getHtmlGameCoverResponse200ImageWebp | getHtmlGameCoverResponse200ImageSvgXml) & {
+  headers: Headers;
+};
+export type getHtmlGameCoverResponseError = (getHtmlGameCoverResponse400 | getHtmlGameCoverResponse401 | getHtmlGameCoverResponse403 | getHtmlGameCoverResponse404 | getHtmlGameCoverResponse409 | getHtmlGameCoverResponse413 | getHtmlGameCoverResponse422 | getHtmlGameCoverResponse503) & {
+  headers: Headers;
+};
+
+export type getHtmlGameCoverResponse = (getHtmlGameCoverResponseSuccess | getHtmlGameCoverResponseError)
+
+export const getGetHtmlGameCoverUrl = (gameId: string,
+    revisionId: string,
+    params?: GetHtmlGameCoverParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games/${gameId}/revisions/${revisionId}/cover?${stringifiedParams}` : `/api/games/${gameId}/revisions/${revisionId}/cover`
+}
+
+/**
+ * @summary Read a private cover under the same context permissions
+ */
+export const getHtmlGameCover = async (gameId: string,
+    revisionId: string,
+    params?: GetHtmlGameCoverParams, options?: RequestInit): Promise<getHtmlGameCoverResponse> => {
+
+  const res = await fetch(getGetHtmlGameCoverUrl(gameId,revisionId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.blob();
+  const data: getHtmlGameCoverResponse['data'] = body as getHtmlGameCoverResponse['data']
+  return { data, status: res.status, headers: res.headers } as getHtmlGameCoverResponse
+}
+
+
+
+export type getHtmlGameContentResponse200 = {
+  data: string
+  status: 200
+}
+
+export type getHtmlGameContentResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getHtmlGameContentResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getHtmlGameContentResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getHtmlGameContentResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getHtmlGameContentResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getHtmlGameContentResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getHtmlGameContentResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getHtmlGameContentResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getHtmlGameContentResponseSuccess = (getHtmlGameContentResponse200) & {
+  headers: Headers;
+};
+export type getHtmlGameContentResponseError = (getHtmlGameContentResponse400 | getHtmlGameContentResponse401 | getHtmlGameContentResponse403 | getHtmlGameContentResponse404 | getHtmlGameContentResponse409 | getHtmlGameContentResponse413 | getHtmlGameContentResponse422 | getHtmlGameContentResponse503) & {
+  headers: Headers;
+};
+
+export type getHtmlGameContentResponse = (getHtmlGameContentResponseSuccess | getHtmlGameContentResponseError)
+
+export const getGetHtmlGameContentUrl = (gameId: string,
+    revisionId: string,
+    params?: GetHtmlGameContentParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/games/${gameId}/revisions/${revisionId}/content?${stringifiedParams}` : `/api/games/${gameId}/revisions/${revisionId}/content`
+}
+
+/**
+ * @summary Read private game bytes; learners require an exact authorized material reference
+ */
+export const getHtmlGameContent = async (gameId: string,
+    revisionId: string,
+    params?: GetHtmlGameContentParams, options?: RequestInit): Promise<getHtmlGameContentResponse> => {
+
+  const res = await fetch(getGetHtmlGameContentUrl(gameId,revisionId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getHtmlGameContentResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
+  return { data, status: res.status, headers: res.headers } as getHtmlGameContentResponse
+}
+
+
+
+export type getHtmlGameProcessingResponse200 = {
+  data: HtmlGameProcessingResponse
+  status: 200
+}
+
+export type getHtmlGameProcessingResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type getHtmlGameProcessingResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type getHtmlGameProcessingResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type getHtmlGameProcessingResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type getHtmlGameProcessingResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type getHtmlGameProcessingResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type getHtmlGameProcessingResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type getHtmlGameProcessingResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type getHtmlGameProcessingResponseSuccess = (getHtmlGameProcessingResponse200) & {
+  headers: Headers;
+};
+export type getHtmlGameProcessingResponseError = (getHtmlGameProcessingResponse400 | getHtmlGameProcessingResponse401 | getHtmlGameProcessingResponse403 | getHtmlGameProcessingResponse404 | getHtmlGameProcessingResponse409 | getHtmlGameProcessingResponse413 | getHtmlGameProcessingResponse422 | getHtmlGameProcessingResponse503) & {
+  headers: Headers;
+};
+
+export type getHtmlGameProcessingResponse = (getHtmlGameProcessingResponseSuccess | getHtmlGameProcessingResponseError)
+
+export const getGetHtmlGameProcessingUrl = (gameId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/processing/${jobId}`
+}
+
+/**
+ * @summary Get game processing status without exposing private context
+ */
+export const getHtmlGameProcessing = async (gameId: string,
+    jobId: string, options?: RequestInit): Promise<getHtmlGameProcessingResponse> => {
+
+  const res = await fetch(getGetHtmlGameProcessingUrl(gameId,jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getHtmlGameProcessingResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getHtmlGameProcessingResponse
+}
+
+
+
+export type previewHtmlGameCandidateResponse200 = {
+  data: string
+  status: 200
+}
+
+export type previewHtmlGameCandidateResponse400 = {
+  data: ProjectErrorResponse
+  status: 400
+}
+
+export type previewHtmlGameCandidateResponse401 = {
+  data: ProjectErrorResponse
+  status: 401
+}
+
+export type previewHtmlGameCandidateResponse403 = {
+  data: ProjectErrorResponse
+  status: 403
+}
+
+export type previewHtmlGameCandidateResponse404 = {
+  data: ProjectErrorResponse
+  status: 404
+}
+
+export type previewHtmlGameCandidateResponse409 = {
+  data: ProjectErrorResponse
+  status: 409
+}
+
+export type previewHtmlGameCandidateResponse413 = {
+  data: ProjectErrorResponse
+  status: 413
+}
+
+export type previewHtmlGameCandidateResponse422 = {
+  data: ProjectErrorResponse
+  status: 422
+}
+
+export type previewHtmlGameCandidateResponse503 = {
+  data: ProjectErrorResponse
+  status: 503
+}
+
+export type previewHtmlGameCandidateResponseSuccess = (previewHtmlGameCandidateResponse200) & {
+  headers: Headers;
+};
+export type previewHtmlGameCandidateResponseError = (previewHtmlGameCandidateResponse400 | previewHtmlGameCandidateResponse401 | previewHtmlGameCandidateResponse403 | previewHtmlGameCandidateResponse404 | previewHtmlGameCandidateResponse409 | previewHtmlGameCandidateResponse413 | previewHtmlGameCandidateResponse422 | previewHtmlGameCandidateResponse503) & {
+  headers: Headers;
+};
+
+export type previewHtmlGameCandidateResponse = (previewHtmlGameCandidateResponseSuccess | previewHtmlGameCandidateResponseError)
+
+export const getPreviewHtmlGameCandidateUrl = (gameId: string,
+    jobId: string,) => {
+
+
+
+
+  return `/api/games/${gameId}/processing/${jobId}/preview`
+}
+
+/**
+ * @summary Local teacher preview of a validated candidate, without launch authority
+ */
+export const previewHtmlGameCandidate = async (gameId: string,
+    jobId: string, options?: RequestInit): Promise<previewHtmlGameCandidateResponse> => {
+
+  const res = await fetch(getPreviewHtmlGameCandidateUrl(gameId,jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: previewHtmlGameCandidateResponse['data'] = body ? (contentType.includes('json') ? JSON.parse(body) : body) : {}
+  return { data, status: res.status, headers: res.headers } as previewHtmlGameCandidateResponse
 }
 
 

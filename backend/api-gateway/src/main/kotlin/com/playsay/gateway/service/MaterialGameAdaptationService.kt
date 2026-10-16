@@ -51,6 +51,7 @@ class MaterialGameAdaptationService(
     private val materialAssetService: MaterialAssetService,
     private val materialAssetUploadService: MaterialAssetUploadService,
     private val adapterClient: MaterialGameAdapterClient,
+    private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
     @Transactional
@@ -59,6 +60,7 @@ class MaterialGameAdaptationService(
         sourceAssetId: UUID,
         request: MaterialGameAdaptationRequest,
     ): MaterialGameAdaptationResponse {
+        gameRegistration?.requireWritable()
         materialAssetService.requireHtmlGameAsset(materialId, sourceAssetId)
         val blockId = request.blockId.trim().take(120)
         if (blockId.isEmpty()) {
@@ -139,6 +141,7 @@ class MaterialGameAdaptationService(
 
     @Transactional
     fun apply(materialId: UUID, sourceAssetId: UUID, jobId: UUID): MaterialGameAdaptationResponse {
+        gameRegistration?.requireWritable()
         val job = requireJob(materialId, sourceAssetId, jobId)
         val adaptedAssetId = job.adaptedAssetId
         if (
@@ -178,11 +181,14 @@ class MaterialGameAdaptationService(
             it.updatedAt = job.updatedAt
             repo.save(it)
         }
-        return repo.save(job).toResponse()
+        repo.saveAndFlush(job)
+        gameRegistration?.register(adaptedAssetId)
+        return job.toResponse()
     }
 
     @Transactional
     fun revalidate(materialId: UUID, sourceAssetId: UUID, jobId: UUID): MaterialGameAdaptationResponse {
+        gameRegistration?.requireWritable()
         val previous = requireJob(materialId, sourceAssetId, jobId)
         materialAssetService.requireHtmlGameAsset(materialId, sourceAssetId)
         val material = lessonMaterialRepo.lockById(materialId)
@@ -214,6 +220,7 @@ class MaterialGameAdaptationService(
 
     @Transactional
     fun rollback(materialId: UUID, sourceAssetId: UUID, jobId: UUID): MaterialGameAdaptationResponse {
+        gameRegistration?.requireWritable()
         val job = requireJob(materialId, sourceAssetId, jobId)
         val adaptedAssetId = job.adaptedAssetId
             ?: throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.GAME_ADAPTER_NOT_READY)

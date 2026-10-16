@@ -1,3 +1,6 @@
+import { useLessonLibraryGame } from "../../games/hooks/useLessonLibraryGame";
+import { HtmlGamePicker } from "../../games/ui/HtmlGameLibraryPanel";
+import { LessonLibraryGameStage } from "../../games/ui/LessonLibraryGameStage";
 import { observeConnection, observeSessionPolicy } from "../../../shared/routing/connectionDiagnostics";
 import { LiveKitRoom } from "@livekit/components-react";
 import { Radio } from "lucide-react";
@@ -111,7 +114,11 @@ export function LiveLessonExperience({
     lessonId: session.lessonId,
     ownerSubject: canManageLesson ? undefined : profile?.subject,
   });
-  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice;
+  const libraryGame = useLessonLibraryGame(session.lessonId, session.workMode === "SHARED");
+  const [gamePickerOpen, setGamePickerOpen] = useState(false);
+  const [gameMinimized, setGameMinimized] = useState(false);
+  useEffect(() => setGameMinimized(false), [libraryGame.launch?.id]);
+  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
@@ -278,7 +285,12 @@ export function LiveLessonExperience({
           </div>
         </section>
 
-        {showWorkspace ? (
+        {libraryGame.canControl && session.workMode === "SHARED" ? <div className="px-3 py-2"><Button variant="outline" onClick={() => setGamePickerOpen(true)}>{t("games.title")}</Button></div> : null}
+        {gamePickerOpen ? <HtmlGamePicker selectLabelKey="games.start" onClose={() => setGamePickerOpen(false)} onSelect={async (game) => { await libraryGame.start(game); setGamePickerOpen(false); }} /> : null}
+        {libraryGame.error ? <div role="alert" className="px-3">{t("games.failed")}<Button variant="outline" onClick={() => void libraryGame.refresh()}>{t("games.retry")}</Button></div> : null}
+        {libraryGame.launch ? <LessonLibraryGameStage key={libraryGame.launch.id} launch={libraryGame.launch} name={displayName} authority={libraryGame.canControl} protocolReady={libraryGame.protocolReady} minimized={gameMinimized} onMinimize={setGameMinimized} onStop={() => libraryGame.stop(libraryGame.launch!.id)} /> : null}
+        {showWorkspace || libraryGame.launch ? (
+          <div className={libraryGame.launch && !gameMinimized ? "hidden" : "contents"}>
           <LessonWorkspace
             displayName={displayName}
             liveVocabulary={liveVocabulary}
@@ -289,6 +301,7 @@ export function LiveLessonExperience({
             profile={profile}
             session={session}
           />
+          </div>
         ) : null}
       </LiveKitRoom> : null}
     </div>

@@ -1,3 +1,4 @@
+import { gameRequest } from "./gameRequest";
 import { authConfig, getCredentialGeneration } from "./auth";
 import { apiErrorFromResponse, apiFetch, isApiStatus } from "./errors";
 import { validateHtmlGameUpload } from "./htmlGameUploadPolicy";
@@ -204,7 +205,7 @@ export async function uploadMaterialHtmlGameAsset(
   config = authConfig,
 ): Promise<LessonMaterialAsset> {
   validateHtmlGameUpload(file);
-  return uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config);
+  return gameRequest((signal) => uploadMaterialAsset(`/api/materials/${materialId}/assets/html-games`, file, config, signal));
 }
 
 export async function uploadMaterialDocument(
@@ -380,7 +381,7 @@ export async function appendScheduledLessonHtmlGamePage(
   config = authConfig,
 ): Promise<LiveLessonHtmlGamePageResult> {
   validateHtmlGameUpload(file);
-  return uploadImagePage<LiveLessonHtmlGamePageResult>(`/api/schedule/lessons/${lessonId}/html-game-page`, file, null, config);
+  return gameRequest((signal) => uploadImagePage<LiveLessonHtmlGamePageResult>(`/api/schedule/lessons/${lessonId}/html-game-page`, file, null, config, signal));
 }
 
 export async function fetchScheduledLessonMaterial(
@@ -397,11 +398,21 @@ export async function fetchScheduledLessonMaterial(
   }
 }
 
+const gameUploadCommands = new Map<string, string>();
+function gameUploadHeaders(path: string, file: File, headers: HeadersInit | undefined) {
+  if (!path.endsWith("html-game-page") && !path.endsWith("html-games")) return headers;
+  const key = `${path}:${file.name}:${file.size}:${file.lastModified}`;
+  const command = gameUploadCommands.get(key) ?? crypto.randomUUID();
+  gameUploadCommands.set(key, command);
+  const result = new Headers(headers); result.set("Idempotency-Key", command); return result;
+}
+
 async function uploadImagePage<T>(
   path: string,
   file: File,
   title: string | null | undefined,
   config = authConfig,
+  signal?: AbortSignal,
 ): Promise<T> {
   const formData = new FormData();
   formData.append("file", file);
@@ -413,7 +424,8 @@ async function uploadImagePage<T>(
   const generation = getCredentialGeneration();
   const response = await apiFetch(path, {
     body: formData,
-    headers: authorized.headers,
+    signal,
+    headers: gameUploadHeaders(path, file, authorized.headers),
     method: "POST",
   });
 
@@ -432,6 +444,7 @@ async function uploadMaterialAsset(
   path: string,
   file: File,
   config = authConfig,
+  signal?: AbortSignal,
 ): Promise<LessonMaterialAsset> {
   const formData = new FormData();
   formData.append("file", file);
@@ -439,7 +452,8 @@ async function uploadMaterialAsset(
   const generation = getCredentialGeneration();
   const response = await apiFetch(path, {
     body: formData,
-    headers: authorized.headers,
+    signal,
+    headers: gameUploadHeaders(path, file, authorized.headers),
     method: "POST",
   });
   assertAuthorizedResponse(response, authorized, generation);

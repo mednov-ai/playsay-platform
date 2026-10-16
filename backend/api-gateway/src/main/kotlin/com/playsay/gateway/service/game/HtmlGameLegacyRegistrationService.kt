@@ -89,12 +89,25 @@ class HtmlGameLegacyRegistrationService(
         repository.retainAuthoredTitle(title.take(160), Timestamp.from(Instant.now()), alias.gameId, alias.revisionId)
     }
 
+    fun validateCover(assetId: UUID, rootId: UUID) {
+        (repository.legacyCover(assetId, rootId).firstOrNull()?.get("icon_asset_id") as? UUID)?.let(::readCover)
+    }
+
     private fun copyCover(gameId: UUID, revisionId: UUID, assetId: UUID) {
-        val asset = assets.findById(assetId).orElse(null) ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND")
-        val content = objects.getObject(asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND"))
-        if (content.contentType !in setOf("image/png", "image/jpeg", "image/webp", "image/svg+xml")) gameError(HttpStatus.BAD_REQUEST, "GAME_COVER_INVALID")
+        val content = readCover(assetId)
         val id = blobs.put(gameId, content.bytes, content.contentType)
         repository.setCover(id, revisionId)
+    }
+
+    private fun readCover(assetId: UUID): com.playsay.gateway.service.MaterialObjectContent {
+        val asset = assets.findById(assetId).orElse(null) ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND")
+        val content = objects.getObject(asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND"))
+        val declared = content.contentType.substringBefore(';').trim().lowercase(java.util.Locale.ROOT)
+        // Historical MinIO objects may lack MIME metadata; retain exact bytes and infer only raster signatures.
+        val type = if (declared == "application/octet-stream") {
+            java.net.URLConnection.guessContentTypeFromStream(content.bytes.inputStream())?.takeIf { it in setOf("image/png", "image/jpeg") }
+        } else declared.takeIf { it in setOf("image/png", "image/jpeg", "image/webp", "image/svg+xml") }
+        return content.copy(contentType = type ?: gameError(HttpStatus.BAD_REQUEST, "GAME_COVER_INVALID"))
     }
 
 }

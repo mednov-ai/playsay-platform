@@ -67,7 +67,10 @@ class HtmlGameLibraryMigrationService(
             if (!dryRun) retainCandidate(id, bytes, origin)
             return HtmlGameMigrationOutcome(id, "CANDIDATE")
         }
-        if (dryRun) return HtmlGameMigrationOutcome(id, "READY")
+        if (dryRun) {
+            registration.validateCover(id, origin.root.id)
+            return HtmlGameMigrationOutcome(id, "READY")
+        }
         val alias = registration.register(id)
         verifyPlayable(alias.revisionId, alias.sha256)
         if (alias.sha256 != gameHash(bytes)) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")

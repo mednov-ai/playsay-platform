@@ -199,6 +199,33 @@ class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() 
         assertTrue(recovered.path("pages").first().path("blocks").first().hasNonNull("gameRevisionId"))
     }
 
+    @Test
+    fun `generic legacy JPEG cover survives restart byte exact while unknown generic cover blocks dry run`() {
+        val teacher = authentication(subject = "teacher-1", role = "ROLE_TEACHER")
+        val material = materialCrudController.create(teacher, LessonMaterialRequest(title = "Legacy cover")).body!!
+        val source = legacy(material.id, "<html><body>Legacy cover</body></html>".toByteArray())
+        val icon = UUID.randomUUID()
+        val key = "synthetic-legacy/$icon.jpg"
+        val output = java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "jpeg", output)
+        val bytes = output.toByteArray()
+        objects.putObject(key, bytes, "application/octet-stream")
+        materialAssetRepo.saveAndFlush(MaterialAssetEntity(id = icon, materialId = material.id, kind = "GAME_ICON", provider = "AI", storageKey = key, createdAt = Instant.now()))
+        materialHtmlGameEnrichmentRepo.saveAndFlush(com.playsay.gateway.entity.MaterialHtmlGameEnrichmentEntity(materialId = material.id, assetId = source, blockId = "cover-block", status = "READY", iconAssetId = icon))
+        objects.putObject(key, "<html>not an image</html>".toByteArray(), "application/octet-stream")
+        assertEquals("GAME_COVER_INVALID", migration.batch(true).outcomes.single { it.assetId == source }.errorCode)
+        assertEquals("GAME_COVER_INVALID", migration.batch(false).outcomes.single { it.assetId == source }.errorCode)
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM html_game_legacy_alias WHERE asset_id=?", Long::class.java, source))
+        objects.putObject(key, bytes, "application/octet-stream")
+        assertEquals("READY", migration.batch(true).outcomes.single { it.assetId == source }.outcome)
+        repeat(2) { assertEquals("MAPPED", migration.batch(false).outcomes.single { it.assetId == source }.outcome) }
+        val cover = jdbc.queryForMap("SELECT b.storage_key,b.content_type FROM html_game_legacy_alias a JOIN html_game_revision r ON r.id=a.revision_id JOIN html_game_blob b ON b.id=r.cover_blob_id WHERE a.asset_id=?", source)
+        assertEquals("image/jpeg", cover["content_type"])
+        assertTrue(bytes.contentEquals(objects.getObject(cover["storage_key"].toString()).bytes))
+        assertTrue(bytes.contentEquals(objects.getObject(key).bytes))
+        assertEquals(0L, migration.reconcile()["unresolved"])
+    }
+
     private fun legacy(materialId: UUID, bytes: ByteArray, copiedFrom: UUID? = null): UUID {
         val id = UUID.randomUUID()
         val key = "synthetic-legacy/$id.html"

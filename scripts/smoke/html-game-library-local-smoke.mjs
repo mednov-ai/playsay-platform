@@ -62,8 +62,10 @@ try {
   await teacher.getByRole('heading',{name:'Library Race'}).waitFor();
   await teacher.getByRole('button',{name:'Предпросмотр',exact:true}).focus();await teacher.keyboard.press('Enter');await teacher.locator('dialog iframe').waitFor();
   assert.equal(await student.locator('iframe').count(),0);assert.equal(launch,null);
+  const previewClock=await teacher.getByTestId('clock-resumes').textContent();
   await teacher.frameLocator('dialog iframe').locator('#step:enabled').click();await teacher.frameLocator('dialog iframe').locator('#count').filter({hasText:'1'}).waitFor();
   await teacher.keyboard.press('Escape');await teacher.locator('dialog').waitFor({state:'detached'});
+  assert.equal(await teacher.getByTestId('clock-resumes').textContent(),previewClock);
   assert.equal(await teacher.getByRole('textbox',{name:'Поиск игр'}).inputValue(),'Library');
   await teacher.waitForFunction(()=>document.activeElement?.textContent?.trim()==='Предпросмотр');
   await teacher.getByRole('button',{name:'Запустить на уроке',exact:true}).click();
@@ -73,7 +75,9 @@ try {
   await student.frameLocator('iframe').locator(`body[data-run-id="${acceptedRun}"] #step:enabled`).waitFor();
   for(let action=1;action<=20;action++) { await teacher.frameLocator('iframe').locator('#step').click(); await teacher.frameLocator('iframe').locator('#count').filter({hasText:new RegExp(`^${action}$`)}).waitFor(); if(action===1) await student.frameLocator('iframe').locator('#count').filter({hasText:'1'}).waitFor(); }
   try { await student.frameLocator('iframe').locator('#count').filter({hasText:'20'}).waitFor(); } catch(error) { console.log('COUNT DIAGNOSTIC',engineName,layout,dark,await teacher.frameLocator('iframe').locator('#count').textContent(),await student.frameLocator('iframe').locator('#count').textContent(),errors);throw error; }
+  const gameClock=await teacher.getByTestId('clock-resumes').textContent();
   await teacher.getByRole('button',{name:'Свернуть',exact:true}).click();
+  assert.equal(await teacher.getByTestId('clock-resumes').textContent(),gameClock);
   assert.equal(await teacher.locator('iframe').count(),1);assert.equal(await teacher.getByRole('textbox',{name:'Material draft'}).inputValue(),'Keep my annotation');
   await teacher.getByRole('button',{name:'Продолжить',exact:true}).click();
   await student.reload();await student.locator('iframe').waitFor();try { await student.frameLocator('iframe').locator('#count').filter({hasText:'20'}).waitFor(); } catch(error) { console.log('COUNT DIAGNOSTIC',engineName,layout,dark,await teacher.frameLocator('iframe').locator('#count').textContent(),await student.frameLocator('iframe').locator('#count').textContent(),errors);throw error; }

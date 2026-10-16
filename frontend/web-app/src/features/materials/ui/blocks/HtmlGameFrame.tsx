@@ -236,6 +236,21 @@ function HtmlGameFrameComponent({
   const syncClientId = sync?.clientId;
   const syncIsAuthority = sync?.isAuthority ?? true;
   const presentedBlockId = sync?.presentedBlockId ?? null;
+  const attachSdkSession = useCallback(() => {
+    sdkSessionRef.current?.release();
+    sdkSessionRef.current = null;
+    if (!sdkRuntime || !sdkChannel || presentedBlockId !== blockId || !sdkHelloAcceptedRef.current || !sdkPortRef.current) return;
+    sdkSessionRef.current = sdkChannel.attach({
+      actorId: String(syncClientId ?? channel),
+      blockId,
+      getCheckpoint: () => sdkChannel.getCheckpoint(blockId),
+      getPort: () => sdkPortRef.current,
+      isAuthority: syncIsAuthority,
+      onFailure: () => setRuntimeStatus("failed"),
+      runId: runtimeRunId,
+      validateRequest: (request) => sdkHelloAcceptedRef.current && validSdkActionRequest(request, embeddedManifest),
+    });
+  }, [blockId, channel, embeddedManifest, presentedBlockId, runtimeRunId, sdkChannel, sdkRuntime, syncClientId, syncIsAuthority]);
   const sdkReplicaAuthorityReady = Boolean(authorityRunId && sync?.ready);
   const authorityAvailable = sdkRuntime
     ? !sync || sync.isAuthority || sdkReplicaAuthorityReady
@@ -412,6 +427,9 @@ function HtmlGameFrameComponent({
       } else if (message.type === "runtimeReady" && !sdkRuntime) {
         setRuntimeStatus((current) => current === "failed" ? current : "ready");
       } else if (message.type === "sdkReady" && sdkRuntime) {
+        sdkSessionRef.current?.release();
+        sdkSessionRef.current = null;
+        sdkHelloAcceptedRef.current = false;
         sdkPortRef.current?.close();
         const ports = new MessageChannel();
         sdkPortRef.current = ports.port1;
@@ -444,6 +462,8 @@ function HtmlGameFrameComponent({
               seed: seedFromRunId(runtimeRunId),
             };
             ports.port1.postMessage(context);
+            // Fast-lane resume can replay immediately: the iframe must receive context first.
+            attachSdkSession();
           } else if (outbound.kind === "diagnostic") {
             recordGameSyncDiagnostic({
               ...outbound.diagnostic,
@@ -549,7 +569,7 @@ function HtmlGameFrameComponent({
         bridgeMessageHandlerRef.current = () => undefined;
       }
     };
-  }, [activeSnapshot, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, onEscape, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, attachSdkSession, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, onEscape, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
@@ -564,43 +584,12 @@ function HtmlGameFrameComponent({
   }, []);
 
   useEffect(() => {
-    if (
-      !sdkRuntime
-      || !sdkChannel
-      || presentedBlockId !== blockId
-    ) {
-      return;
-    }
-    const attachment = sdkChannel.attach({
-      actorId: String(syncClientId ?? channel),
-      blockId,
-      getCheckpoint: () => sdkChannel.getCheckpoint(blockId),
-      getPort: () => sdkPortRef.current,
-      isAuthority: syncIsAuthority,
-      onFailure: () => setRuntimeStatus("failed"),
-      runId: runtimeRunId,
-      validateRequest: (request) => (
-        sdkHelloAcceptedRef.current
-        && validSdkActionRequest(request, embeddedManifest)
-      ),
-    });
-    sdkSessionRef.current = attachment;
+    attachSdkSession();
     return () => {
-      if (sdkSessionRef.current === attachment) {
-        sdkSessionRef.current = null;
-      }
-      attachment.release();
+      sdkSessionRef.current?.release();
+      sdkSessionRef.current = null;
     };
-  }, [
-    blockId,
-    embeddedManifest,
-    presentedBlockId,
-    runtimeRunId,
-    sdkChannel,
-    sdkRuntime,
-    syncClientId,
-    syncIsAuthority,
-  ]);
+  }, [attachSdkSession]);
 
   useEffect(() => {
     if (!sync) {

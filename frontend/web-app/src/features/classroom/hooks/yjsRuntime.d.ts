@@ -53,6 +53,7 @@ export type YjsWorkspaceRuntime = {
   publishHtmlGamePatch: (patch: MaterialHtmlGamePatch) => void;
   publishHtmlGameSdkAction: (action: MaterialHtmlGameSdkOrderedAction) => void;
   publishHtmlGameSdkEffect: (effect: MaterialHtmlGameSdkEffect) => void;
+  publishHtmlGameSdkControl: (message: Extract<MaterialHtmlGameRealtimeMessage, { kind: "resume" | "recovery-required" }>) => void;
   publishHtmlGameSdkRequest: (request: MaterialHtmlGameSdkActionRequest) => void;
   setHtmlGameSnapshot: (blockId: string, snapshot: MaterialHtmlGameSnapshot) => void;
   setHtmlGameSdkCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;

@@ -137,6 +137,7 @@ export function useYjsWorkspace({
       recoveryDeadline = null;
     };
     let gameSyncController: ReturnType<typeof createGameSyncSessionController> | null = null;
+    let gameRealtime: ReturnType<typeof createGameRealtimeClient> | null = null;
     let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
       color,
@@ -154,7 +155,7 @@ export function useYjsWorkspace({
         latestHtmlGameSdkCheckpoints = checkpoints;
         gameSyncController?.replaceCheckpoints(checkpoints);
       },
-      onHtmlGameSdkMessage: (message) => gameSyncController?.receiveFallback(message),
+      onHtmlGameSdkMessage: (message) => gameRealtime?.receiveFallback(message),
       onHtmlGameSnapshotsChange: setHtmlGameSnapshots,
       onMaterialAnswersChange: setMaterialAnswers,
       onMaterialViewportChange: setMaterialViewportState,
@@ -165,7 +166,7 @@ export function useYjsWorkspace({
       snapshot: document.snapshot,
     });
     runtimeRef.current = runtime;
-    const gameRealtime = createGameRealtimeClient({
+    gameRealtime = createGameRealtimeClient({
       fallback: (message) => {
         if (message.kind === "action-request") {
           runtime.publishHtmlGameSdkRequest(message.request);
@@ -173,6 +174,8 @@ export function useYjsWorkspace({
           runtime.publishHtmlGameSdkAction(message.action);
         } else if (message.kind === "effect") {
           runtime.publishHtmlGameSdkEffect(message.effect);
+        } else if (message.kind === "resume" || message.kind === "recovery-required") {
+          runtime.publishHtmlGameSdkControl(message);
         }
       },
       getActorId: () => String(runtime.getClientId()),
@@ -378,7 +381,7 @@ export function useYjsWorkspace({
       runtime.setSocket(null);
       runtime.destroy();
       gameSyncController.close();
-      gameRealtime.close();
+      gameRealtime?.close();
       externalActivityRealtime?.close();
       gameSyncControllerRef.current = null;
       runtimeRef.current = null;

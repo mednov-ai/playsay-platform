@@ -86,6 +86,9 @@ try {
   for(const page of pages)await page.locator('iframe').waitFor({state:'detached'});
   await teacher.getByRole('button',{name:'Запустить на уроке',exact:true}).click();for(const page of pages) { try { await page.locator('iframe').waitFor(); } catch(error) { console.log('DIAGNOSTIC',await page.locator('body').innerText(),await page.evaluate(()=>({launch:window.smoke?.launch,stage:document.querySelector('[data-game-connection]')?.outerHTML.slice(0,1400)})),errors,stderr);throw error; } }
   await teacher.frameLocator('iframe').locator('#count').filter({hasText:'0'}).waitFor();
+  for(let action=1;action<=2;action++){await teacher.frameLocator('iframe').locator('#step:enabled').click();await student.frameLocator('iframe').locator('#count').filter({hasText:String(action)}).waitFor();}
+  await student.reload();await student.frameLocator('iframe').locator('#count').filter({hasText:'2'}).waitFor();
+  await student.frameLocator('iframe').locator('#step:enabled').click();await teacher.frameLocator('iframe').locator('#count').filter({hasText:'3'}).waitFor();
   const shots=process.env.GAME_LIBRARY_SCREENSHOTS;if(shots){fs.mkdirSync(shots,{recursive:true});await teacher.screenshot({path:path.join(shots,`${engineName}-${layout}-${dark?'dark':'light'}.png`),fullPage:true});}
   await teacher.getByRole('region',{name:'Игра на уроке'}).getByRole('button',{name:'Завершить для всех',exact:true}).click();for(const page of pages)await page.locator('iframe').waitFor({state:'detached'});
   assert.equal(await teacher.getByRole('textbox',{name:'Material draft'}).inputValue(),'Keep my annotation');

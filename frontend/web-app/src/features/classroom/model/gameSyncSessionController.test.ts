@@ -159,6 +159,24 @@ describe("game sync session controller", () => {
     });
   });
 
+  it.each([false, true])("hydrates a late matching checkpoint without rewinding or crossing runs (authority=%s)", (isAuthority) => {
+    const { controller, publish, registrations } = fixture();
+    const targetPort = port();
+    controller.attach({ actorId: "actor", blockId: "game", getCheckpoint: () => undefined, getPort: () => targetPort, isAuthority, onFailure: vi.fn(), runId: "run", validateRequest: () => true });
+    const checkpoint = { checksum: "checksum", gameId: "racing", logicalTime: 4, revision: 4, runId: "run", seed: 1, state: { position: 4 }, stateVersion: "1", updatedAt: 1 };
+    controller.replaceCheckpoints({ game: { ...checkpoint, runId: "other-run" } });
+    expect(targetPort.postMessage).not.toHaveBeenCalled();
+    controller.replaceCheckpoints({ game: checkpoint });
+    expect(targetPort.postMessage).toHaveBeenCalledExactlyOnceWith({ kind: "checkpoint", checkpoint });
+    controller.replaceCheckpoints({ game: { ...checkpoint, revision: 3 } });
+    controller.replaceCheckpoints({ game: checkpoint });
+    expect(targetPort.postMessage).toHaveBeenCalledTimes(1);
+    registrations.get("game/run")?.({ kind: "ordered-action", action: orderedAction(5) });
+    expect(targetPort.postMessage).toHaveBeenLastCalledWith({ kind: "ordered-action", action: orderedAction(5) });
+    if (isAuthority) expect(publish).not.toHaveBeenCalled();
+    else expect(publish).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: "resume", lastRevision: 4 }));
+  });
+
   it("updates the durable checkpoint cache without a React-facing state contract", () => {
     const { controller } = fixture();
     const checkpoint = {

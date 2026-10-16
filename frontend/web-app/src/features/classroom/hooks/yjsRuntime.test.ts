@@ -882,6 +882,7 @@ describe("yjs workspace runtime annotations", () => {
         stateVersion: "1",
         type: "answer",
       };
+      runtime.publishHtmlGameSdkControl({ kind: "resume", blockId: "game-a", runId: "run-a", requesterId: "student", lastRevision: 0 });
       runtime.publishHtmlGameSdkRequest(request);
       runtime.publishHtmlGameSdkAction({
         ...request,
@@ -904,6 +905,7 @@ describe("yjs workspace runtime annotations", () => {
       expect(requests.at(-1)?.at(-1)?.id).toBe("event-1");
       expect(actions.at(-1)?.at(-1)?.id).toBe("event-1:ordered");
       expect(directMessages.map((message) => message.kind)).toEqual([
+        "resume",
         "action-request",
         "ordered-action",
       ]);

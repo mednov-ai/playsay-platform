@@ -17,3 +17,5 @@ Evidence directory: `/Users/evgeniymednov/Documents/Projects/Play&Say/local-resu
 ## Delivery routing correction
 
 Initial dispatcher256 stopped before publication on unmapped `contracts/material-game-reference.schema.json`. Added an explicit API/web routing rule and its test. The AJV/YAML validation runs in the web job after frontend dependencies are installed, outside the dependency-free dispatcher contract test glob. Full CI contracts: 60 passed, 3 optional environment fixtures skipped. Native delivery must analyze the original feature range, including collaboration-service. Local rebuilt browser matrix passes all eight combinations.
+
+DEV inventory found 275 legacy HTML assets and 65 historical IN_PROGRESS rows, with zero unexpired access windows. Migration drain now reuses the server access-deadline function including grace/extension and treats unknown end times as active. The regression verifies active/extended blocking and expired-history retention; it does not authorize forcibly completing lessons.

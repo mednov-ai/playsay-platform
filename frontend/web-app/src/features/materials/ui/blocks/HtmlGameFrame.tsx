@@ -46,6 +46,7 @@ type BridgeMessage =
   | { channel: string; runId?: string; sequence: number; type: "snapshotApplied" }
   | { channel: string; operations: MaterialHtmlGamePatchOperation[]; sequence: number; type: "patch" }
   | { channel: string; runId?: string; sequence: number; type: "patchRejected" }
+  | { channel: string; type: "escape" }
   | { channel: string; type: "sdkReady" }
   | { channel: string; message: string; type: "runtimeError" }
   | { channel: string; type: "runtimeReady" }
@@ -168,6 +169,7 @@ type HtmlGameFrameProps = {
   height: number;
   html?: string;
   onClose?: () => void;
+  onEscape?: () => void;
   onRetry?: () => void;
   onRuntimeStatusChange?: (status: HtmlGameRuntimeStatus) => void;
   sync?: MaterialHtmlGameSync;
@@ -184,6 +186,7 @@ function HtmlGameFrameComponent({
   height,
   html,
   onClose,
+  onEscape,
   onRetry,
   onRuntimeStatusChange,
   sync,
@@ -203,9 +206,10 @@ function HtmlGameFrameComponent({
   const runtimeRunId = (isMirror || (sdkRuntime && !sync?.isAuthority))
     ? authorityRunId ?? runIdentity ?? blockId
     : authorityRuntimeRunId;
+  const escapeToHost = Boolean(onEscape);
   const srcDoc = useMemo(
-    () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror) : "",
-    [channel, html, isMirror, predictiveMirror, runtimeRunId],
+    () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror, escapeToHost) : "",
+    [channel, escapeToHost, html, isMirror, predictiveMirror, runtimeRunId],
   );
   const handledInputsRef = useRef<Set<string> | null>(null);
   const latestInputSequenceRef = useRef<Map<string, number>>(new Map());
@@ -334,6 +338,10 @@ function HtmlGameFrameComponent({
         return;
       }
       const message = messageEvent.data;
+      if (message.type === "escape") {
+        onEscape?.();
+        return;
+      }
       if (sdkRuntime && message.type !== "sdkReady" && message.type !== "runtimeError") {
         return;
       }
@@ -541,7 +549,7 @@ function HtmlGameFrameComponent({
         bridgeMessageHandlerRef.current = () => undefined;
       }
     };
-  }, [activeSnapshot, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, onEscape, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
@@ -753,6 +761,7 @@ function sameHtmlGameFrameProps(
     || previous.height !== next.height
     || previous.html !== next.html
     || previous.onClose !== next.onClose
+    || previous.onEscape !== next.onEscape
     || previous.onRetry !== next.onRetry
     || previous.onRuntimeStatusChange !== next.onRuntimeStatusChange
     || previous.title !== next.title
@@ -791,6 +800,7 @@ export function createSandboxedGameDocument(
   mirror: boolean,
   runId = channel,
   predictive = false,
+  escapeToHost = false,
 ): string {
   const sdkRuntime = classifyGameHtml(html) === "SDK_V1";
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">`;
@@ -803,7 +813,10 @@ export function createSandboxedGameDocument(
   const legacyBridge = sdkRuntime
     ? ""
     : `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
-  const headContent = `${csp}${sdkBridge}${diagnosticsBridge}${legacyBridge}`;
+  const escapeBridge = escapeToHost
+    ? `<script data-playsay-game-bridge data-playsay-preview-escape>window.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); window.parent.postMessage({ channel: ${JSON.stringify(channel)}, type: 'escape' }, '*'); } }, true);</script>`
+    : "";
+  const headContent = `${csp}${escapeBridge}${sdkBridge}${diagnosticsBridge}${legacyBridge}`;
   const withHead = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, (head) => `${head}${headContent}`)
     : html.replace(/<html\b[^>]*>/i, (root) => `${root}<head>${headContent}</head>`);

@@ -16,3 +16,5 @@ data class AssignmentChangedEvent(
     val visibleSubjects: Set<String>,
     val change: String,
 )
+
+data class LessonGameChangedEvent(val lessonId: UUID)

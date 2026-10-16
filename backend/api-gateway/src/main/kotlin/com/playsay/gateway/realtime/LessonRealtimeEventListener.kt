@@ -9,6 +9,9 @@ class LessonRealtimeEventListener(
     private val hub: LessonRealtimeHub,
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun onGameChanged(event: LessonGameChangedEvent) { hub.publishGameChanged(event.lessonId) }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onLessonChanged(event: LessonChangedEvent) {
         hub.publishLessonUpdated(event.lesson)
     }

@@ -52,7 +52,9 @@ class LessonMaterialStore(
     private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
+    private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val gameUploadCommands: com.playsay.gateway.service.game.LegacyGameUploadCommandService? = null,
 ) {
     @Transactional
     fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> =
@@ -278,13 +280,26 @@ class LessonMaterialStore(
         authentication: JwtAuthenticationToken,
         materialId: UUID,
         file: MultipartFile,
+        commandId: UUID? = null,
     ): MaterialAssetResponse {
         lessonMaterialCatalogService.requireEditable(
             authentication,
             materialId,
             MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
         )
-        return materialAssetService.uploadHtmlGameAsset(materialId, file)
+        val result = gameUploadCommands?.run("material", materialId, commandId, file) {
+            val asset = materialAssetService.uploadHtmlGameAsset(materialId, file)
+            gameRegistration?.register(asset.id)
+            com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().createObjectNode().put("assetId", asset.id.toString())
+        }
+        if (result != null) {
+            val asset = materialAssetService.list(materialId).firstOrNull { it.id.toString() == result.path("assetId").asText() }
+                ?: com.playsay.gateway.service.game.gameError(HttpStatus.CONFLICT, "GAME_SOURCE_NOT_FOUND")
+            return gameRegistration?.withReference(asset) ?: asset
+        }
+        val asset = materialAssetService.uploadHtmlGameAsset(materialId, file)
+        gameRegistration?.register(asset.id)
+        return gameRegistration?.withReference(asset) ?: asset
     }
 
     @Transactional

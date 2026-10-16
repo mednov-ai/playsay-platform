@@ -4,7 +4,8 @@ export interface CollaborationClaims {
   subject: string;
   documentId: string;
   lessonId: string;
-  materialId: string;
+  materialId?: string;
+  gameLaunchId?: string;
   studentUserId?: string;
   documentKind: string;
   scope: CollaborationScope;
@@ -13,6 +14,11 @@ export interface CollaborationClaims {
 }
 
 export function collaborationRoomName(claims: CollaborationClaims): string {
+  if (claims.documentKind === "LESSON_GAME") {
+    if (claims.materialId || !claims.gameLaunchId || claims.scope !== "GROUP") throw new Error("invalid game launch binding");
+    return `lesson:${claims.lessonId}:game:${claims.gameLaunchId}:group:kind:LESSON_GAME`;
+  }
+  if (!claims.materialId || claims.gameLaunchId) throw new Error("invalid material binding");
   if (claims.scope === "GROUP") {
     return `lesson:${claims.lessonId}:material:${claims.materialId}:group:kind:${claims.documentKind}`;
   }
@@ -34,8 +40,9 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const subject = requiredString(payload, "sub");
   const documentId = requiredString(payload, "documentId");
   const lessonId = requiredString(payload, "lessonId");
-  const materialId = requiredString(payload, "materialId");
   const documentKind = requiredString(payload, "documentKind");
+  const materialId = documentKind === "LESSON_GAME" ? optionalString(payload, "materialId") : requiredString(payload, "materialId");
+  const gameLaunchId = optionalString(payload, "gameLaunchId");
   const scope = requiredScope(payload);
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
   const studentUserId = optionalString(payload, "studentUserId");
@@ -45,6 +52,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
     documentId,
     lessonId,
     materialId,
+    gameLaunchId,
     studentUserId,
     documentKind,
     scope,

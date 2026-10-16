@@ -8,7 +8,7 @@ import java.util.UUID
 data class CollaborationDocumentResponse(
     val id: UUID,
     val lessonId: UUID,
-    val materialId: UUID,
+    val materialId: UUID?,
     val studentUserId: UUID?,
     val studentSubject: String?,
     val studentName: String?,

@@ -22,6 +22,7 @@ class MaterialAssetUploadService(
     private val materialObjectStorage: MaterialObjectStorage,
     private val materialHtmlGameMetadataService: MaterialHtmlGameMetadataService,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val gameAvailability: com.playsay.gateway.service.game.GameLibraryAvailabilityService? = null,
 ) {
     fun validateImageFile(file: MultipartFile): ValidatedMaterialAssetFile {
         val contentType = normalizedMaterialAssetContentType(file.contentType)
@@ -60,6 +61,7 @@ class MaterialAssetUploadService(
     }
 
     fun validateHtmlGameFile(file: MultipartFile): ValidatedMaterialAssetFile {
+        gameAvailability?.requireWrites()
         val contentType = normalizedMaterialAssetContentType(file.contentType)
         val fileName = cleanMaterialAssetFileName(file.originalFilename)
         if (contentType != "text/html" || fileName?.endsWith(".html", ignoreCase = true) != true) {

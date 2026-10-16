@@ -32,10 +32,13 @@ object MaterialHtmlGameEnrichmentStatuses {
 }
 
 @Component
+// Constructor mirrors persistence fields or coordinates existing domain boundaries.
+@Suppress("LongParameterList")
 class MaterialHtmlGameEnrichmentService(
     private val enrichmentRepo: MaterialHtmlGameEnrichmentRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,
     private val materialAssetService: MaterialAssetService,
+    private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val metadataService: MaterialHtmlGameMetadataService,
     private val aiService: MaterialHtmlGameAiService,
     private val imageGenerationService: MaterialImageGenerationService,
@@ -46,6 +49,7 @@ class MaterialHtmlGameEnrichmentService(
     private val transactionTemplate = TransactionTemplate(transactionManager)
     @Transactional
     fun request(materialId: UUID, assetId: UUID, request: MaterialHtmlGameEnrichmentRequest): MaterialHtmlGameEnrichmentResponse {
+        gameRegistration?.requireWritable()
         materialAssetService.requireHtmlGameAsset(materialId, assetId)
         val blockId = request.blockId.trim().take(120)
         if (blockId.isEmpty()) {
@@ -163,6 +167,7 @@ class MaterialHtmlGameEnrichmentService(
         job.lastErrorCode = null
         job.updatedAt = Instant.now()
         enrichmentRepo.save(job)
+        gameRegistration?.enrichment(job.assetId, job.resolvedTitle ?: title, iconAssetId)
     }
 
     @Transactional

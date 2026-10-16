@@ -131,10 +131,11 @@ class MaterialAssetController(
         authentication: JwtAuthenticationToken,
         @PathVariable materialId: UUID,
         @RequestPart("file") file: MultipartFile,
+        @RequestHeader("Idempotency-Key", required = false) commandId: UUID? = null,
     ): ResponseEntity<MaterialAssetResponse> =
         ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(store.uploadHtmlGameAsset(authentication, materialId, file))
+            .body(store.uploadHtmlGameAsset(authentication, materialId, file, commandId))
 
     @PostMapping(
         "/materials/{materialId}/assets/{assetId}/html-game-enrichment",

@@ -161,6 +161,7 @@ function orderSdkAction(
 }
 
 type HtmlGameFrameProps = {
+  runIdentity?: string;
   blockId: string;
   contentState?: HtmlGameContentState;
   fillAvailable?: boolean;
@@ -176,6 +177,7 @@ type HtmlGameFrameProps = {
 export type HtmlGameContentState = "loading" | "ready" | "unavailable";
 
 function HtmlGameFrameComponent({
+  runIdentity,
   blockId,
   contentState,
   fillAvailable = false,
@@ -197,9 +199,10 @@ function HtmlGameFrameComponent({
   const isMirror = Boolean(sync && !sync.isAuthority && !sdkRuntime);
   const authorityRunId = sync?.authorityRuns[blockId];
   const predictiveMirror = Boolean(isMirror && html && supportsPredictiveHtmlGame(html));
+  const authorityRuntimeRunId = runIdentity ?? channel;
   const runtimeRunId = (isMirror || (sdkRuntime && !sync?.isAuthority))
-    ? authorityRunId ?? blockId
-    : channel;
+    ? authorityRunId ?? runIdentity ?? blockId
+    : authorityRuntimeRunId;
   const srcDoc = useMemo(
     () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror) : "",
     [channel, html, isMirror, predictiveMirror, runtimeRunId],
@@ -321,9 +324,9 @@ function HtmlGameFrameComponent({
     if (!html || !sync?.isAuthority || !sync.ready) {
       return undefined;
     }
-    sync.setAuthorityRun(blockId, channel);
+    sync.setAuthorityRun(blockId, authorityRuntimeRunId);
     return () => sync.setAuthorityRun(blockId, null);
-  }, [blockId, channel, html, sync?.isAuthority, sync?.ready, sync?.setAuthorityRun]);
+  }, [blockId, authorityRuntimeRunId, html, sync?.isAuthority, sync?.ready, sync?.setAuthorityRun]);
 
   useEffect(() => {
     function handleMessage(messageEvent: MessageEvent<BridgeMessage>) {
@@ -339,7 +342,7 @@ function HtmlGameFrameComponent({
           canvases: message.canvases,
           controls: message.controls,
           html: message.html,
-          runId: channel,
+          runId: authorityRuntimeRunId,
           scroll: message.scroll,
           sequence: message.sequence,
           updatedAt: Date.now(),
@@ -372,7 +375,7 @@ function HtmlGameFrameComponent({
           at: Date.now(),
           blockId,
           id: crypto.randomUUID(),
-          runId: sync.isAuthority ? channel : sync.authorityRuns[blockId],
+          runId: sync.isAuthority ? authorityRuntimeRunId : sync.authorityRuns[blockId],
           sequence: ++nextInputSequenceRef.current,
         };
         (handledInputsRef.current ??= new Set()).add(input.id);
@@ -384,7 +387,7 @@ function HtmlGameFrameComponent({
           blockId,
           id: crypto.randomUUID(),
           operations: message.operations,
-          runId: channel,
+          runId: authorityRuntimeRunId,
           sequence: message.sequence,
         });
       } else if (message.type === "patchRejected" && isMirror) {
@@ -538,7 +541,7 @@ function HtmlGameFrameComponent({
         bridgeMessageHandlerRef.current = () => undefined;
       }
     };
-  }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
@@ -595,7 +598,7 @@ function HtmlGameFrameComponent({
     if (!sync) {
       return;
     }
-    const expectedRunId = sync.isAuthority ? channel : authorityRunId;
+    const expectedRunId = sync.isAuthority ? authorityRuntimeRunId : authorityRunId;
     if (!expectedRunId) return;
     if (handledInputsRef.current === null) {
       handledInputsRef.current = new Set(
@@ -621,7 +624,7 @@ function HtmlGameFrameComponent({
       }
       iframeRef.current?.contentWindow?.postMessage({ channel, type: "applyInput", event }, "*");
     });
-  }, [authorityRunId, blockId, channel, sync, sync?.inputs, sync?.isAuthority]);
+  }, [authorityRuntimeRunId, authorityRunId, blockId, channel, sync, sync?.inputs, sync?.isAuthority]);
 
   useEffect(() => {
     if (!sync || sync.isAuthority) {
@@ -745,6 +748,7 @@ function sameHtmlGameFrameProps(
   if (
     previous.blockId !== next.blockId
     || previous.contentState !== next.contentState
+    || previous.runIdentity !== next.runIdentity
     || previous.fillAvailable !== next.fillAvailable
     || previous.height !== next.height
     || previous.html !== next.html

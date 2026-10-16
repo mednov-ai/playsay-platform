@@ -482,6 +482,8 @@ export type MaterialEditorBlock = {
   pairs?: MaterialMatchingPair[];
   wordBankOptions?: MaterialWordBankOption[];
   height?: number;
+  gameId?: string;
+  gameRevisionId?: string;
   gameIconUrl?: string;
   gameSyncCompatibility?: "SDK_V1" | "LEGACY_PREDICTIVE" | "LEGACY_MIRROR" | "UNSUPPORTED";
   gameAdaptationSourceAssetId?: string;

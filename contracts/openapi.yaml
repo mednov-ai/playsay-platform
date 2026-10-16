@@ -1449,6 +1449,12 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           multipart/form-data:
@@ -1535,6 +1541,166 @@ paths:
           description: Current user cannot create assignments
         "404":
           description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/game-launches:
+    post:
+      tags:
+      - Lesson Games
+      summary: Start a pinned shared library game without changing the material
+      operationId: startLessonLibraryGame
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonGameStartRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonGameLaunchResponse"
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/game-launches/{launchId}/stop:
+    post:
+      tags:
+      - Lesson Games
+      summary: Stop only the specified shared launch
+      operationId: stopLessonLibraryGame
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: launchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonGameLaunchResponse"
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/extend-access:
@@ -2297,6 +2463,86 @@ paths:
           description: Material not found
       security:
       - bearerAuth: []
+  /materials/{materialId}/games:
+    post:
+      tags:
+      - HTML Game Library
+      summary: Attach a pinned game occurrence idempotently to an editable material
+      operationId: attachHtmlGameToMaterial
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialGameAttachRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+      security:
+      - bearerAuth: []
   /materials/{materialId}/assets/{assetId}/html-game-enrichment:
     get:
       tags:
@@ -2555,6 +2801,12 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           multipart/form-data:
@@ -2804,6 +3056,701 @@ paths:
       responses:
         "204":
           description: No Content
+  /games:
+    get:
+      tags:
+      - HTML Game Library
+      summary: Search the shared teacher HTML game catalog
+      operationId: listHtmlGames
+      parameters:
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ""
+      - name: topic
+        in: query
+        required: false
+        schema:
+          type: string
+          default: ""
+      - name: level
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: compatibility
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 24
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGamePageResponse"
+      security:
+      - bearerAuth: []
+    post:
+      tags:
+      - HTML Game Library
+      summary: "Upload a shared game, maximum 20 MiB, with idempotent command identity"
+      operationId: uploadHtmlGame
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/select-revision:
+    post:
+      tags:
+      - HTML Game Library
+      summary: Explicitly select an existing playable revision without changing pinned
+        references
+      operationId: selectHtmlGameRevision
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HtmlGameRevisionSelection"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/revisions:
+    post:
+      tags:
+      - HTML Game Library
+      summary: Create a pinned immutable game revision; requires author or administrator
+      operationId: uploadHtmlGameRevision
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/processing:
+    post:
+      tags:
+      - HTML Game Library
+      summary: Queue revision-bound enrichment or adaptation with idempotent command
+        identity
+      operationId: requestHtmlGameProcessing
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HtmlGameProcessingRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameProcessingResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/processing/{jobId}/apply:
+    post:
+      tags:
+      - HTML Game Library
+      summary: "Accept a validated candidate as a new immutable revision, checking\
+        \ current version"
+      operationId: applyHtmlGameCandidate
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/materials:
+    post:
+      tags:
+      - HTML Game Library
+      summary: "Create a new material with a pinned game, idempotently"
+      operationId: createMaterialFromHtmlGame
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HtmlGameMaterialRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonMaterialResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/fork:
+    post:
+      tags:
+      - HTML Game Library
+      summary: Create an independently editable derivative without copying immutable
+        bytes
+      operationId: forkHtmlGame
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HtmlGameForkRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
   /diagnostics/regional-route:
     post:
       tags:
@@ -3553,6 +4500,234 @@ paths:
           description: Material or asset not found
       security:
       - bearerAuth: []
+  /games/{gameId}:
+    get:
+      tags:
+      - HTML Game Library
+      summary: Get game metadata for a teacher
+      operationId: getHtmlGame
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revisionId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
+    delete:
+      tags:
+      - HTML Game Library
+      summary: Archive a game while retaining existing references
+      operationId: archiveHtmlGame
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "204":
+          description: Success
+      security:
+      - bearerAuth: []
+    patch:
+      tags:
+      - HTML Game Library
+      summary: Edit catalog metadata with optimistic concurrency
+      operationId: editHtmlGame
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HtmlGameEditRequest"
+        required: true
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameResponse"
+      security:
+      - bearerAuth: []
   /assignments/{assignmentId}/vocabulary-review/{studentSubject}:
     patch:
       tags:
@@ -3757,6 +4932,242 @@ paths:
           description: Current user cannot monitor submissions
         "404":
           description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/game-launches/{launchId}/document:
+    get:
+      tags:
+      - Lesson Games
+      summary: Get the exact authorized lesson game collaboration binding
+      operationId: getLessonGameDocument
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: launchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationDocumentResponse"
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/game-launches/{launchId}/content:
+    get:
+      tags:
+      - Lesson Games
+      summary: Read pinned game content under current lesson admission and launch
+        permissions
+      operationId: getLessonGameContent
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: launchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            text/html:
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/game-launches/current:
+    get:
+      tags:
+      - Lesson Games
+      summary: Recover the active library game without a material assignment
+      operationId: getCurrentLessonGame
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonGameStateResponse"
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents:
@@ -4212,6 +5623,354 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelloResponse"
+  /games/{gameId}/revisions/{revisionId}/cover:
+    get:
+      tags:
+      - HTML Game Library
+      summary: Read a private cover under the same context permissions
+      operationId: getHtmlGameCover
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revisionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            image/png:
+              schema:
+                type: string
+                format: byte
+            image/jpeg:
+              schema:
+                type: string
+                format: byte
+            image/webp:
+              schema:
+                type: string
+                format: byte
+            image/svg+xml:
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+  /games/{gameId}/revisions/{revisionId}/content:
+    get:
+      tags:
+      - HTML Game Library
+      summary: Read private game bytes; learners require an exact authorized material
+        reference
+      operationId: getHtmlGameContent
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revisionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            text/html:
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
+  /games/{gameId}/processing/{jobId}:
+    get:
+      tags:
+      - HTML Game Library
+      summary: Get game processing status without exposing private context
+      operationId: getHtmlGameProcessing
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HtmlGameProcessingResponse"
+      security:
+      - bearerAuth: []
+  /games/{gameId}/processing/{jobId}/preview:
+    get:
+      tags:
+      - HTML Game Library
+      summary: "Local teacher preview of a validated candidate, without launch authority"
+      operationId: previewHtmlGameCandidate
+      parameters:
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: "Invalid game query, reference, file or command"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "401":
+          description: Bearer authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "403":
+          description: "Teacher, author, manager or admission permission required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "404":
+          description: Game/revision/context unavailable; context substitution does
+            not disclose content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "409":
+          description: "Command payload, optimistic version, archived game, adaptation\
+            \ trust, active launch or client capability conflict; ProjectErrorResponse.errorCode\
+            \ identifies the reason"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "413":
+          description: HTML file exceeds 20 MiB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "422":
+          description: Embedded image validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "503":
+          description: "Game writes paused, maintenance or private storage temporarily\
+            \ unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectErrorResponse"
+        "200":
+          description: Success
+          content:
+            text/html:
+              schema:
+                type: string
+                format: byte
+      security:
+      - bearerAuth: []
   /chat/push/capability:
     get:
       tags:
@@ -5072,7 +6831,9 @@ components:
           type: string
           format: uuid
         materialId:
-          type: string
+          type:
+          - string
+          - "null"
           format: uuid
         studentUserId:
           type:
@@ -5115,7 +6876,6 @@ components:
       - documentKind
       - id
       - lessonId
-      - materialId
       - scope
       - updatedAt
       - version
@@ -6461,6 +8221,62 @@ components:
       - distinctGradedPrompts
       - masteryPercent
       - policyVersion
+    LessonGameStartRequest:
+      type: object
+      properties:
+        gameId:
+          type: string
+          format: uuid
+        revisionId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+        protocolVersion:
+          type: integer
+          format: int32
+      required:
+      - commandId
+      - gameId
+      - protocolVersion
+      - revisionId
+    LessonGameLaunchResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        gameId:
+          type: string
+          format: uuid
+        revisionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        documentId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        presentationRevision:
+          type: integer
+          format: int64
+      required:
+      - createdAt
+      - gameId
+      - id
+      - lessonId
+      - presentationRevision
+      - revisionId
+      - status
     LessonAccessExtensionRequest:
       type: object
       properties:
@@ -6931,6 +8747,28 @@ components:
           type:
           - boolean
           - "null"
+    MaterialGameAttachRequest:
+      type: object
+      properties:
+        gameId:
+          type: string
+          format: uuid
+        revisionId:
+          type: string
+          format: uuid
+        blockId:
+          type: string
+        pageId:
+          type: string
+        expectedUpdatedAt:
+          type: string
+          format: date-time
+      required:
+      - blockId
+      - expectedUpdatedAt
+      - gameId
+      - pageId
+      - revisionId
     MaterialHtmlGameEnrichmentRequest:
       type: object
       properties:
@@ -7426,6 +9264,138 @@ components:
       - sessionId
       - state
       - updatedAt
+    HtmlGameResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        revisionId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        topic:
+          type: string
+        cefrLevel:
+          type:
+          - string
+          - "null"
+        compatibility:
+          type: string
+        status:
+          type: string
+        canEdit:
+          type: boolean
+        hasCover:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        validationStatus:
+          type:
+          - string
+          - "null"
+      required:
+      - canEdit
+      - compatibility
+      - createdAt
+      - hasCover
+      - id
+      - revisionId
+      - status
+      - title
+      - topic
+      - updatedAt
+      - version
+    HtmlGameRevisionSelection:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        expectedVersion:
+          type: integer
+          format: int64
+      required:
+      - expectedVersion
+      - revisionId
+    HtmlGameProcessingRequest:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+      required:
+      - commandId
+      - kind
+      - revisionId
+    HtmlGameProcessingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gameId:
+          type: string
+          format: uuid
+        sourceRevisionId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        status:
+          type: string
+        errorCode:
+          type:
+          - string
+          - "null"
+        appliedRevisionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+      required:
+      - gameId
+      - id
+      - kind
+      - sourceRevisionId
+      - status
+    HtmlGameMaterialRequest:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+      required:
+      - commandId
+      - revisionId
+    HtmlGameForkRequest:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+      required:
+      - commandId
+      - revisionId
     RegionalRouteDiagnosticEventRequest:
       type: object
       properties:
@@ -7974,6 +9944,24 @@ components:
             type: string
             maxLength: 40
           maxItems: 16
+    HtmlGameEditRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        topic:
+          type: string
+        cefrLevel:
+          type:
+          - string
+          - "null"
+        expectedVersion:
+          type: integer
+          format: int64
+      required:
+      - expectedVersion
+      - title
+      - topic
     VocabularyHomeworkReviewRequest:
       type: object
       properties:
@@ -7990,6 +9978,28 @@ components:
           minLength: 0
       required:
       - action
+    LessonGameStateResponse:
+      type: object
+      properties:
+        launch:
+          oneOf:
+          - $ref: "#/components/schemas/LessonGameLaunchResponse"
+          - type: "null"
+        revision:
+          type: integer
+          format: int64
+        canControl:
+          type: boolean
+        protocolReady:
+          type: boolean
+        primaryKind:
+          type:
+          - string
+          - "null"
+      required:
+      - canControl
+      - protocolReady
+      - revision
     LessonAdmissionOverviewResponse:
       type: object
       properties:
@@ -8246,6 +10256,27 @@ components:
       - message
       - service
       - timestamp
+    HtmlGamePageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HtmlGameResponse"
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+      required:
+      - items
+      - page
+      - pageSize
+      - total
     ChatPushCapabilityResponse:
       type: object
       properties:

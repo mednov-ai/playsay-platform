@@ -372,7 +372,13 @@ export function useLessonRealtime({
       return;
     }
 
+    if (message.type === "lesson.game.changed" && message.lessonId) {
+      window.dispatchEvent(new CustomEvent("honey-school:lesson-game-changed", { detail: message.lessonId }));
+      return;
+    }
+
     if (message.type === "lesson.updated" && message.lesson) {
+      window.dispatchEvent(new CustomEvent("honey-school:lesson-game-changed", { detail: message.lesson.id }));
       applyRealtimeLessonSnapshot(message.lesson);
       return;
     }
@@ -458,7 +464,7 @@ export function useLessonRealtime({
   }
 
   function sendLessonRealtimeSubscribe(lessonId: string) {
-    sendLessonRealtimeMessage({ type: "subscribe.lesson", lessonId });
+    sendLessonRealtimeMessage({ type: "subscribe.lesson", lessonId, gameLibraryVersion: 1 });
   }
 
   function sendLessonPresenceUpdate(lessonId: string, state: Exclude<LessonParticipantPresenceState, "OFFLINE">) {
@@ -496,7 +502,7 @@ export function useLessonRealtime({
     }, DICE_RESPONSE_TIMEOUT_MS);
   }
 
-  function sendLessonRealtimeMessage(message: Record<string, string>): boolean {
+  function sendLessonRealtimeMessage(message: Record<string, string | number>): boolean {
     const socket = realtimeSocketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setRealtimeOpen(false);

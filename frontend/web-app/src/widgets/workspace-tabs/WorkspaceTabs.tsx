@@ -209,6 +209,7 @@ function workspaceTabIcon(tab: WorkspaceTab): ReactNode {
       return <ClipboardList className="h-4 w-4" />;
     case "emails":
       return <Mail className="h-4 w-4" />;
+    case "games":
     case "materials":
       return <BookOpen className="h-4 w-4" />;
     case "students":

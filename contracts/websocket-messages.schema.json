@@ -195,6 +195,44 @@
         "type": { "const": "error" },
         "message": { "type": "string", "minLength": 1, "maxLength": 500 }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "type",
+        "lessonId"
+      ],
+      "properties": {
+        "type": {
+          "const": "subscribe.lesson"
+        },
+        "lessonId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "gameLibraryVersion": {
+          "type": "integer",
+          "const": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "type",
+        "lessonId"
+      ],
+      "properties": {
+        "type": {
+          "const": "lesson.game.changed"
+        },
+        "lessonId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": true
     }
   ],
   "$defs": {

@@ -53,7 +53,8 @@ class CollaborationTokenService(
             .subject(authentication.token.subject)
             .claim("documentId", document.id.toString())
             .claim("lessonId", document.lessonId.toString())
-            .claim("materialId", document.materialId.toString())
+            .claim("materialId", document.materialId?.toString())
+            .claim("gameLaunchId", document.gameLaunchId?.toString())
             .claim("studentUserId", document.studentUserId?.toString())
             .claim("documentKind", document.documentKind)
             .claim("scope", document.collaborationScope)
@@ -91,6 +92,7 @@ class CollaborationDocumentService(
     private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: CollaborationTokenService,
     private val objectMapper: ObjectMapper,
+    private val gameAccess: com.playsay.gateway.service.game.LessonGameAccessService? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
@@ -100,6 +102,7 @@ class CollaborationDocumentService(
         request: CreateCollaborationDocumentRequest,
     ): CollaborationDocumentResponse {
         val values = request.validated()
+        if (values.documentKind == "LESSON_GAME") throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         accessibleScheduledMaterial(authentication, lessonId, values.materialId)
         lockLesson(lessonId)
         val studentUserId = studentUserIdForCurrentDocument(authentication, values.scope)
@@ -246,7 +249,13 @@ class CollaborationDocumentService(
         val document = collaborationDocumentRepo.findById(documentId).orElse(null)
             ?.takeIf { found -> found.lessonId == lessonId }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
-        accessibleScheduledMaterial(authentication, lessonId, document.materialId)
+        if (document.documentKind == "LESSON_GAME") {
+            val access = requireNotNull(gameAccess)
+            access.requireAccess(authentication, lessonId)
+            access.requireActiveDocument(lessonId, documentId)
+            return document
+        }
+        accessibleScheduledMaterial(authentication, lessonId, requireNotNull(document.materialId))
         if (authentication.canManageCollaboration()) {
             return document
         }

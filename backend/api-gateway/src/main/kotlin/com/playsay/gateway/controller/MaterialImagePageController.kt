@@ -132,8 +132,9 @@ class MaterialImagePageController(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
         @RequestPart("file") file: MultipartFile,
+        @org.springframework.web.bind.annotation.RequestHeader("Idempotency-Key", required = false) commandId: UUID? = null,
     ): ResponseEntity<LiveLessonHtmlGamePageResponse> =
         ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(service.appendLiveLessonHtmlGamePage(authentication, lessonId, file))
+            .body(service.appendLiveLessonHtmlGamePage(authentication, lessonId, file, commandId))
 }

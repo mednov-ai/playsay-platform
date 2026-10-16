@@ -73,10 +73,10 @@ class HtmlGameLibraryService(
         val title = metadata.extract(optimized.upload.bytes, raw.originalFileName).displayTitle
         val now = Instant.now()
         val id = gameId ?: UUID.randomUUID()
-        if (gameId == null) repository.jdbc.update("INSERT INTO html_game(id,creator_user_id,title,topic,status,created_at,updated_at) VALUES(?,?,?,'','ACTIVE',?,?)", id, creatorId, title, Timestamp.from(now), Timestamp.from(now))
+        if (gameId == null) repository.createGame(id, creatorId, title, Timestamp.from(now))
         val revision = addRevision(id, optimized.upload.bytes, classifyHtmlGameCompatibility(requireNotNull(optimized.upload.text)), mapper.writeValueAsString(mapOf("optimization" to optimized.metadata)))
-        repository.jdbc.update("UPDATE html_game SET current_revision_id=?,version=version+1,updated_at=? WHERE id=?", revision, Timestamp.from(now), id)
-        repository.jdbc.update("INSERT INTO html_game_command(command_key,payload_hash,game_id,revision_id) VALUES(?,?,?,?)", key, payloadHash, id, revision)
+        repository.advanceRevision(revision, Timestamp.from(now), id)
+        repository.recordCommand(key, payloadHash, id, revision)
         return requireGame(id, revision).copy(canEdit = true)
     }
 
@@ -85,7 +85,7 @@ class HtmlGameLibraryService(
         requireEditable(auth, id)
         val title = request.title.trim()
         if (title.isEmpty() || title.length > 160 || request.topic.length > 120 || request.cefrLevel?.let { it !in setOf("PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2") } == true) gameError(HttpStatus.BAD_REQUEST, "GAME_METADATA_INVALID")
-        val changed = repository.jdbc.update("UPDATE html_game SET title=?,title_source='USER',topic=?,cefr_level=?,version=version+1,updated_at=? WHERE id=? AND version=?", title, request.topic.trim(), request.cefrLevel, Timestamp.from(Instant.now()), id, request.expectedVersion)
+        val changed = repository.editMetadata(title, request.topic.trim(), request.cefrLevel, Timestamp.from(Instant.now()), id, request.expectedVersion)
         if (changed != 1) gameError(HttpStatus.CONFLICT, "GAME_VERSION_CONFLICT")
         return requireGame(id).copy(canEdit = true)
     }
@@ -93,7 +93,7 @@ class HtmlGameLibraryService(
     @Transactional
     fun archive(auth: JwtAuthenticationToken, id: UUID) {
         requireEditable(auth, id)
-        repository.jdbc.update("UPDATE html_game SET status='ARCHIVED',version=version+1,updated_at=? WHERE id=?", Timestamp.from(Instant.now()), id)
+        repository.archive(Timestamp.from(Instant.now()), id)
     }
 
     @Transactional
@@ -111,10 +111,10 @@ class HtmlGameLibraryService(
         val id = UUID.randomUUID()
         val revision = UUID.randomUUID()
         val now = Timestamp.from(Instant.now())
-        repository.jdbc.update("INSERT INTO html_game(id,creator_user_id,title,topic,cefr_level,status,derived_from_revision_id,created_at,updated_at) VALUES(?,?,?,?,?,'ACTIVE',?,?,?)", id, creatorId, source.title, source.topic, source.cefrLevel, revisionId, now, now)
-        repository.jdbc.update("INSERT INTO html_game_revision(id,game_id,blob_id,cover_blob_id,source_revision_id,compatibility,metadata,created_at) SELECT ?,?,blob_id,cover_blob_id,id,compatibility,metadata,? FROM html_game_revision WHERE id=?", revision, id, now, revisionId)
-        repository.jdbc.update("UPDATE html_game SET current_revision_id=? WHERE id=?", revision, id)
-        repository.jdbc.update("INSERT INTO html_game_command(command_key,payload_hash,game_id,revision_id) VALUES(?,?,?,?)", key, payload, id, revision)
+        repository.createGame(id, creatorId, source.title, now, source.topic, source.cefrLevel, revisionId)
+        repository.copyRevision(revision, id, now, revisionId)
+        repository.setInitialRevision(revision, id)
+        repository.recordCommand(key, payload, id, revision)
         return requireGame(id).copy(canEdit = true)
     }
 
@@ -143,7 +143,7 @@ class HtmlGameLibraryService(
         val revisionId = UUID.randomUUID()
         val blobId = blobs.put(gameId, bytes, "text/html")
         val now = Timestamp.from(Instant.now())
-        repository.jdbc.update("INSERT INTO html_game_revision(id,game_id,blob_id,source_revision_id,compatibility,metadata,created_at) VALUES(?,?,?,?,?,?,?)", revisionId, gameId, blobId, sourceRevisionId, compatibility, metadata, now)
+        repository.insertRevision(revisionId, gameId, blobId, sourceRevisionId, compatibility, metadata, now)
         return revisionId
     }
 }

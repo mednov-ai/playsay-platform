@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.transaction.annotation.Transactional
 
 class HtmlGameLibraryIntegrationTest : MaterialControllerTestFixture() {
+    @Autowired private lateinit var gameMaterials: com.playsay.gateway.controller.HtmlGameMaterialController
     @Autowired private lateinit var lessonGames: com.playsay.gateway.controller.LessonGameController
     @Autowired private lateinit var games: HtmlGameLibraryController
 
@@ -58,19 +59,19 @@ class HtmlGameLibraryIntegrationTest : MaterialControllerTestFixture() {
         val author = authentication(subject = "teacher-1", role = "ROLE_TEACHER")
         val game = games.upload(author, htmlFile(), UUID.randomUUID()).body!!
         val creation = com.playsay.gateway.dto.HtmlGameMaterialRequest(game.revisionId, UUID.randomUUID())
-        val created = games.createMaterial(author, game.id, creation)
-        assertEquals(created.id, games.createMaterial(author, game.id, creation).id)
+        val created = gameMaterials.createMaterial(author, game.id, creation)
+        assertEquals(created.id, gameMaterials.createMaterial(author, game.id, creation).id)
         val material = materialCrudController.create(author, LessonMaterialRequest(title = "Game lesson")).body!!
         val page = material.document.path("pages").first().path("id").asText()
         val request = MaterialGameAttachRequest(game.id, game.revisionId, "attached-game", page, material.updatedAt)
-        val attached = games.attach(author, material.id, request)
-        assertEquals(attached.document, games.attach(author, material.id, request).document)
+        val attached = gameMaterials.attach(author, material.id, request)
+        assertEquals(attached.document, gameMaterials.attach(author, material.id, request).document)
         assertEquals(1, attached.document.path("pages").flatMap { it.path("blocks").toList() }.count { it.path("id").asText() == "attached-game" })
-        assertEquals(HttpStatus.CONFLICT, assertFailsWith<ProjectResponseException> { games.attach(author, material.id, request.copy(blockId = "second")) }.statusCode)
+        assertEquals(HttpStatus.CONFLICT, assertFailsWith<ProjectResponseException> { gameMaterials.attach(author, material.id, request.copy(blockId = "second")) }.statusCode)
         games.archive(author, game.id)
         assertTrue(games.content(author, game.id, game.revisionId, material.id).body!!.isNotEmpty())
         val latest = materialCrudController.get(author, material.id)
-        assertEquals(HttpStatus.CONFLICT, assertFailsWith<ProjectResponseException> { games.attach(author, material.id, request.copy(blockId = "new", expectedUpdatedAt = latest.updatedAt)) }.statusCode)
+        assertEquals(HttpStatus.CONFLICT, assertFailsWith<ProjectResponseException> { gameMaterials.attach(author, material.id, request.copy(blockId = "new", expectedUpdatedAt = latest.updatedAt)) }.statusCode)
         materialCrudController.archive(author, material.id)
         assertEquals("ARCHIVED", games.get(author, game.id, game.revisionId).status)
     }

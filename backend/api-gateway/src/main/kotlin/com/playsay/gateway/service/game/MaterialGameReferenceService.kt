@@ -68,7 +68,7 @@ class MaterialGameReferenceService(
         games.requireWritable()
         repository.lockGame(gameId)
         val key = gameHash("$userId:create-material:${request.commandId}".toByteArray())
-        val previous = repository.jdbc.queryForList("SELECT * FROM html_game_material_command WHERE command_key=?", key).firstOrNull()
+        val previous = repository.materialCommand(key).firstOrNull()
         if (previous != null) {
             if (previous["game_id"] != gameId || previous["revision_id"] != request.revisionId) gameError(HttpStatus.CONFLICT, "GAME_COMMAND_CONFLICT")
             return catalog.get(auth, previous["material_id"] as? UUID ?: gameError(HttpStatus.CONFLICT, "GAME_MATERIAL_NOT_FOUND"))
@@ -79,7 +79,7 @@ class MaterialGameReferenceService(
         page.putArray("blocks").add(mapper.createObjectNode().put("id", "block-${UUID.randomUUID()}").put("type", "htmlGame").put("title", game.title).put("gameId", gameId.toString()).put("gameRevisionId", request.revisionId.toString()).put("gameTitleSource", "HTML").put("gameSyncCompatibility", game.compatibility).put("height", 640))
         document.putArray("pages").add(page)
         val saved = catalog.create(auth, com.playsay.gateway.dto.LessonMaterialRequest(title = game.title, cefrLevel = game.cefrLevel ?: "A2", document = document))
-        repository.jdbc.update("INSERT INTO html_game_material_command(command_key,game_id,revision_id,material_id) VALUES(?,?,?,?)", key, gameId, request.revisionId, saved.id)
+        repository.recordMaterialCommand(key, gameId, request.revisionId, saved.id)
         return saved
     }
 

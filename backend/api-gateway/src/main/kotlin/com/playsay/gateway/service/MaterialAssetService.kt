@@ -147,7 +147,7 @@ class MaterialAssetService(
         val gameAlias = gameRepository?.alias(sourceAsset.id) ?: return false
         val metadata = copiedAssetMetadata(sourceAsset, null).apply { put("gameId", gameAlias.gameId.toString()); put("gameRevisionId", gameAlias.revisionId.toString()) }
         materialAssetRepo.saveAndFlush(MaterialAssetEntity(id = copiedAssetId, materialId = targetMaterialId, kind = "HTML_GAME", provider = "GAME_LIBRARY", storageKey = null, metadata = objectMapper.writeValueAsString(metadata), createdAt = Instant.now()))
-        gameRepository.jdbc.update("INSERT INTO html_game_legacy_alias(asset_id,source_material_id,game_id,revision_id,sha256) VALUES(?,?,?,?,?)", copiedAssetId, targetMaterialId, gameAlias.gameId, gameAlias.revisionId, gameAlias.sha256)
+        gameRepository.insertAlias(copiedAssetId, targetMaterialId, gameAlias.gameId, gameAlias.revisionId, gameAlias.sha256)
         return true
     }
 

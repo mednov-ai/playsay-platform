@@ -56,9 +56,9 @@ class HtmlGameLegacyRegistrationService(
         val sourceNeedsFork = sourceAlias != null && repository.creator(sourceAlias.gameId) != material.ownerTeacherUserId
         val gameId = targetGame(material.ownerTeacherUserId, metadata.path("gameTitle").asText(), sourceAlias, copyAlias, sourceNeedsFork, now)
         val revisionId = copyAlias?.revisionId ?: games.addRevision(gameId, bytes, mapper.readTree(origin.root.metadata).path("syncCompatibility").asText("UNSUPPORTED"), provenance.evidence(origin), sourceAlias?.revisionId)
-        if (shouldAdvanceCurrent(copyAlias, sourceAlias, sourceNeedsFork, origin.current)) repository.jdbc.update("UPDATE html_game SET current_revision_id=?,version=version+1,updated_at=? WHERE id=?", revisionId, now, gameId)
-        repository.jdbc.update("INSERT INTO html_game_legacy_alias(asset_id,source_material_id,game_id,revision_id,sha256) VALUES(?,?,?,?,?)", assetId, material.id, gameId, revisionId, hash)
-        val cover = repository.jdbc.queryForList("SELECT icon_asset_id FROM material_html_game_enrichment WHERE (asset_id=? OR asset_id=?) AND status='READY' AND icon_asset_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1", assetId, origin.root.id).firstOrNull()?.get("icon_asset_id") as? UUID
+        if (shouldAdvanceCurrent(copyAlias, sourceAlias, sourceNeedsFork, origin.current)) repository.advanceRevision(revisionId, now, gameId)
+        repository.insertAlias(assetId, material.id, gameId, revisionId, hash)
+        val cover = repository.legacyCover(assetId, origin.root.id).firstOrNull()?.get("icon_asset_id") as? UUID
         if (cover != null) copyCover(gameId, revisionId, cover)
         return GameAlias(material.id, gameId, revisionId, hash)
     }
@@ -70,7 +70,7 @@ class HtmlGameLegacyRegistrationService(
         if (source != null && !fork) return source.gameId
         val id = UUID.randomUUID()
         val title = rawTitle.trim().take(160).ifEmpty { "HTML game" }
-        repository.jdbc.update("INSERT INTO html_game(id,creator_user_id,title,topic,status,derived_from_revision_id,created_at,updated_at) VALUES(?,?,?,'','ACTIVE',?,?,?)", id, owner, title, source?.revisionId, now, now)
+        repository.createGame(id, owner, title, now, derived = source?.revisionId)
         return id
     }
 
@@ -86,7 +86,7 @@ class HtmlGameLegacyRegistrationService(
     fun enrichment(assetId: UUID, title: String, iconAssetId: UUID) {
         val alias = repository.alias(assetId) ?: register(assetId)
         copyCover(alias.gameId, alias.revisionId, iconAssetId)
-        repository.jdbc.update("UPDATE html_game SET title=?,updated_at=? WHERE id=? AND current_revision_id=? AND title_source<>'USER'", title.take(160), Timestamp.from(Instant.now()), alias.gameId, alias.revisionId)
+        repository.retainAuthoredTitle(title.take(160), Timestamp.from(Instant.now()), alias.gameId, alias.revisionId)
     }
 
     private fun copyCover(gameId: UUID, revisionId: UUID, assetId: UUID) {
@@ -94,7 +94,7 @@ class HtmlGameLegacyRegistrationService(
         val content = objects.getObject(asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND"))
         if (content.contentType !in setOf("image/png", "image/jpeg", "image/webp", "image/svg+xml")) gameError(HttpStatus.BAD_REQUEST, "GAME_COVER_INVALID")
         val id = blobs.put(gameId, content.bytes, content.contentType)
-        repository.jdbc.update("UPDATE html_game_revision SET cover_blob_id=? WHERE id=?", id, revisionId)
+        repository.setCover(id, revisionId)
     }
 
 }

@@ -48,13 +48,13 @@ class HtmlGameProcessingService(
         games.requireActive(gameId, request.revisionId)
         if (request.kind !in setOf("ADAPT", "ENRICH")) gameError(HttpStatus.BAD_REQUEST, "GAME_QUERY_INVALID")
         val key = gameHash("$gameId:${request.commandId}".toByteArray())
-        repository.jdbc.queryForList("SELECT * FROM html_game_processing WHERE command_key=?", key).firstOrNull()?.let {
+        repository.processing.command(key).firstOrNull()?.let {
             if (it["source_revision_id"] != request.revisionId || it["kind"] != request.kind) gameError(HttpStatus.CONFLICT, "GAME_COMMAND_CONFLICT")
             return response(it)
         }
         val id = UUID.randomUUID()
         val now = Timestamp.from(Instant.now())
-        repository.jdbc.update("INSERT INTO html_game_processing(id,game_id,source_revision_id,kind,status,command_key,created_at,updated_at) VALUES(?,?,?,?,'PENDING',?,?,?)", id, gameId, request.revisionId, request.kind, key, now, now)
+        repository.processing.enqueue(id, gameId, request.revisionId, request.kind, key, now)
         return statusInternal(gameId, id)
     }
 
@@ -79,8 +79,8 @@ class HtmlGameProcessingService(
         val bytes = blobs.read(row["candidate_blob_id"] as UUID)
         val acceptedEvidence = mapper.readTree(row["evidence"].toString()).deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>().put("mechanicsValidation", "PASSED").toString()
         val revision = games.addRevision(gameId, bytes, "SDK_V1", acceptedEvidence, current.revisionId)
-        repository.jdbc.update("UPDATE html_game SET current_revision_id=?,version=version+1,updated_at=? WHERE id=?", revision, Timestamp.from(Instant.now()), gameId)
-        repository.jdbc.update("UPDATE html_game_processing SET applied_revision_id=?,status='APPLIED',updated_at=? WHERE id=?", revision, Timestamp.from(Instant.now()), id)
+        repository.advanceRevision(revision, Timestamp.from(Instant.now()), gameId)
+        repository.processing.applied(revision, Timestamp.from(Instant.now()), id)
         return games.requireGame(gameId).copy(canEdit = true)
     }
 
@@ -88,7 +88,7 @@ class HtmlGameProcessingService(
     fun selectRevision(auth: JwtAuthenticationToken, gameId: UUID, request: HtmlGameRevisionSelection): HtmlGameResponse {
         games.requireEditable(auth, gameId)
         games.requireActive(gameId, request.revisionId)
-        if (repository.jdbc.update("UPDATE html_game SET current_revision_id=?,version=version+1,updated_at=? WHERE id=? AND version=?", request.revisionId, Timestamp.from(Instant.now()), gameId, request.expectedVersion) != 1) gameError(HttpStatus.CONFLICT, "GAME_VERSION_CONFLICT")
+        if (repository.selectRevision(request.revisionId, Timestamp.from(Instant.now()), gameId, request.expectedVersion) != 1) gameError(HttpStatus.CONFLICT, "GAME_VERSION_CONFLICT")
         return games.requireGame(gameId).copy(canEdit = true)
     }
 
@@ -109,10 +109,10 @@ class HtmlGameProcessingService(
         try { availability.requireBackgroundProcessing() } catch (_: Exception) { busy.set(false); return }
         val claim = try { tx.execute {
             val now = Timestamp.from(Instant.now())
-            repository.jdbc.update("UPDATE html_game_processing SET status='FAILED',error_code='GAME_PROCESSING_FAILED',lease_until=NULL WHERE status='RUNNING' AND lease_until<? AND attempts>=3", now)
-            val row = repository.jdbc.queryForList("SELECT * FROM html_game_processing WHERE (status='PENDING' OR (status='RUNNING' AND lease_until<?)) AND attempts<3 ORDER BY created_at LIMIT 1 FOR UPDATE", now).firstOrNull() ?: return@execute null
+            repository.processing.expireExhausted(now)
+            val row = repository.processing.nextClaim(now).firstOrNull() ?: return@execute null
             val generation = (row["attempts"] as Number).toInt() + 1
-            repository.jdbc.update("UPDATE html_game_processing SET status='RUNNING',attempts=?,lease_until=?,updated_at=? WHERE id=?", generation, Timestamp.from(Instant.now().plusSeconds(600)), now, row["id"])
+            repository.processing.claim(generation, Timestamp.from(Instant.now().plusSeconds(600)), now, row["id"] as UUID)
             row to generation
         } } catch (_: Exception) { busy.set(false); return } ?: run { busy.set(false); return }
         try { executor.execute { try { process(claim.first, claim.second) } finally { busy.set(false) } } } catch (_: Exception) { busy.set(false) }
@@ -134,7 +134,7 @@ class HtmlGameProcessingService(
                     if (!ownsLease(id, generation)) return@executeWithoutResult
                     val candidateId = blobs.put(gameId, candidate, "text/html")
                     val evidence = mapper.valueToTree<com.fasterxml.jackson.databind.node.ObjectNode>(result).apply { remove("html") }.toString()
-                    repository.jdbc.update("UPDATE html_game_processing SET candidate_blob_id=?,evidence=?,status='READY_FOR_REVIEW',lease_until=NULL,updated_at=? WHERE id=?", candidateId, evidence, Timestamp.from(Instant.now()), id)
+                    repository.processing.candidate(candidateId, evidence, Timestamp.from(Instant.now()), id)
                 }
             } else {
                 val extracted = metadata.extract(bytes, "game.html")
@@ -143,19 +143,19 @@ class HtmlGameProcessingService(
                 tx.executeWithoutResult {
                     if (!ownsLease(id, generation)) return@executeWithoutResult
                     val cover = blobs.put(gameId, generated.bytes, generated.mimeType)
-                    repository.jdbc.update("UPDATE html_game_revision SET cover_blob_id=? WHERE id=?", cover, revision)
-                    repository.jdbc.update("UPDATE html_game SET title=CASE WHEN title_source='USER' THEN title ELSE ? END,updated_at=? WHERE id=? AND current_revision_id=?", analysis.title.take(160), Timestamp.from(Instant.now()), gameId, revision)
-                    repository.jdbc.update("UPDATE html_game_processing SET status='READY',lease_until=NULL,updated_at=? WHERE id=?", Timestamp.from(Instant.now()), id)
+                    repository.setCover(cover, revision)
+                    repository.processing.enrichTitle(analysis.title.take(160), Timestamp.from(Instant.now()), gameId, revision)
+                    repository.processing.ready(Timestamp.from(Instant.now()), id)
                 }
             }
         } catch (error: Exception) {
             val code = (error as? com.playsay.gateway.client.GameAdapterClientException)?.adapterErrorCode ?: (error as? com.playsay.gateway.error.ProjectResponseException)?.errorCode ?: "GAME_PROCESSING_FAILED"
-            tx.executeWithoutResult { repository.jdbc.update("UPDATE html_game_processing SET status='FAILED',error_code=?,lease_until=NULL,updated_at=? WHERE id=? AND attempts=? AND status='RUNNING'", code, Timestamp.from(Instant.now()), id, generation) }
+            tx.executeWithoutResult { repository.processing.failed(code, Timestamp.from(Instant.now()), id, generation) }
         }
     }
 
-    private fun ownsLease(id: UUID, generation: Int): Boolean = repository.jdbc.queryForList("SELECT id FROM html_game_processing WHERE id=? AND attempts=? AND status='RUNNING' FOR UPDATE", id, generation).isNotEmpty()
-    private fun row(gameId: UUID, id: UUID): Map<String, Any?> = repository.jdbc.queryForList("SELECT * FROM html_game_processing WHERE id=? AND game_id=?", id, gameId).firstOrNull() ?: gameError(HttpStatus.NOT_FOUND, "GAME_NOT_FOUND")
+    private fun ownsLease(id: UUID, generation: Int): Boolean = repository.processing.lease(id, generation).isNotEmpty()
+    private fun row(gameId: UUID, id: UUID): Map<String, Any?> = repository.processing.row(id, gameId).firstOrNull() ?: gameError(HttpStatus.NOT_FOUND, "GAME_NOT_FOUND")
     private fun statusInternal(gameId: UUID, id: UUID) = response(row(gameId, id))
     private fun response(row: Map<String, Any?>) = HtmlGameProcessingResponse(row["id"] as UUID, row["game_id"] as UUID, row["source_revision_id"] as UUID, row["kind"].toString(), row["status"].toString(), row["error_code"] as? String, row["applied_revision_id"] as? UUID)
 }

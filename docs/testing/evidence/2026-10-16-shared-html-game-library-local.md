@@ -1,5 +1,7 @@
 # Shared HTML-game library — local acceptance, 2026-10-16
 
+This document records the initial local-only handoff. Subsequent authorized develop/DEV delivery is tracked in [the delivery evidence](2026-10-16-shared-html-game-library-develop.md).
+
 Change: `add-shared-html-game-library`. Local implementation and verification are complete; delivery and migration of real data have not been performed. OpenSpec remains active for the separately authorized delivery tasks.
 
 ## Source and work locations

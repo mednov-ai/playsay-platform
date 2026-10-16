@@ -28,7 +28,7 @@ export function LessonLibraryGameStage({ launch, name, authority, protocolReady,
   useEffect(() => { if (authority && workspace.connected && sync.presentedBlockId !== blockId) sync.setPresentedBlock(blockId); }, [authority, blockId, sync, workspace.connected]);
   const runtimeFailed = workspace.status === "error";
   async function stop() { if (stopping) return; setStopping(true); setError(false); try { await onStop(); } catch { setError(true); } finally { setStopping(false); } }
-  return <section className="relative flex min-h-0 flex-1 flex-col gap-3 rounded-xl border bg-card p-3" aria-label={t("games.active")} data-game-connection={workspace.status} data-game-presented={sync.presentedBlockId ?? ""}>
+  return <section className={`relative flex min-h-0 ${minimized ? "flex-none" : "flex-1"} flex-col gap-3 rounded-xl border bg-card p-3`} aria-label={t("games.active")} data-game-connection={workspace.status} data-game-presented={sync.presentedBlockId ?? ""}>
     <div className="flex flex-wrap items-center justify-between gap-2"><strong>{t("games.active")}</strong><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => onMinimize(!minimized)}>{t(minimized ? "games.resume" : "games.minimize")}</Button><Button type="button" disabled={stopping} onClick={() => void stop()}>{t(stopping ? "games.stopping" : "games.stop")}</Button></div></div>
     {!protocolReady ? <p role="alert">{t("games.updateRequired")}</p> : null}
     {error || runtimeFailed ? <div role="alert" className="flex flex-wrap gap-2">{t("games.failed")}<Button type="button" variant="outline" onClick={() => { setRetry((value) => value + 1); workspace.retryConnection(); }}>{t("games.retry")}</Button></div> : null}

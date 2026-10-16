@@ -3367,3 +3367,20 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   border: 1px solid hsl(var(--border));
   border-radius: 0.75rem;
 }
+
+/* Keep the material and library game in one grid cell beside the video rail. */
+.playsay-classroom-primary {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.playsay-classroom-primary .playsay-workbench {
+  flex: 1 1 0;
+}
+
+.playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-classroom-primary {
+  grid-column: 1;
+}

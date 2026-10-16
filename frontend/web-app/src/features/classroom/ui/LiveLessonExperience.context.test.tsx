@@ -8,6 +8,10 @@ import type { LessonRoomSession } from "../model/session";
 import { LiveLessonExperience } from "./LiveLessonExperience";
 
 const liveState = vi.hoisted(() => ({ practice: null as unknown, teacher: true }));
+vi.mock("../../games/hooks/useLessonLibraryGame", () => ({
+  useLessonLibraryGame: () => ({ canControl: liveState.teacher, error: "temporarily-unavailable", launch: null, protocolReady: true, refresh: vi.fn() }),
+}));
+
 vi.mock("../../vocabulary/hooks/useLiveVocabularyPractice", () => ({
   useLiveVocabularyPractice: () => ({ practice: liveState.practice }),
 }));
@@ -142,6 +146,11 @@ describe("LiveLessonExperience room context", () => {
     const room = screen.getByTestId("livekit-room");
     expect(within(room).getByTestId("video-stage")).toBeInTheDocument();
     expect(within(room).getByTestId("lesson-workspace")).toBeInTheDocument();
+    const primary = room.querySelector(".playsay-classroom-primary");
+    expect(primary).toContainElement(within(room).getByTestId("lesson-workspace"));
+    expect(primary).toContainElement(within(room).getByRole("alert"));
+    expect(room.querySelector(".playsay-video-header")).toContainElement(within(room).getByRole("button", { name: "games.title" }));
+    expect(primary?.parentElement).toBe(room);
   });
 
   it("switches the lesson shell to the external activity overlay mode", () => {

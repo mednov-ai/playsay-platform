@@ -260,6 +260,7 @@ export function LiveLessonExperience({
               learnerSubjects={session.participants.map((participant) => participant.subject)}
             />
             <h1 title={session.lessonTitle}>{session.lessonTitle}</h1>
+            {libraryGame.canControl && session.workMode === "SHARED" ? <Button variant="outline" onClick={() => setGamePickerOpen(true)}>{t("games.title")}</Button> : null}
           </div>
 
           <div className="playsay-classroom-room min-h-0 flex-1">
@@ -285,8 +286,9 @@ export function LiveLessonExperience({
           </div>
         </section>
 
-        {libraryGame.canControl && session.workMode === "SHARED" ? <div className="px-3 py-2"><Button variant="outline" onClick={() => setGamePickerOpen(true)}>{t("games.title")}</Button></div> : null}
+
         {gamePickerOpen ? <HtmlGamePicker selectLabelKey="games.start" onClose={() => setGamePickerOpen(false)} onSelect={async (game) => { await libraryGame.start(game); setGamePickerOpen(false); }} /> : null}
+        {showWorkspace || libraryGame.launch ? <div className="playsay-classroom-primary">
         {libraryGame.error ? <div role="alert" className="px-3">{t("games.failed")}<Button variant="outline" onClick={() => void libraryGame.refresh()}>{t("games.retry")}</Button></div> : null}
         {libraryGame.launch ? <LessonLibraryGameStage key={libraryGame.launch.id} launch={libraryGame.launch} name={displayName} authority={libraryGame.canControl} protocolReady={libraryGame.protocolReady} minimized={gameMinimized} onMinimize={setGameMinimized} onStop={() => libraryGame.stop(libraryGame.launch!.id)} /> : null}
         {showWorkspace || libraryGame.launch ? (
@@ -303,6 +305,7 @@ export function LiveLessonExperience({
           />
           </div>
         ) : null}
+        </div> : null}
       </LiveKitRoom> : null}
     </div>
   );

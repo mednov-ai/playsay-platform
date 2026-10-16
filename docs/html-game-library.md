@@ -68,3 +68,5 @@ Migration drain uses the authoritative access deadline (scheduled end plus grace
 Legacy cover copies normalize declared MIME parameters. A historical generic `application/octet-stream` cover is accepted only when raster byte signatures identify JPEG or PNG; other generic content fails closed. Original and independent copy bytes remain identical. Read-only inventory validates legacy covers before declaring a source READY. Migration JVM memory is bounded independently from the API server profile.
 
 Preview Escape is relayed from the sandboxed iframe only when that frame is hosted by a library preview. The parent validates the active iframe window and per-frame channel before closing the dialog and restoring focus. Ordinary lesson frames keep their existing Escape behavior; the relay does not stop a shared launch or reset its state.
+
+Moving focus from an embedded game to its lesson controls does not count as an external browser resume. The trusted lesson clock is retained for this internal focus transition, keeping controls stable for minimize/stop; real browser/tab/network resume continues to reconcile server policy.

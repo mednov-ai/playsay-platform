@@ -30,6 +30,40 @@ afterEach(() => {
 });
 
 describe("HTML game sandbox", () => {
+  it.each([false, true])("only the active preview frame can close its dialog via Escape (SDK=%s)", (sdk) => {
+    const onEscape = vi.fn();
+    const nextEscape = vi.fn();
+    const html = sdk ? '<html><head><script type="application/playsay-game+json">{"protocol":"playsay-game-sync/v1","gameId":"preview","stateVersion":"1","reducerVersion":"1","buildHash":"test"}</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>' : gameHtml;
+    const view = render(<HtmlGameFrame blockId="preview" height={640} html={html} onEscape={onEscape} title="Preview" />);
+    const iframe = view.container.querySelector("iframe")!;
+    const source = iframe.getAttribute("srcdoc")!;
+    const channel = JSON.parse(source.match(/channel: ("[^"]+")/)![1]) as string;
+    const send = (sourceWindow: MessageEventSource | null, value: string) => act(() => {
+      window.dispatchEvent(new MessageEvent("message", { data: { channel: value, type: "escape" }, source: sourceWindow }));
+    });
+    send(window, channel); send(iframe.contentWindow, "other-preview");
+    expect(onEscape).not.toHaveBeenCalled();
+    send(iframe.contentWindow, channel);
+    expect(onEscape).toHaveBeenCalledTimes(1);
+    view.rerender(<HtmlGameFrame blockId="preview" height={640} html={html} onEscape={nextEscape} title="Preview" />);
+    expect(view.container.querySelector("iframe")).toBe(iframe);
+    expect(iframe.getAttribute("srcdoc")).toBe(source);
+    send(iframe.contentWindow, channel);
+    expect(nextEscape).toHaveBeenCalledTimes(1);
+    expect(onEscape).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps lesson game close behavior unchanged when preview Escape is not configured", () => {
+    const onClose = vi.fn();
+    const { container } = render(<HtmlGameFrame blockId="lesson-game" height={640} html={gameHtml} onClose={onClose} title="Game" />);
+    const iframe = container.querySelector("iframe")!;
+    const source = iframe.getAttribute("srcdoc")!;
+    expect(source).not.toContain("data-playsay-preview-escape");
+    const channel = JSON.parse(source.match(/const channel = ("[^"]+");/)![1]) as string;
+    act(() => window.dispatchEvent(new MessageEvent("message", { data: { channel, type: "escape" }, source: iframe.contentWindow })));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("shows a terminal recoverable error instead of a spinner for unavailable content", () => {
     const onClose = vi.fn();
     const onRetry = vi.fn();

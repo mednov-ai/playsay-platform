@@ -62,6 +62,7 @@ try {
   await teacher.getByRole('heading',{name:'Library Race'}).waitFor();
   await teacher.getByRole('button',{name:'Предпросмотр',exact:true}).focus();await teacher.keyboard.press('Enter');await teacher.locator('dialog iframe').waitFor();
   assert.equal(await student.locator('iframe').count(),0);assert.equal(launch,null);
+  await teacher.frameLocator('dialog iframe').locator('#step:enabled').click();await teacher.frameLocator('dialog iframe').locator('#count').filter({hasText:'1'}).waitFor();
   await teacher.keyboard.press('Escape');await teacher.locator('dialog').waitFor({state:'detached'});
   assert.equal(await teacher.getByRole('textbox',{name:'Поиск игр'}).inputValue(),'Library');
   await teacher.waitForFunction(()=>document.activeElement?.textContent?.trim()==='Предпросмотр');

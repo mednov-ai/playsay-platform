@@ -13,3 +13,7 @@ Implementation source commits: platform `7cd6afa2`, infra `45783f4`. Three-way p
 - Fresh full npm audits: collaboration zero findings; frontend five high advisory nodes in braces/chokidar/fast-glob/micromatch/tailwindcss. They remain raw findings. Exact versions, lock/audit/Dockerfile hashes and outside-server-runtime classification are retained in protected local evidence `delivery-node-gate.json`. The static nginx Dockerfile copies only dist and configuration, with no Node interpreter or node_modules. Owner policy 2026-10-14 applies; no exception is extended or broadened.
 
 Evidence directory: `/Users/evgeniymednov/Documents/Projects/Play&Say/local-results/shared-html-game-library-20261016`. Native CI security, exact-source rollout, PostgreSQL migration, actual library workflows and legacy inventory are recorded after completion. Local checks do not claim authenticated native DEV or production acceptance.
+
+## Delivery routing correction
+
+Initial dispatcher256 stopped before publication on unmapped `contracts/material-game-reference.schema.json`. Added an explicit API/web routing rule and its test. The AJV/YAML validation runs in the web job after frontend dependencies are installed, outside the dependency-free dispatcher contract test glob. Full CI contracts: 60 passed, 3 optional environment fixtures skipped. Native delivery must analyze the original feature range, including collaboration-service. Local rebuilt browser matrix passes all eight combinations.

@@ -80,8 +80,9 @@ export class SnapshotQueue {
   }
   stop(): void { if (this.interval) clearInterval(this.interval); this.interval = undefined; }
   async load(claims: CollaborationClaims): Promise<unknown | null> {
-    const { response, document } = await this.request(claims);
-    if (response.status === 404) throw new InvalidCollaborationDocument();
+    const { response, document, retiredGameDocument } = await this.request(claims);
+    if (retiredGameDocument) this.remove(claims.documentId);
+    if (response.status === 404 || retiredGameDocument) throw new InvalidCollaborationDocument();
     if (!response.ok) throw new Error("snapshot restore unavailable");
     const pending = this.pending.get(claims.documentId);
     if (pending?.terminal) {
@@ -102,7 +103,7 @@ export class SnapshotQueue {
       while (index < entries.length) await this.flush(entries[index++]);
     }));
   }
-  private async request(claims: CollaborationClaims, body?: string): Promise<{ response: Response; document?: { snapshot?: unknown } }> {
+  private async request(claims: CollaborationClaims, body?: string): Promise<{ response: Response; document?: { snapshot?: unknown }; retiredGameDocument?: boolean }> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5_000);
     try {
@@ -111,18 +112,25 @@ export class SnapshotQueue {
         headers: { "x-playsay-collaboration-service-token": this.config.collaborationServiceToken, ...(body === undefined ? {} : { "content-type": "application/json" }) },
       });
       const document = body === undefined && response.ok ? await response.json() as { snapshot?: unknown } : undefined;
-      if (body !== undefined || !response.ok) await response.body?.cancel();
-      return { response, document };
+      let retiredGameDocument = false;
+      if (claims.documentKind === "LESSON_GAME" && response.status === 403) {
+        const payload: unknown = await response.json().catch(() => null);
+        retiredGameDocument = typeof payload === "object" && payload !== null && "errorCode" in payload
+          && (payload.errorCode === "GAME_LAUNCH_NOT_ACTIVE" || payload.errorCode === "GAME_LESSON_ACCESS_DENIED");
+      }
+      if ((body !== undefined || !response.ok) && !response.bodyUsed) await response.body?.cancel();
+      return { response, document, retiredGameDocument };
     } finally { clearTimeout(timer); }
   }
   private async flush(entry: PendingSnapshot): Promise<void> {
     const start = performance.now();
-    const response = (await this.request(entry.claims, entry.body).catch(() => null))?.response;
+    const result = await this.request(entry.claims, entry.body).catch(() => null);
+    const response = result?.response;
     let outcome: SnapshotOutcome;
     if (response?.ok) {
       outcome = "saved";
       if (this.pending.get(entry.claims.documentId) === entry) this.remove(entry.claims.documentId);
-    } else if (response?.status === 404) {
+    } else if (response?.status === 404 || result?.retiredGameDocument) {
       outcome = "document_invalid";
       this.remove(entry.claims.documentId);
     } else {

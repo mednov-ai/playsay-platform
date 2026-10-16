@@ -13,6 +13,39 @@ describe("SnapshotQueue", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
     await expect(new SnapshotQueue(config).load(claims)).rejects.toThrow("document unavailable");
   });
+  it.each(["GAME_LAUNCH_NOT_ACTIVE", "GAME_LESSON_ACCESS_DENIED"])("releases a retired game snapshot on exact terminal code %s", async errorCode => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ errorCode }, { status: 403 })));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const gameClaims = { ...claims, materialId: undefined, documentKind: "LESSON_GAME", gameLaunchId: "launch" };
+    const queue = new SnapshotQueue(config); const doc = new Y.Doc();
+    queue.markDirty(gameClaims, doc); const outcome = vi.fn(); queue.onOutcome = outcome;
+    await queue.flushAll(); expect(queue.hasPending()).toBe(false);
+    expect(outcome).toHaveBeenCalledWith(gameClaims, "document_invalid");
+    queue.markDirty(gameClaims, doc);
+    await expect(queue.load(gameClaims)).rejects.toThrow("document unavailable");
+    expect(queue.hasPending()).toBe(false); doc.destroy();
+  });
+  it.each([
+    { documentKind: "MATERIAL_WORK", status: 403, errorCode: "GAME_LAUNCH_NOT_ACTIVE" },
+    { documentKind: "LESSON_GAME", status: 403, errorCode: "COLLABORATION_ACCESS_DENIED" },
+    { documentKind: "LESSON_GAME", status: 401, errorCode: "GAME_LAUNCH_NOT_ACTIVE" },
+    { documentKind: "LESSON_GAME", status: 409, errorCode: "GAME_CLIENT_UPDATE_REQUIRED" },
+    { documentKind: "LESSON_GAME", status: 403, errorCode: undefined },
+  ])("retains snapshots for other authorization/protocol responses: %j", async ({ documentKind, status, errorCode }) => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ errorCode }, { status })));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const context = { ...claims, documentKind }; const doc = new Y.Doc();
+    const queue = new SnapshotQueue(config); queue.markDirty(context, doc);
+    await queue.flushAll(); expect(queue.hasPending()).toBe(true);
+    await expect(queue.load(context)).rejects.toThrow("restore unavailable"); doc.destroy();
+  });
+  it("retains a game snapshot when the 403 response body is malformed", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("invalid JSON", { status: 403 })));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const queue = new SnapshotQueue(config); const doc = new Y.Doc();
+    queue.markDirty({ ...claims, documentKind: "LESSON_GAME" }, doc);
+    await queue.flushAll(); expect(queue.hasPending()).toBe(true); doc.destroy();
+  });
   it("retains immutable unsaved edits after the live document is destroyed", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 })).mockResolvedValueOnce(new Response(null, { status: 200 }));

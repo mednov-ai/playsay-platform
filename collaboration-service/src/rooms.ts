@@ -4,7 +4,9 @@ export interface CollaborationClaims {
   subject: string;
   documentId: string;
   lessonId: string;
-  materialId?: string;
+  materialId?: string | null;
+  whiteboardId?: string;
+  contentEpoch?: number;
   gameLaunchId?: string;
   studentUserId?: string;
   documentKind: string;
@@ -14,6 +16,11 @@ export interface CollaborationClaims {
 }
 
 export function collaborationRoomName(claims: CollaborationClaims): string {
+  if (claims.documentKind === "LESSON_WHITEBOARD") {
+    if (!claims.whiteboardId || !Number.isSafeInteger(claims.contentEpoch) || claims.contentEpoch! < 0 || claims.materialId != null || claims.gameLaunchId || (claims.scope === "INDIVIDUAL" && !claims.studentUserId)) throw new Error("invalid whiteboard claims");
+    return `lesson:${claims.lessonId}:whiteboard:${claims.whiteboardId}:epoch:${claims.contentEpoch}`;
+  }
+  if (claims.whiteboardId || claims.contentEpoch != null) throw new Error("invalid whiteboard binding");
   if (claims.documentKind === "LESSON_GAME") {
     if (claims.materialId || !claims.gameLaunchId || claims.scope !== "GROUP") throw new Error("invalid game launch binding");
     return `lesson:${claims.lessonId}:game:${claims.gameLaunchId}:group:kind:LESSON_GAME`;
@@ -41,7 +48,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const documentId = requiredString(payload, "documentId");
   const lessonId = requiredString(payload, "lessonId");
   const documentKind = requiredString(payload, "documentKind");
-  const materialId = documentKind === "LESSON_GAME" ? optionalString(payload, "materialId") : requiredString(payload, "materialId");
+  const materialId = ["LESSON_GAME", "LESSON_WHITEBOARD"].includes(documentKind) ? optionalString(payload, "materialId") : requiredString(payload, "materialId");
   const gameLaunchId = optionalString(payload, "gameLaunchId");
   const scope = requiredScope(payload);
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
@@ -58,6 +65,8 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
     scope,
     yjsDocumentId,
     canPublishMaterialViewport,
+    whiteboardId: optionalString(payload, "whiteboardId"),
+    contentEpoch: typeof payload.contentEpoch === "number" ? payload.contentEpoch : undefined,
   };
 
   assertRoomMatchesClaims(yjsDocumentId, claims);

@@ -9,10 +9,10 @@ import java.util.UUID
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 
+// JPA keeps mapped columns explicit in the entity constructor.
+@Suppress("LongParameterList")
 @Entity
 @Table(name = "collaboration_document")
-// Constructor mirrors persistence fields or coordinates existing domain boundaries.
-@Suppress("LongParameterList")
 class CollaborationDocumentEntity(
     @Id
     @Column(name = "id", nullable = false)
@@ -20,7 +20,7 @@ class CollaborationDocumentEntity(
     @Column(name = "lesson_id", nullable = false)
     var lessonId: UUID = UUID.randomUUID(),
     @Column(name = "material_id")
-    var materialId: UUID? = UUID.randomUUID(),
+    var materialId: UUID? = null,
     @Column(name = "game_launch_id")
     var gameLaunchId: UUID? = null,
     @Column(name = "student_user_id")

@@ -28,6 +28,7 @@ import type { ClassroomMediaRecoveryPhase } from "../model/mediaRecovery";
 import { Button } from "../../../components/ui/button";
 import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
+import { useWhiteboardPresentation } from "../hooks/useLessonWhiteboard";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -114,15 +115,18 @@ export function LiveLessonExperience({
     lessonId: session.lessonId,
     ownerSubject: canManageLesson ? undefined : profile?.subject,
   });
+  const [teacherBoardPresented, setTeacherBoardPresented] = useState(false);
+  const remoteBoardPresented = useWhiteboardPresentation(session.lessonId, !canManageLesson);
+  const whiteboardPresented = teacherBoardPresented || remoteBoardPresented;
   const libraryGame = useLessonLibraryGame(session.lessonId, session.workMode === "SHARED");
   const [gamePickerOpen, setGamePickerOpen] = useState(false);
   const [gameMinimized, setGameMinimized] = useState(false);
   useEffect(() => setGameMinimized(false), [libraryGame.launch?.id]);
-  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch;
+  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch && !whiteboardPresented;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
-  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
-  const externalActivityFocus = presentationMode === "external-activity-focus";
+  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
+  const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
     : videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
@@ -130,7 +134,7 @@ export function LiveLessonExperience({
       : videoOnly
         ? "videoOnly"
         : "lesson";
-  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const showWorkspace = whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],
@@ -199,7 +203,7 @@ export function LiveLessonExperience({
   return (
     <div
       className="playsay-classroom-shell"
-      data-presentation-mode={presentationMode}
+      data-presentation-mode={whiteboardPresented ? "default" : presentationMode}
       data-connection-role={canManageLesson ? "teacher" : "learner"}
       data-media-all-relayed={mediaTransportEvidence.allRelayed ? "true" : "false"}
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
@@ -290,15 +294,17 @@ export function LiveLessonExperience({
         {gamePickerOpen ? <HtmlGamePicker selectLabelKey="games.start" onClose={() => setGamePickerOpen(false)} onSelect={async (game) => { await libraryGame.start(game); setGamePickerOpen(false); }} /> : null}
         {showWorkspace || libraryGame.launch ? <div className="playsay-classroom-primary">
         {libraryGame.error ? <div role="alert" className="px-3">{t("games.failed")}<Button variant="outline" onClick={() => void libraryGame.refresh()}>{t("games.retry")}</Button></div> : null}
-        {libraryGame.launch ? <LessonLibraryGameStage key={libraryGame.launch.id} launch={libraryGame.launch} name={displayName} authority={libraryGame.canControl} protocolReady={libraryGame.protocolReady} minimized={gameMinimized} onMinimize={setGameMinimized} onStop={() => libraryGame.stop(libraryGame.launch!.id)} /> : null}
+        {libraryGame.launch ? <LessonLibraryGameStage key={libraryGame.launch.id} launch={libraryGame.launch} name={displayName} authority={libraryGame.canControl} protocolReady={libraryGame.protocolReady} minimized={gameMinimized} suspended={whiteboardPresented} onMinimize={setGameMinimized} onStop={() => libraryGame.stop(libraryGame.launch!.id)} /> : null}
         {showWorkspace || libraryGame.launch ? (
-          <div className={libraryGame.launch && !gameMinimized ? "hidden" : "contents"}>
+          <div className="contents">
           <LessonWorkspace
+            coveredByLibraryGame={Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented)}
+            onWhiteboardActiveChange={setTeacherBoardPresented}
             displayName={displayName}
             liveVocabulary={liveVocabulary}
             materials={materials}
             onAssignMaterial={onAssignMaterial}
-            onPresentationModeChange={setPresentationMode}
+            onPresentationModeChange={mode => { if (!whiteboardPresented) setPresentationMode(mode); }}
             presentationMode={presentationMode}
             profile={profile}
             session={session}

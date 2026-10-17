@@ -189,7 +189,7 @@ export function useLessonMaterial({
         file,
         onPending: (nextPending) => { documentUploadDraftRef.current = nextPending; },
         pending,
-        save: (input, materialId) => saveMaterial(input, materialId),
+        save: (input, materialId) => saveMaterial({ ...input, isLessonMaterial: true, sourceMeta: { ...input.sourceMeta, kind: "LIVE_LESSON_CREATE", sourceLessonId: session.lessonId } }, materialId),
         titleFallback: t("materials.defaults.materialTitle"),
       });
       setReadyDocumentMaterials((current) => [ready, ...current.filter((item) => item.id !== ready.id)]);

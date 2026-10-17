@@ -14,15 +14,16 @@ export function createExternalActivityRealtimeClient({
   getUrl,
 }: {
   getUrl: () => Promise<string>;
-}): ExternalActivityRealtime {
+}): ExternalActivityRealtime & { setSuspended: (value: boolean) => void } {
   const subscribers = new Set<(message: ExternalActivityRealtimeMessage) => void>();
   let socket: WebSocket | null = null;
   let disposed = false;
+  let suspended = false;
   let reconnectAttempt = 0;
   let reconnectTimer: number | null = null;
 
   const scheduleReconnect = () => {
-    if (disposed || subscribers.size === 0 || reconnectTimer !== null) return;
+    if (disposed || suspended || subscribers.size === 0 || reconnectTimer !== null) return;
     const delay = Math.min(10_000, 250 * (2 ** reconnectAttempt));
     reconnectAttempt += 1;
     reconnectTimer = window.setTimeout(() => {
@@ -33,17 +34,19 @@ export function createExternalActivityRealtimeClient({
 
   const connect = async () => {
     if (
-      disposed
+      disposed || suspended
       || subscribers.size === 0
       || socket?.readyState === WebSocket.OPEN
       || socket?.readyState === WebSocket.CONNECTING
     ) return;
     try {
-      const next = new WebSocket(await getUrl(), externalActivityRealtimeSubprotocol);
+      const url = await getUrl();
+      if (disposed || suspended) return;
+      const next = new WebSocket(url, externalActivityRealtimeSubprotocol);
       next.binaryType = "arraybuffer";
       socket = next;
       next.onmessage = (event) => {
-        if (socket !== next || !(event.data instanceof ArrayBuffer)) return;
+        if (suspended || socket !== next || !(event.data instanceof ArrayBuffer)) return;
         try {
           const message = decodeExternalActivityRealtimeFrame(event.data);
           subscribers.forEach((subscriber) => subscriber(message));
@@ -66,6 +69,11 @@ export function createExternalActivityRealtimeClient({
   };
 
   return {
+    setSuspended(value: boolean) {
+      suspended = value;
+      if (value) { if (reconnectTimer !== null) window.clearTimeout(reconnectTimer); reconnectTimer = null; socket?.close(1000, "surface paused"); socket = null; }
+      else void connect();
+    },
     acquire(onMessage) {
       subscribers.add(onMessage);
       void connect();
@@ -88,6 +96,7 @@ export function createExternalActivityRealtimeClient({
       socket = null;
     },
     publish(message) {
+      if (suspended) return false;
       if (
         socket?.readyState !== WebSocket.OPEN
         || socket.bufferedAmount >= maximumBufferedBytes

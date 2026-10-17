@@ -120,9 +120,11 @@ function deliver(
 export function createGameSyncSessionController({
   realtime,
   publishCheckpoint,
+  isSuspended = () => false,
 }: {
   publishCheckpoint: (blockId: string, checkpoint: MaterialHtmlGameSdkCheckpoint) => void;
   realtime: MaterialHtmlGameRealtime;
+  isSuspended?: () => boolean;
 }): MaterialHtmlGameSdkChannel & {
   close: () => void;
   receiveFallback: (message: MaterialHtmlGameRealtimeMessage) => void;
@@ -224,6 +226,7 @@ export function createGameSyncSessionController({
   };
 
   const receive = (message: MaterialHtmlGameRealtimeMessage) => {
+    if (isSuspended()) return;
     const blockId = message.kind === "action-request"
       ? message.request.blockId
       : message.kind === "ordered-action"
@@ -295,6 +298,7 @@ export function createGameSyncSessionController({
       });
       const attachment: MaterialHtmlGameSdkSessionAttachment = {
         handleOutbound(message: GameSyncOutboundMessage) {
+          if (isSuspended()) return;
           if (message.kind === "action-request") {
             if (!session.validateRequest(message.action)) {
               reject(session, message.action?.eventId, "ACTION_CONTRACT_INVALID", true);

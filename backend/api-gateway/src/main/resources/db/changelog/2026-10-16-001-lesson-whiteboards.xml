@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-10-16-lesson-material-category" author="codex">
+        <addColumn tableName="lesson_material">
+            <column name="is_lesson_material" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="lesson_material_category_set" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+        </addColumn>
+        <createIndex tableName="lesson_material" indexName="ix_lesson_material_category">
+            <column name="owner_teacher_user_id"/><column name="is_lesson_material"/>
+        </createIndex>
+    </changeSet>
+    <changeSet id="2026-10-16-lesson-material-provenance-backfill" author="codex" dbms="postgresql">
+        <sql splitStatements="false"><![CDATA[
+            WITH candidates AS (
+                SELECT id,
+                    CASE WHEN pg_input_is_valid(source_meta, 'jsonb') THEN source_meta::jsonb ELSE '{}'::jsonb END AS metadata
+                FROM lesson_material WHERE lesson_material_category_set = false
+            )
+            UPDATE lesson_material AS material
+            SET is_lesson_material = COALESCE(
+                    candidates.metadata->>'kind' = 'LIVE_LESSON_COPY'
+                    AND candidates.metadata->>'sourceLessonId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                    false),
+                lesson_material_category_set = true
+            FROM candidates WHERE material.id = candidates.id AND material.lesson_material_category_set = false
+        ]]></sql>
+    </changeSet>
+    <changeSet id="2026-10-16-lesson-whiteboards" author="codex">
+        <dropNotNullConstraint tableName="collaboration_document" columnName="material_id" columnDataType="uuid"/>
+        <sql>ALTER TABLE collaboration_document DROP CONSTRAINT ck_collaboration_game_binding</sql>
+        <sql>ALTER TABLE collaboration_document ADD CONSTRAINT ck_collaboration_game_binding CHECK
+            ((document_kind = 'LESSON_GAME' AND material_id IS NULL AND game_launch_id IS NOT NULL AND collaboration_scope = 'GROUP')
+            OR (document_kind = 'LESSON_WHITEBOARD' AND material_id IS NULL AND game_launch_id IS NULL)
+            OR (document_kind NOT IN ('LESSON_GAME', 'LESSON_WHITEBOARD') AND material_id IS NOT NULL AND game_launch_id IS NULL))</sql>
+        <createTable tableName="lesson_whiteboard">
+            <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="student_user_id" type="uuid"/>
+            <column name="context_key" type="varchar(40)"><constraints nullable="false"/></column>
+            <column name="document_id" type="uuid"><constraints nullable="false" unique="true"/></column>
+            <column name="background" type="varchar(7)" defaultValue="#ffffff"><constraints nullable="false"/></column>
+            <column name="learner_ink_enabled" type="boolean" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="content_epoch" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="control_revision" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="active_surface" type="varchar(16)" defaultValue="MATERIAL"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+            <column name="updated_at" type="timestamp with time zone"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_whiteboard" columnNames="lesson_id, context_key" constraintName="uq_whiteboard_context"/>
+        <addForeignKeyConstraint baseTableName="lesson_whiteboard" baseColumnNames="lesson_id" referencedTableName="lesson" referencedColumnNames="id" constraintName="fk_whiteboard_lesson" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="lesson_whiteboard" baseColumnNames="document_id" referencedTableName="collaboration_document" referencedColumnNames="id" constraintName="fk_whiteboard_document" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="lesson_whiteboard" baseColumnNames="student_user_id" referencedTableName="app_user" referencedColumnNames="id" constraintName="fk_whiteboard_student" onDelete="CASCADE"/>
+        <sql>ALTER TABLE lesson_whiteboard ADD CONSTRAINT ck_whiteboard_context CHECK
+            ((student_user_id IS NULL AND context_key = 'GROUP') OR (student_user_id IS NOT NULL AND context_key = CAST(student_user_id AS varchar(36))))</sql>
+        <sql>ALTER TABLE lesson_whiteboard ADD CONSTRAINT ck_whiteboard_surface CHECK (active_surface IN ('MATERIAL', 'WHITEBOARD'))</sql>
+    </changeSet>
+</databaseChangeLog>

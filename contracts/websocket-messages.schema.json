@@ -5,6 +5,15 @@
   "oneOf": [
     {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "lessonId"],
+      "properties": {
+        "type": { "const": "lesson.whiteboard.changed" },
+        "lessonId": { "type": "string", "format": "uuid" }
+      }
+    },
+    {
+      "type": "object",
       "required": ["type", "lessonId", "studentId"],
       "properties": {
         "type": { "const": "LESSON_PRESENCE_CHANGED" },

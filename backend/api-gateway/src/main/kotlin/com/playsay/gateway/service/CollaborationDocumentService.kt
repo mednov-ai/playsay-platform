@@ -41,6 +41,8 @@ class CollaborationTokenService(
         document: CollaborationDocumentEntity,
         origin: String?,
         canPublishMaterialViewport: Boolean,
+        whiteboardId: UUID? = null,
+        contentEpoch: Long? = null,
     ): CollaborationTokenResponse {
         val secretBytes = tokenSecret.trim().toByteArray(StandardCharsets.UTF_8)
         if (secretBytes.size < 32) {
@@ -54,6 +56,8 @@ class CollaborationTokenService(
             .claim("documentId", document.id.toString())
             .claim("lessonId", document.lessonId.toString())
             .claim("materialId", document.materialId?.toString())
+            .claim("whiteboardId", whiteboardId?.toString())
+            .claim("contentEpoch", contentEpoch)
             .claim("gameLaunchId", document.gameLaunchId?.toString())
             .claim("studentUserId", document.studentUserId?.toString())
             .claim("documentKind", document.documentKind)
@@ -94,6 +98,7 @@ class CollaborationDocumentService(
     private val objectMapper: ObjectMapper,
     private val gameAccess: com.playsay.gateway.service.game.LessonGameAccessService? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val whiteboardAccess: WhiteboardAccessService,
 ) {
     @Transactional
     fun createCurrent(
@@ -186,11 +191,14 @@ class CollaborationDocumentService(
         origin: String? = null,
     ): CollaborationTokenResponse {
         val document = visibleDocument(authentication, lessonId, documentId)
+        val board = if (document.documentKind == "LESSON_WHITEBOARD") whiteboardAccess.boardForDocument(authentication, lessonId, documentId, true) else null
         return tokenService.createToken(
             authentication = authentication,
             document = document,
             origin = origin,
-            canPublishMaterialViewport = lessonAuthorizationService.canManageLesson(authentication, lessonId),
+            canPublishMaterialViewport = board == null && lessonAuthorizationService.canManageLesson(authentication, lessonId),
+            whiteboardId = board?.id,
+            contentEpoch = board?.contentEpoch,
         )
     }
 
@@ -249,6 +257,10 @@ class CollaborationDocumentService(
         val document = collaborationDocumentRepo.findById(documentId).orElse(null)
             ?.takeIf { found -> found.lessonId == lessonId }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
+        if (document.documentKind == "LESSON_WHITEBOARD") {
+            whiteboardAccess.boardForDocument(authentication, lessonId, documentId, true)
+            return document
+        }
         if (document.documentKind == "LESSON_GAME") {
             val access = requireNotNull(gameAccess)
             access.requireAccess(authentication, lessonId)
@@ -354,7 +366,9 @@ private data class ValidatedCollaborationDocumentRequest(
 private fun CreateCollaborationDocumentRequest.validated(): ValidatedCollaborationDocumentRequest =
     ValidatedCollaborationDocumentRequest(
         materialId = materialId,
-        documentKind = documentKind.requiredClean("documentKind", 40),
+        documentKind = documentKind.requiredClean("documentKind", 40).also {
+            if (it == "LESSON_WHITEBOARD") throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SCOPE_INVALID)
+        },
         scope = scope.validatedScope(),
     )
 

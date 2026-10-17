@@ -21,13 +21,14 @@ function App() {
  const [clockResumes,setClockResumes] = useState(0);
  useEffect(()=>subscribeLessonClockResume(()=>setClockResumes(value=>value+1)),[]);
  const [minimized,setMinimized] = useState(false);
+ const [board,setBoard] = useState(false);
  const [material,setMaterial] = useState<any>(null);
- (window as any).smoke = {refresh:state.refresh,launch:state.launch,showMaterial:setMaterial};
+ (window as any).smoke = {refresh:state.refresh,launch:state.launch,showMaterial:setMaterial,setBoard};
  return <main className="space-y-4 bg-background p-3 text-foreground" style={{minHeight:'100dvh'}}>
   <output data-testid="clock-resumes">{clockResumes}</output>
   {!student ? <HtmlGameLibraryPanel onSelect={params.has("catalog") ? undefined : async game=>{await state.start(game);setMinimized(false);}} selectLabelKey="games.start" onMaterialSaved={()=>{}} /> : null}
   <div hidden={Boolean(state.launch)&&!minimized}><label>Material draft<textarea aria-label="Material draft" defaultValue="Keep my annotation" /></label>{material ? <LessonMaterialDocumentView material={material} mode="teacherPreview" /> : <p data-testid="video-only">Video-only lesson</p>}</div>
-  {state.launch ? <LessonLibraryGameStage key={state.launch.id} launch={state.launch} authority={state.canControl} protocolReady={state.protocolReady} name={student?'Student':'Teacher'} minimized={minimized} onMinimize={setMinimized} onStop={()=>state.stop(state.launch!.id)} /> : null}
+  {state.launch ? <LessonLibraryGameStage key={state.launch.id} launch={state.launch} authority={state.canControl} protocolReady={state.protocolReady} name={student?'Student':'Teacher'} minimized={minimized} suspended={board} onMinimize={setMinimized} onStop={()=>state.stop(state.launch!.id)} /> : null}
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

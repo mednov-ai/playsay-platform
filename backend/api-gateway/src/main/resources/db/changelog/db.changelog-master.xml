@@ -39,4 +39,5 @@
     <include file="2026-09-06-001-user-deletion-checkpoints.xml" relativeToChangelogFile="true"/>
     <include file="2026-10-04-001-lesson-access-extension.xml" relativeToChangelogFile="true"/>
     <include file="2026-10-16-001-shared-html-game-library.xml" relativeToChangelogFile="true"/>
+    <include file="2026-10-16-001-lesson-whiteboards.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

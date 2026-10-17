@@ -17,4 +17,12 @@ describe("lesson game room trust boundary", () => {
   it("does not accept nullable material for ordinary documents", () => {
     expect(() => validateCollaborationClaims({ ...claims, documentKind: "MATERIAL_WORK" })).toThrow();
   });
+  it("keeps board, game and material token bindings separate", () => {
+    expect(() => validateCollaborationClaims({ ...claims, whiteboardId: "board-one", contentEpoch: 0 })).toThrow();
+    const board = { ...claims, gameLaunchId: null, whiteboardId: "board-one", contentEpoch: 0, documentKind: "LESSON_WHITEBOARD", yjsDocumentId: "lesson:lesson-one:whiteboard:board-one:epoch:0" };
+    expect(validateCollaborationClaims(board).whiteboardId).toBe("board-one");
+    expect(() => validateCollaborationClaims({ ...board, gameLaunchId: "launch-one" })).toThrow();
+    expect(() => validateCollaborationClaims({ ...board, materialId: "material-one" })).toThrow();
+    expect(() => validateCollaborationClaims({ ...board, scope: "INDIVIDUAL" })).toThrow();
+  });
 });

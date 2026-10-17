@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playsay.local/contracts/lesson-whiteboard-control.schema.json",
+  "title": "LessonWhiteboardControl",
+  "description": "JSON payload after varuint type 5 (hello/camera) or type 6 (persisted), then a varstring. Existing Yjs types 0/1 and negotiated recovery 4 retain their wire formats.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "whiteboard"
+      ],
+      "properties": {
+        "type": {
+          "const": "hello"
+        },
+        "version": {
+          "const": 1
+        },
+        "whiteboard": {
+          "const": true
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "sourceClientId",
+        "region"
+      ],
+      "properties": {
+        "type": {
+          "const": "camera"
+        },
+        "version": {
+          "const": 1
+        },
+        "sourceClientId": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": -200000,
+              "maximum": 200000
+            },
+            "y": {
+              "type": "number",
+              "minimum": -200000,
+              "maximum": 200000
+            },
+            "width": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 200000,
+              "exclusiveMinimum": 0
+            },
+            "height": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 200000,
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "contentEpoch",
+        "stateVector",
+        "deleteSet"
+      ],
+      "properties": {
+        "type": {
+          "const": "persisted"
+        },
+        "version": {
+          "const": 1
+        },
+        "contentEpoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stateVector": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "deleteSet": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      }
+    }
+  ]
+}

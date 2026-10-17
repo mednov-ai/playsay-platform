@@ -11,6 +11,7 @@ const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const web=path.join(repo,'frontend/web-app');
 const req=createRequire(path.join(repo,'frontend/package.json'));
 const collabReq=createRequire(path.join(repo,'collaboration-service/package.json'));
+const sdk=fs.readFileSync(path.join(repo,'frontend/game-sync-sdk/dist/game-sync.iife.js'),'utf8');
 const {chromium,webkit}=createRequire(path.join(process.env.PLAYWRIGHT_PACKAGE_DIR||path.join(os.homedir(),'.codex/tools/playwright'),'package.json'))('playwright');
 const {SignJWT}=await import(pathToFileURL(collabReq.resolve('jose')).href);
 const secret='synthetic-library-smoke-secret-123456789';
@@ -21,7 +22,6 @@ const reserve=net.createServer();await new Promise(resolve=>reserve.listen(0,'12
 const child=spawn(process.execPath,['dist/server.js'],{cwd:path.join(repo,'collaboration-service'),env:{...process.env,PORT:String(collabPort),PLAYSAY_API_BASE_URL:`http://127.0.0.1:${api.address().port}`,COLLABORATION_SERVICE_TOKEN:'synthetic',COLLABORATION_TOKEN_SECRET:secret,GAME_REALTIME_MODE:'off'},stdio:['ignore','pipe','pipe']});
 let vite,fixture;let stderr='';child.stderr.on('data',v=>stderr+=v);
 const results=[];
-const sdk=fs.readFileSync(path.join(repo,'frontend/game-sync-sdk/dist/game-sync.iife.js'),'utf8');
 const manifest={protocol:'playsay-game-sync/v1',gameId:'synthetic',stateVersion:'1',reducerVersion:'1',buildHash:'smoke'};
 const html=`<html><head><title>Library Race</title><script type="application/playsay-game+json">${JSON.stringify(manifest)}</script></head><body><button id="step" disabled>Step</button><output id="count">0</output><script>${sdk}</script><script>const game=PlaySayGameSync.defineGame({manifest:${JSON.stringify(manifest)},initialState:{count:0},onSession:session=>{document.body.dataset.runId=session.runId;document.getElementById("step").disabled=false;game.ready();},reduce:s=>({count:s.count+1}),onState:s=>document.getElementById('count').textContent=s.count});document.getElementById('step').onclick=()=>game.dispatch('STEP',{});</script></body></html>`;
 try {
@@ -76,6 +76,14 @@ try {
   for(let action=1;action<=20;action++) { await teacher.frameLocator('iframe').locator('#step').click(); await teacher.frameLocator('iframe').locator('#count').filter({hasText:new RegExp(`^${action}$`)}).waitFor(); if(action===1) await student.frameLocator('iframe').locator('#count').filter({hasText:'1'}).waitFor(); }
   try { await student.frameLocator('iframe').locator('#count').filter({hasText:'20'}).waitFor(); } catch(error) { console.log('COUNT DIAGNOSTIC',engineName,layout,dark,await teacher.frameLocator('iframe').locator('#count').textContent(),await student.frameLocator('iframe').locator('#count').textContent(),errors);throw error; }
   const gameClock=await teacher.getByTestId('clock-resumes').textContent();
+  const launchBeforeBoard=launch.id,framesBeforeBoard=await Promise.all(pages.map(page=>page.locator('iframe').elementHandle()));
+  for(const page of pages)await page.evaluate(()=>window.smoke.setBoard(true));
+  for(const page of pages)await page.locator('[data-game-connection]').waitFor({state:'hidden'});
+  assert.equal(launch.id,launchBeforeBoard);
+  for(const page of pages)await page.evaluate(()=>window.smoke.setBoard(false));
+  for(const frame of framesBeforeBoard)assert.equal(await frame.evaluate(frame=>frame.isConnected),true);
+  for(const page of pages)await page.frameLocator('iframe').locator('#count').filter({hasText:'20'}).waitFor();
+  assert.equal(launch.id,launchBeforeBoard);
   await teacher.getByRole('button',{name:'Свернуть',exact:true}).click();
   assert.equal(await teacher.getByTestId('clock-resumes').textContent(),gameClock);
   assert.equal(await teacher.locator('iframe').count(),1);assert.equal(await teacher.getByRole('textbox',{name:'Material draft'}).inputValue(),'Keep my annotation');

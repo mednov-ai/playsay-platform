@@ -222,6 +222,14 @@ class LessonRealtimeHub(
         publishLessonPresence(lessonId)
     }
 
+    fun publishWhiteboardChanged(lessonId: UUID, studentSubject: String?) {
+        lessonSubscriptions[lessonId].orEmpty().forEach { sessionId ->
+            val principal = principals[sessionId] ?: return@forEach
+            if (studentSubject != null && !principal.canManagePresence() && principal.subject != studentSubject) return@forEach
+            sessions[sessionId]?.let { sendToSession(it, LessonRealtimeOutboundMessage(type = "lesson.whiteboard.changed", lessonId = lessonId)) }
+        }
+    }
+
     fun publishGameChanged(lessonId: UUID) {
         lessonSubscriptions[lessonId].orEmpty().forEach { sessionId ->
             val session = sessions[sessionId] ?: return@forEach

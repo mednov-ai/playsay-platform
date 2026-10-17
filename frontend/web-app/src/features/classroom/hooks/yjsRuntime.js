@@ -478,6 +478,10 @@ export function createYjsWorkspaceRuntime({
       };
     },
     startSocketSync(nextSocket) {
+      // A server removes disconnected awareness with the next clock. Advance
+      // beyond that tombstone before reclaiming the same client on reconnect.
+      const localState = awareness.getLocalState();
+      if (localState) { awareness.setLocalState(localState); awareness.setLocalState(localState); }
       socket = nextSocket;
       sendSyncStep1(nextSocket, ydoc);
       sendAwarenessUpdate(nextSocket, awareness, [ydoc.clientID]);

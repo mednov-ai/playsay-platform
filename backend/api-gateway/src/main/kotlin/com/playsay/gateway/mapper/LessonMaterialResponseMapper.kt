@@ -32,6 +32,7 @@ class LessonMaterialResponseMapper(
             ageBand = material.ageBand,
             estimatedDurationMin = material.estimatedDurationMin,
             blockCount = documentNode.blockCount(),
+            isLessonMaterial = material.isLessonMaterial,
             createdAt = material.createdAt,
             updatedAt = material.updatedAt,
         )

@@ -265,6 +265,87 @@ export interface ScheduledLessonResponse {
   canExtend?: boolean | null;
 }
 
+/**
+ * @nullable
+ */
+export type UpdateLessonWhiteboardRequestActiveSurface = typeof UpdateLessonWhiteboardRequestActiveSurface[keyof typeof UpdateLessonWhiteboardRequestActiveSurface] | null;
+
+
+export const UpdateLessonWhiteboardRequestActiveSurface = {
+  MATERIAL: 'MATERIAL',
+  WHITEBOARD: 'WHITEBOARD',
+} as const;
+
+export interface UpdateLessonWhiteboardRequest {
+  expectedRevision: number;
+  /** @nullable */
+  background?: string | null;
+  /** @nullable */
+  learnerInkEnabled?: boolean | null;
+  /** @nullable */
+  activeSurface?: UpdateLessonWhiteboardRequestActiveSurface;
+  clear: boolean;
+}
+
+export interface CollaborationDocumentResponse {
+  id: string;
+  lessonId: string;
+  /** @nullable */
+  materialId?: string | null;
+  /** @nullable */
+  studentUserId?: string | null;
+  /** @nullable */
+  studentSubject?: string | null;
+  /** @nullable */
+  studentName?: string | null;
+  documentKind: string;
+  scope: string;
+  yjsDocumentId: string;
+  snapshot?: JsonNode | null;
+  /** @nullable */
+  snapshotStorageKey?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LessonWhiteboardResponseScope = typeof LessonWhiteboardResponseScope[keyof typeof LessonWhiteboardResponseScope];
+
+
+export const LessonWhiteboardResponseScope = {
+  GROUP: 'GROUP',
+  INDIVIDUAL: 'INDIVIDUAL',
+} as const;
+
+export type LessonWhiteboardResponseActiveSurface = typeof LessonWhiteboardResponseActiveSurface[keyof typeof LessonWhiteboardResponseActiveSurface];
+
+
+export const LessonWhiteboardResponseActiveSurface = {
+  MATERIAL: 'MATERIAL',
+  WHITEBOARD: 'WHITEBOARD',
+} as const;
+
+export interface LessonWhiteboardResponse {
+  id: string;
+  lessonId: string;
+  scope: LessonWhiteboardResponseScope;
+  /** @nullable */
+  studentSubject?: string | null;
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
+  background: string;
+  learnerInkEnabled: boolean;
+  /** @minimum 0 */
+  contentEpoch: number;
+  controlRevision: number;
+  activeSurface: LessonWhiteboardResponseActiveSurface;
+  canManage: boolean;
+  canDraw: boolean;
+  readOnly: boolean;
+  document: CollaborationDocumentResponse;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MaterialSubmissionRequest {
   content: JsonNode;
   submitted: boolean;
@@ -310,28 +391,6 @@ export interface SaveCollaborationSnapshotRequest {
   snapshot: JsonNode;
   /** @nullable */
   snapshotStorageKey?: string | null;
-}
-
-export interface CollaborationDocumentResponse {
-  id: string;
-  lessonId: string;
-  /** @nullable */
-  materialId?: string | null;
-  /** @nullable */
-  studentUserId?: string | null;
-  /** @nullable */
-  studentSubject?: string | null;
-  /** @nullable */
-  studentName?: string | null;
-  documentKind: string;
-  scope: string;
-  yjsDocumentId: string;
-  snapshot?: JsonNode | null;
-  /** @nullable */
-  snapshotStorageKey?: string | null;
-  version: number;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface AssignmentSubmissionResponse {
@@ -403,6 +462,8 @@ export interface LessonMaterialRequest {
   document?: JsonNode | null;
   sourceMeta?: JsonNode | null;
   scoringRubric?: JsonNode | null;
+  /** @nullable */
+  isLessonMaterial?: boolean | null;
   topicTags: string[];
   skillTags: string[];
   /**
@@ -439,6 +500,7 @@ export interface LessonMaterialResponse {
   /** @nullable */
   estimatedDurationMin?: number | null;
   blockCount: number;
+  isLessonMaterial: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -2126,6 +2188,20 @@ export interface VocabularyHomeworkReviewRequest {
   note?: string | null;
 }
 
+export interface LessonWhiteboardSummaryResponse {
+  id: string;
+  lessonId: string;
+  /** @nullable */
+  studentName?: string | null;
+  updatedAt: string;
+}
+
+export interface LessonWhiteboardContextResponse {
+  enabled: boolean;
+  canManage: boolean;
+  board?: LessonWhiteboardResponse | null;
+}
+
 export interface LessonGameStateResponse {
   launch?: LessonGameLaunchResponse | null;
   revision: number;
@@ -2228,6 +2304,44 @@ export interface WorksheetSourceAttachmentResponse {
   fileName: string;
   mimeType: string;
   byteSize: number;
+}
+
+export type MaterialLibraryItemResponseKind = typeof MaterialLibraryItemResponseKind[keyof typeof MaterialLibraryItemResponseKind];
+
+
+export const MaterialLibraryItemResponseKind = {
+  MATERIAL: 'MATERIAL',
+  LESSON_WHITEBOARD: 'LESSON_WHITEBOARD',
+} as const;
+
+export interface MaterialLibraryItemResponse {
+  id: string;
+  kind: MaterialLibraryItemResponseKind;
+  /** @nullable */
+  title?: string | null;
+  isLessonMaterial: boolean;
+  updatedAt: string;
+  /** @nullable */
+  lessonId?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+  /** @nullable */
+  cefrLevel?: string | null;
+  topicTags: string[];
+  skillTags: string[];
+  /** @nullable */
+  ageBand?: string | null;
+  /** @nullable */
+  estimatedDurationMin?: number | null;
+  /** @nullable */
+  status?: string | null;
+}
+
+export interface MaterialLibraryPageResponse {
+  items: MaterialLibraryItemResponse[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 export interface HelloResponse {
@@ -2355,6 +2469,14 @@ direction?: string;
 status?: string;
 };
 
+export type GetLessonWhiteboardContextParams = {
+studentSubject?: string;
+};
+
+export type EnsureLessonWhiteboardParams = {
+studentSubject?: string;
+};
+
 export type AppendScheduledLessonImagePageParams = {
 title?: string;
 };
@@ -2446,6 +2568,44 @@ revisionId?: string;
 export type ListCollaborationDocumentsParams = {
 materialId: string;
 };
+
+export type ListMaterialLibraryItemsParams = {
+category?: ListMaterialLibraryItemsCategory;
+/**
+ * @nullable
+ */
+kind?: ListMaterialLibraryItemsKind;
+query?: string;
+level?: string;
+topic?: string;
+skill?: string;
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
+
+export type ListMaterialLibraryItemsCategory = typeof ListMaterialLibraryItemsCategory[keyof typeof ListMaterialLibraryItemsCategory];
+
+
+export const ListMaterialLibraryItemsCategory = {
+  STUDY: 'STUDY',
+  LESSON: 'LESSON',
+  ALL: 'ALL',
+} as const;
+
+export type ListMaterialLibraryItemsKind = typeof ListMaterialLibraryItemsKind[keyof typeof ListMaterialLibraryItemsKind] | null;
+
+
+export const ListMaterialLibraryItemsKind = {
+  MATERIAL: 'MATERIAL',
+  LESSON_WHITEBOARD: 'LESSON_WHITEBOARD',
+} as const;
 
 export type GetHtmlGameCoverParams = {
 materialId?: string;
@@ -3017,6 +3177,105 @@ export const deleteScheduledLesson = async (lessonId: string, options?: RequestI
 
   const data: deleteScheduledLessonResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteScheduledLessonResponse
+}
+
+
+
+export type getLessonWhiteboardResponse200 = {
+  data: LessonWhiteboardResponse
+  status: 200
+}
+
+export type getLessonWhiteboardResponseSuccess = (getLessonWhiteboardResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLessonWhiteboardResponse = (getLessonWhiteboardResponseSuccess)
+
+export const getGetLessonWhiteboardUrl = (lessonId: string,
+    boardId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/whiteboards/${boardId}`
+}
+
+export const getLessonWhiteboard = async (lessonId: string,
+    boardId: string, options?: RequestInit): Promise<getLessonWhiteboardResponse> => {
+
+  const res = await fetch(getGetLessonWhiteboardUrl(lessonId,boardId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLessonWhiteboardResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLessonWhiteboardResponse
+}
+
+
+
+export type updateLessonWhiteboardResponse200 = {
+  data: LessonWhiteboardResponse
+  status: 200
+}
+
+export type updateLessonWhiteboardResponseSuccess = (updateLessonWhiteboardResponse200) & {
+  headers: Headers;
+};
+;
+
+export type updateLessonWhiteboardResponse = (updateLessonWhiteboardResponseSuccess)
+
+export const getUpdateLessonWhiteboardUrl = (lessonId: string,
+    boardId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/whiteboards/${boardId}`
+}
+
+export const updateLessonWhiteboard = async (lessonId: string,
+    boardId: string,
+    updateLessonWhiteboardRequest: UpdateLessonWhiteboardRequest, options?: RequestInit): Promise<updateLessonWhiteboardResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUpdateLessonWhiteboardUrl(lessonId,boardId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateLessonWhiteboardRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateLessonWhiteboardResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as updateLessonWhiteboardResponse
 }
 
 
@@ -5156,6 +5415,104 @@ const res = await fetch(getCreateScheduledLessonUrl(),
 
   const data: createScheduledLessonResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createScheduledLessonResponse
+}
+
+
+
+export type getLessonWhiteboardContextResponse200 = {
+  data: LessonWhiteboardContextResponse
+  status: 200
+}
+
+export type getLessonWhiteboardContextResponseSuccess = (getLessonWhiteboardContextResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLessonWhiteboardContextResponse = (getLessonWhiteboardContextResponseSuccess)
+
+export const getGetLessonWhiteboardContextUrl = (lessonId: string,
+    params?: GetLessonWhiteboardContextParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/whiteboard?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/whiteboard`
+}
+
+export const getLessonWhiteboardContext = async (lessonId: string,
+    params?: GetLessonWhiteboardContextParams, options?: RequestInit): Promise<getLessonWhiteboardContextResponse> => {
+
+  const res = await fetch(getGetLessonWhiteboardContextUrl(lessonId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLessonWhiteboardContextResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLessonWhiteboardContextResponse
+}
+
+
+
+export type ensureLessonWhiteboardResponse200 = {
+  data: LessonWhiteboardResponse
+  status: 200
+}
+
+export type ensureLessonWhiteboardResponseSuccess = (ensureLessonWhiteboardResponse200) & {
+  headers: Headers;
+};
+;
+
+export type ensureLessonWhiteboardResponse = (ensureLessonWhiteboardResponseSuccess)
+
+export const getEnsureLessonWhiteboardUrl = (lessonId: string,
+    params?: EnsureLessonWhiteboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/whiteboard?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/whiteboard`
+}
+
+export const ensureLessonWhiteboard = async (lessonId: string,
+    params?: EnsureLessonWhiteboardParams, options?: RequestInit): Promise<ensureLessonWhiteboardResponse> => {
+
+  const res = await fetch(getEnsureLessonWhiteboardUrl(lessonId,params),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: ensureLessonWhiteboardResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as ensureLessonWhiteboardResponse
 }
 
 
@@ -11671,6 +12028,46 @@ export const students = async ( options?: RequestInit): Promise<studentsResponse
 
 
 
+export type listLessonWhiteboardsResponse200 = {
+  data: LessonWhiteboardSummaryResponse[]
+  status: 200
+}
+
+export type listLessonWhiteboardsResponseSuccess = (listLessonWhiteboardsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listLessonWhiteboardsResponse = (listLessonWhiteboardsResponseSuccess)
+
+export const getListLessonWhiteboardsUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/whiteboards`
+}
+
+export const listLessonWhiteboards = async (lessonId: string, options?: RequestInit): Promise<listLessonWhiteboardsResponse> => {
+
+  const res = await fetch(getListLessonWhiteboardsUrl(lessonId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listLessonWhiteboardsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listLessonWhiteboardsResponse
+}
+
+
+
 export type getScheduledLessonMaterialResponse200 = {
   data: LessonMaterialResponse
   status: 200
@@ -12863,6 +13260,53 @@ export const getMaterialDocumentUpload = async (materialId: string,
 
   const data: getMaterialDocumentUploadResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getMaterialDocumentUploadResponse
+}
+
+
+
+export type listMaterialLibraryItemsResponse200 = {
+  data: MaterialLibraryPageResponse
+  status: 200
+}
+
+export type listMaterialLibraryItemsResponseSuccess = (listMaterialLibraryItemsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listMaterialLibraryItemsResponse = (listMaterialLibraryItemsResponseSuccess)
+
+export const getListMaterialLibraryItemsUrl = (params?: ListMaterialLibraryItemsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/library/items?${stringifiedParams}` : `/api/library/items`
+}
+
+export const listMaterialLibraryItems = async (params?: ListMaterialLibraryItemsParams, options?: RequestInit): Promise<listMaterialLibraryItemsResponse> => {
+
+  const res = await fetch(getListMaterialLibraryItemsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listMaterialLibraryItemsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listMaterialLibraryItemsResponse
 }
 
 

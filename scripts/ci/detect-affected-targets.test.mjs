@@ -95,6 +95,12 @@ test("module Jenkinsfiles trigger only the corresponding module", () => {
 
 test("contracts trigger their producers and frontend consumers", () => {
   assertDetection(
+    ["contracts/lesson-whiteboard-control.schema.json"],
+    ["api-gateway", "web-app", "collaboration-service"],
+    ["playsay-api-gateway-develop", "playsay-web-app-develop", "playsay-collaboration-service-develop"],
+    ["ci-contracts"],
+  );
+  assertDetection(
     ["contracts/material-game-reference.schema.json"],
     ["api-gateway", "web-app"],
     ["playsay-api-gateway-develop", "playsay-web-app-develop"],

@@ -116,6 +116,8 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
             title = "Live scan",
         ).body!!
 
+        assertTrue(firstUpload.material.isLessonMaterial)
+        assertFalse(materialCrudController.get(teacher, reusableMaterial.id).isLessonMaterial)
         assertEquals(lesson.id, firstUpload.lesson.id)
         assertEquals(firstUpload.material.id, firstUpload.lesson.materialId)
         assertTrue(firstUpload.material.id != reusableMaterial.id)
@@ -164,6 +166,7 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
             imageFile(name = "first.jpg", contentType = "image/jpeg"),
         ).body!!
 
+        assertTrue(uploaded.material.isLessonMaterial)
         assertEquals(uploaded.material.id, uploaded.lesson.materialId)
         assertEquals(uploaded.material.id, scheduleController.get(student, lesson.id).materialId)
         assertEquals("LIVE_LESSON_COPY", uploaded.material.sourceMeta["kind"].asText())

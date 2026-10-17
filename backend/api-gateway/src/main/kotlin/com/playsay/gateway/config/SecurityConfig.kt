@@ -38,6 +38,7 @@ class SecurityConfig {
                         "/webhooks/mailjet",
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/internal/vocabulary/**",
+                        "/internal/whiteboards/*/policy",
                         "/ws/lessons",
                         "/ws/chat",
                     ).permitAll()

@@ -44,6 +44,12 @@ class OpenApiExportTest {
         assertTrue(yaml.contains("operationId: getMe"))
         listOf(
             "operationId: listMaterials",
+            "operationId: getLessonWhiteboardContext",
+            "operationId: ensureLessonWhiteboard",
+            "operationId: getLessonWhiteboard",
+            "operationId: updateLessonWhiteboard",
+            "operationId: listLessonWhiteboards",
+            "operationId: listMaterialLibraryItems",
             "operationId: createMaterial",
             "operationId: getMaterial",
             "operationId: updateMaterial",

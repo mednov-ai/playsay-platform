@@ -239,6 +239,61 @@ paths:
           description: Scheduled lesson not found
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/whiteboards/{boardId}:
+    get:
+      tags:
+      - lesson-whiteboard-controller
+      operationId: getLessonWhiteboard
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: boardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonWhiteboardResponse"
+    put:
+      tags:
+      - lesson-whiteboard-controller
+      operationId: updateLessonWhiteboard
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: boardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLessonWhiteboardRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonWhiteboardResponse"
   /schedule/lessons/{lessonId}/material-submission:
     get:
       tags:
@@ -1196,6 +1251,53 @@ paths:
           description: Current user cannot manage schedule
       security:
       - bearerAuth: []
+  /schedule/lessons/{lessonId}/whiteboard:
+    get:
+      tags:
+      - lesson-whiteboard-controller
+      operationId: getLessonWhiteboardContext
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: studentSubject
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonWhiteboardContextResponse"
+    post:
+      tags:
+      - lesson-whiteboard-controller
+      operationId: ensureLessonWhiteboard
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: studentSubject
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonWhiteboardResponse"
   /schedule/lessons/{lessonId}/translation-session:
     post:
       tags:
@@ -4874,6 +4976,27 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeacherStudentResponse"
+  /schedule/lessons/{lessonId}/whiteboards:
+    get:
+      tags:
+      - lesson-whiteboard-controller
+      operationId: listLessonWhiteboards
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LessonWhiteboardSummaryResponse"
   /schedule/lessons/{lessonId}/material:
     get:
       tags:
@@ -5609,6 +5732,73 @@ paths:
                 $ref: "#/components/schemas/MaterialDocumentUploadResponse"
       security:
       - bearerAuth: []
+  /library/items:
+    get:
+      tags:
+      - material-library-index-controller
+      operationId: listMaterialLibraryItems
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - STUDY
+          - LESSON
+          - ALL
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type:
+          - string
+          - "null"
+          enum:
+          - MATERIAL
+          - LESSON_WHITEBOARD
+      - name: query
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: level
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: topic
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: skill
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialLibraryPageResponse"
   /hello:
     get:
       tags:
@@ -6705,6 +6895,155 @@ components:
       - type
       - updatedAt
       - workMode
+    UpdateLessonWhiteboardRequest:
+      type: object
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+        background:
+          type:
+          - string
+          - "null"
+        learnerInkEnabled:
+          type:
+          - boolean
+          - "null"
+        activeSurface:
+          type:
+          - string
+          - "null"
+          enum:
+          - MATERIAL
+          - WHITEBOARD
+        clear:
+          type: boolean
+      required:
+      - clear
+      - expectedRevision
+    CollaborationDocumentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        materialId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        studentUserId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        studentSubject:
+          type:
+          - string
+          - "null"
+        studentName:
+          type:
+          - string
+          - "null"
+        documentKind:
+          type: string
+        scope:
+          type: string
+        yjsDocumentId:
+          type: string
+        snapshot:
+          oneOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        snapshotStorageKey:
+          type:
+          - string
+          - "null"
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - documentKind
+      - id
+      - lessonId
+      - scope
+      - updatedAt
+      - version
+      - yjsDocumentId
+    LessonWhiteboardResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum:
+          - GROUP
+          - INDIVIDUAL
+        studentSubject:
+          type:
+          - string
+          - "null"
+        background:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+        learnerInkEnabled:
+          type: boolean
+        contentEpoch:
+          type: integer
+          format: int64
+          minimum: 0
+        controlRevision:
+          type: integer
+          format: int64
+        activeSurface:
+          type: string
+          enum:
+          - MATERIAL
+          - WHITEBOARD
+        canManage:
+          type: boolean
+        canDraw:
+          type: boolean
+        readOnly:
+          type: boolean
+        document:
+          $ref: "#/components/schemas/CollaborationDocumentResponse"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - activeSurface
+      - background
+      - canDraw
+      - canManage
+      - contentEpoch
+      - controlRevision
+      - createdAt
+      - document
+      - id
+      - learnerInkEnabled
+      - lessonId
+      - readOnly
+      - scope
+      - updatedAt
     MaterialSubmissionRequest:
       type: object
       properties:
@@ -6821,65 +7160,6 @@ components:
           - "null"
       required:
       - snapshot
-    CollaborationDocumentResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        lessonId:
-          type: string
-          format: uuid
-        materialId:
-          type:
-          - string
-          - "null"
-          format: uuid
-        studentUserId:
-          type:
-          - string
-          - "null"
-          format: uuid
-        studentSubject:
-          type:
-          - string
-          - "null"
-        studentName:
-          type:
-          - string
-          - "null"
-        documentKind:
-          type: string
-        scope:
-          type: string
-        yjsDocumentId:
-          type: string
-        snapshot:
-          oneOf:
-          - $ref: "#/components/schemas/JsonNode"
-          - type: "null"
-        snapshotStorageKey:
-          type:
-          - string
-          - "null"
-        version:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-      - createdAt
-      - documentKind
-      - id
-      - lessonId
-      - scope
-      - updatedAt
-      - version
-      - yjsDocumentId
     AssignmentSubmissionResponse:
       type: object
       properties:
@@ -6989,6 +7269,10 @@ components:
           oneOf:
           - $ref: "#/components/schemas/JsonNode"
           - type: "null"
+        isLessonMaterial:
+          type:
+          - boolean
+          - "null"
         topicTags:
           type: array
           items:
@@ -7074,6 +7358,8 @@ components:
         blockCount:
           type: integer
           format: int32
+        isLessonMaterial:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -7086,6 +7372,7 @@ components:
       - createdAt
       - document
       - id
+      - isLessonMaterial
       - language
       - scoringRubric
       - skillTags
@@ -9978,6 +10265,40 @@ components:
           minLength: 0
       required:
       - action
+    LessonWhiteboardSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        studentName:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - lessonId
+      - updatedAt
+    LessonWhiteboardContextResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        canManage:
+          type: boolean
+        board:
+          oneOf:
+          - $ref: "#/components/schemas/LessonWhiteboardResponse"
+          - type: "null"
+      required:
+      - canManage
+      - enabled
     LessonGameStateResponse:
       type: object
       properties:
@@ -10242,6 +10563,89 @@ components:
       - kind
       - mimeType
       - sourceId
+    MaterialLibraryItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - MATERIAL
+          - LESSON_WHITEBOARD
+        title:
+          type:
+          - string
+          - "null"
+        isLessonMaterial:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+        lessonId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        createdAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        cefrLevel:
+          type:
+          - string
+          - "null"
+        topicTags:
+          type: array
+          items:
+            type: string
+        skillTags:
+          type: array
+          items:
+            type: string
+        ageBand:
+          type:
+          - string
+          - "null"
+        estimatedDurationMin:
+          type:
+          - integer
+          - "null"
+          format: int32
+        status:
+          type:
+          - string
+          - "null"
+      required:
+      - id
+      - isLessonMaterial
+      - kind
+      - skillTags
+      - topicTags
+      - updatedAt
+    MaterialLibraryPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialLibraryItemResponse"
+        total:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+      required:
+      - items
+      - limit
+      - offset
+      - total
     HelloResponse:
       type: object
       properties:

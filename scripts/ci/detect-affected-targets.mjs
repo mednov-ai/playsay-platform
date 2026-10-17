@@ -227,6 +227,14 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/lesson-whiteboard-control.schema.json") {
+      deployTargets.add("api-gateway");
+      deployTargets.add("web-app");
+      deployTargets.add("collaboration-service");
+      addValidation(validationSuites, "ci-contracts");
+      continue;
+    }
+
     if (path === "contracts/material-game-reference.schema.json") {
       deployTargets.add("api-gateway");
       deployTargets.add("web-app");

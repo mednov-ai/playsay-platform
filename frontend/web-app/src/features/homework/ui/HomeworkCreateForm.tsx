@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { BookOpenCheck, ClipboardList, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AdminUserProfile, LessonMaterial, ScheduledLesson, VocabularyPracticeMode } from "../../../shared/api/playsay";
@@ -110,18 +111,14 @@ export function HomeworkCreateForm({
         />
       </FormField>
       {contentKind === "MATERIAL" ? <FormField label={t("homework.create.material")}>
-        <select
+        <CategorizedMaterialSelect materials={assignableMaterials}
           className="playsay-input"
           disabled={disabled || saving || assignableMaterials.length === 0}
           onChange={(event) => setSelectedMaterialId(event.target.value)}
           value={selectedMaterialId}
         >
-          {assignableMaterials.map((material) => (
-            <option key={material.id} value={material.id}>
-              {material.title}
-            </option>
-          ))}
-        </select>
+
+        </CategorizedMaterialSelect>
       </FormField> : !vocabularyFeatures.personalPracticeV2 ? (
         <div className="grid gap-3 rounded-2xl border border-primary/15 bg-[#fff7f0] p-3">
           <FormField label={t("homework.create.vocabularyMode")}>

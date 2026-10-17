@@ -13,6 +13,7 @@ export function materialToForm(material: LessonMaterial): MaterialFormState {
 
   return {
     id: material.id,
+    isLessonMaterial: material.isLessonMaterial ?? false,
     updatedAt: material.updatedAt,
     title: material.title,
     description: material.description ?? "",
@@ -36,6 +37,7 @@ export function materialDraftToForm(draft: LessonMaterialDraft): MaterialFormSta
 
   return {
     id: null,
+    isLessonMaterial: false,
     updatedAt: null,
     title: draft.title,
     description: draft.description ?? "",
@@ -63,6 +65,7 @@ export function materialFormToInput(form: MaterialFormState): LessonMaterialInpu
 
   return {
     title,
+    isLessonMaterial: form.isLessonMaterial ?? false,
     description: form.description.trim() || null,
     language: form.language.trim() || "en",
     cefrLevel: form.cefrLevel,
@@ -94,6 +97,7 @@ export function materialPreviewFromForm(form: MaterialFormState): LessonMaterial
 
   return {
     id: form.id ?? "preview",
+    isLessonMaterial: input.isLessonMaterial ?? false,
     ownerTeacherUserId: null,
     ownerTeacherSubject: null,
     ownerTeacherName: null,

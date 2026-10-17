@@ -50,6 +50,11 @@ export function MaterialDetailsDrawer({
         </div>
 
         <div className="playsay-material-details-fields">
+          <label className="playsay-material-category-check">
+            <input type="checkbox" checked={form.isLessonMaterial ?? false} disabled={disabled}
+              onChange={event => onUpdateForm("isLessonMaterial", event.target.checked)} />
+            <span>{t("lessonMaterials.mark")}<small>{t("lessonMaterials.hint")}</small></span>
+          </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <FormField label={t("materials.form.level")}>
               <select

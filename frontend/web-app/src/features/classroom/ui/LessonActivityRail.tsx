@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { BookOpen, Check, ChevronRight, CircleHelp, Home, Pause, Play, Square, Users, Wifi, WifiOff, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../../components/ui/button";
@@ -239,10 +240,10 @@ export function LessonActivityRail({
                 <div className="grid gap-3">
                   <label className="grid gap-1 text-sm font-black">
                     {t("classroom.material.pickerLabel")}
-                    <select className="playsay-input" disabled={assigningMaterial || materials.length === 0} onChange={(event) => onSelectMaterial(event.target.value)} value={selectedMaterialId}>
+                    <CategorizedMaterialSelect materials={materials} className="playsay-input" disabled={assigningMaterial || materials.length === 0} onChange={(event) => onSelectMaterial(event.target.value)} value={selectedMaterialId}>
                       <option value="">{t("classroom.material.pickerEmpty")}</option>
-                      {materials.map((material) => <option key={material.id} value={material.id}>{material.title}</option>)}
-                    </select>
+
+                    </CategorizedMaterialSelect>
                   </label>
                   <Button disabled={assigningMaterial || selectedMaterialId === (currentMaterialId ?? "")} onClick={onAssignMaterial} type="button">
                     <BookOpen className="h-4 w-4" />{t("classroom.actions.assign")}

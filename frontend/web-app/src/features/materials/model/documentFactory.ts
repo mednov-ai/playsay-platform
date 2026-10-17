@@ -7,6 +7,7 @@ export function defaultMaterialForm(): MaterialFormState {
   return {
     id: null,
     updatedAt: null,
+    isLessonMaterial: false,
     title: "",
     description: "",
     language: "en",

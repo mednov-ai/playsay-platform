@@ -23,6 +23,7 @@ class CollaborationSnapshotService(
     private val collaborationDocumentRepo: CollaborationDocumentRepo,
     private val collaborationDocumentService: CollaborationDocumentService,
     private val lessonMaterialStore: LessonMaterialStore,
+    private val whiteboards: com.playsay.gateway.repo.LessonWhiteboardRepo,
     private val objectMapper: ObjectMapper,
     private val gameAccess: com.playsay.gateway.service.game.LessonGameAccessService? = null,
     @param:Value("\${playsay.collaboration.service-token:}") private val collaborationServiceToken: String,
@@ -35,7 +36,9 @@ class CollaborationSnapshotService(
         request: SaveCollaborationSnapshotRequest,
     ): CollaborationDocumentResponse {
         collaborationDocumentService.requireDocumentAccess(authentication, lessonId, documentId)
-        return saveSnapshot(lockedDocument(lessonId, documentId), request)
+        val document = lockedDocument(lessonId, documentId)
+        if (document.documentKind == "LESSON_WHITEBOARD") throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+        return saveSnapshot(document, request)
     }
 
     @Transactional
@@ -72,7 +75,7 @@ class CollaborationSnapshotService(
     ): MaterialSubmissionResponse {
         collaborationDocumentService.requireDocumentAccess(authentication, lessonId, documentId)
         val document = lockedDocument(lessonId, documentId)
-        if (document.collaborationScope != MetaData.CollaborationScopes.INDIVIDUAL || document.studentUserId == null) {
+        if (document.documentKind == "LESSON_WHITEBOARD" || document.collaborationScope != MetaData.CollaborationScopes.INDIVIDUAL || document.studentUserId == null) {
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SCOPE_INVALID)
         }
         val snapshot = document.snapshotJson
@@ -96,6 +99,13 @@ class CollaborationSnapshotService(
         document: CollaborationDocumentEntity,
         request: SaveCollaborationSnapshotRequest,
     ): CollaborationDocumentResponse {
+        if (document.documentKind == "LESSON_WHITEBOARD") {
+            val board = whiteboards.findByDocumentId(document.id) ?: documentNotFound()
+            if (request.snapshot.path("contentEpoch").asLong(-1) != board.contentEpoch || request.snapshot.path("coordinateSpace").asText() != "whiteboard-world" ||
+                request.snapshot.path("encoding").asText() != "yjs-update-v1") {
+                throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SNAPSHOT_INVALID)
+            }
+        }
         persistSnapshot(document, request.snapshot, request.snapshotStorageKey)
         return collaborationDocumentService.response(document)
     }

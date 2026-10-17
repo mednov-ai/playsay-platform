@@ -40,6 +40,9 @@ import type { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVo
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 import { documentMaterialsEnabled } from "../../../shared/config/documentMaterials";
 import { LessonActivityRail } from "./LessonActivityRail";
+import { useLessonWhiteboard } from "../hooks/useLessonWhiteboard";
+import { LessonWhiteboard } from "./LessonWhiteboard";
+import { CollaborationSuspensionContext } from "../model/collaborationSuspension";
 
 export function LessonWorkspace({
   displayName,
@@ -50,7 +53,11 @@ export function LessonWorkspace({
   presentationMode,
   profile,
   session,
+  onWhiteboardActiveChange,
+  coveredByLibraryGame = false,
 }: {
+  coveredByLibraryGame?: boolean;
+  onWhiteboardActiveChange?: (active: boolean) => void;
   displayName: string;
   liveVocabulary: ReturnType<typeof useLiveVocabularyPractice>;
   materials: LessonMaterial[];
@@ -162,6 +169,12 @@ export function LessonWorkspace({
   const [studentHealthState, setStudentHealthState] = useState<StudentHealthState>({});
   const healthSubjects = assignedParticipants.map((participant) => participant.subject);
   const healthSubjectKey = healthSubjects.join("|");
+  const whiteboard = useLessonWhiteboard(session.lessonId, canMonitorSubmissions && session.workMode === "PARALLEL" ? activeParticipant?.subject ?? null : null);
+  useEffect(() => {
+    onWhiteboardActiveChange?.(whiteboard.active);
+    return () => onWhiteboardActiveChange?.(false);
+  }, [onWhiteboardActiveChange, whiteboard.active]);
+
   const teacherAnnotationDocumentState = useCollaborationDocument({
     enabled: canMonitorSubmissions && Boolean(visibleMaterial) && !isParallelWork,
     lessonId: session.lessonId,
@@ -172,6 +185,7 @@ export function LessonWorkspace({
     color: collaborationParticipantColor(profile?.subject ?? displayName),
     document: teacherAnnotationDocumentState.document,
     enabled: canMonitorSubmissions && Boolean(teacherAnnotationDocumentState.document),
+    suspended: whiteboard.active || coveredByLibraryGame,
     onDocumentInvalid: teacherAnnotationDocumentState.invalidateDocument,
     participantName: displayName,
   });
@@ -230,6 +244,7 @@ export function LessonWorkspace({
   const externalActivitiesEnabled = externalActivityFeatureEnabled();
   const teacherExternalActivitySync = useExternalActivitySession({
     blocks: externalActivityBlocks,
+    suspended: whiteboard.active || coveredByLibraryGame,
     enabled: canMonitorSubmissions && !isParallelWork && externalActivitiesEnabled,
     isHost: canMonitorSubmissions,
     participantColor: collaborationParticipantColor(profile?.subject ?? displayName),
@@ -280,7 +295,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench" data-presentation-mode={presentationMode}>
+    <section className="playsay-workbench" data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -363,7 +378,16 @@ export function LessonWorkspace({
         </header>
       )}
 
-      <div className="playsay-workbench-layout">
+      {whiteboard.enabled || whiteboard.error ? <nav className="playsay-whiteboard-tabs" aria-label={t("whiteboard.surfaces")}>
+        <button type="button" aria-pressed={!whiteboard.active} disabled={!whiteboard.enabled || !whiteboard.board || !canMonitorSubmissions || whiteboard.pending} onClick={() => void whiteboard.update({ activeSurface: "MATERIAL" })}>{t("whiteboard.material")}</button>
+        <button type="button" aria-pressed={whiteboard.active} disabled={!whiteboard.enabled || !canMonitorSubmissions || whiteboard.pending || (session.workMode === "PARALLEL" && !activeParticipant)} onClick={() => void whiteboard.present()}>{t("whiteboard.title")}</button>
+        {whiteboard.error ? <span role="alert">{t("whiteboard.failed")} <button type="button" onClick={() => void whiteboard.refresh()}>{t("whiteboard.retry")}</button></span> : null}
+      </nav> : null}
+      {whiteboard.board ? <div hidden={!whiteboard.active}>
+        <LessonWhiteboard key={whiteboard.board.document.id} board={whiteboard.board} actor={profile?.subject ?? session.identity} name={displayName} active={whiteboard.active} pending={whiteboard.pending} onUpdate={command => void whiteboard.update(command)} targetLabel={session.workMode === "PARALLEL" ? activeParticipantLabel || displayName : t("whiteboard.group")}/>
+      </div> : null}
+      <CollaborationSuspensionContext.Provider value={whiteboard.active || coveredByLibraryGame}>
+      <div className="playsay-workbench-layout" hidden={whiteboard.active || coveredByLibraryGame} inert={whiteboard.active || coveredByLibraryGame}>
       <div className="playsay-workbench-body">
 
         {assignmentMessage ? (
@@ -553,6 +577,7 @@ export function LessonWorkspace({
         />
       ) : null}
       </div>
+      </CollaborationSuspensionContext.Provider>
     </section>
   );
 }

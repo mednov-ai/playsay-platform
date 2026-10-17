@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, Minus, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -529,7 +530,7 @@ export function ScheduleCreateForm({
       </div>
 
       <FormField label={showParallelAssignments ? t("schedule.form.parallelDefaultMaterial") : t("schedule.form.directMaterial")}>
-        <select
+        <CategorizedMaterialSelect materials={materialOptions}
           className="playsay-input"
           disabled={disabled || materialOptions.length === 0}
           name={showParallelAssignments ? "defaultParallelMaterialId" : "materialId"}
@@ -541,12 +542,8 @@ export function ScheduleCreateForm({
           value={showParallelAssignments ? form.defaultParallelMaterialId : form.materialId}
         >
           <option value="">{t("schedule.form.noMaterial")}</option>
-          {materialOptions.map((material) => (
-            <option key={material.id} value={material.id}>
-              {material.title}
-            </option>
-          ))}
-        </select>
+
+        </CategorizedMaterialSelect>
       </FormField>
 
       <details className="playsay-schedule-advanced" data-schedule-advanced="true">
@@ -609,19 +606,15 @@ export function ScheduleCreateForm({
                 return (
                   <label className="grid gap-1 text-sm font-extrabold sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center" key={subject}>
                     <span className="min-w-0 truncate">{label}</span>
-                    <select
+                    <CategorizedMaterialSelect materials={materialOptions}
                       className="playsay-input"
                       disabled={disabled || materialOptions.length === 0}
                       onChange={(event) => updateParticipantMaterial(subject, event.target.value)}
                       value={form.participantMaterialIds[subject] ?? ""}
                     >
                       <option value="">{t("schedule.form.useDefaultMaterial")}</option>
-                      {materialOptions.map((material) => (
-                        <option key={material.id} value={material.id}>
-                          {material.title}
-                        </option>
-                      ))}
-                    </select>
+
+                    </CategorizedMaterialSelect>
                   </label>
                 );
               })}

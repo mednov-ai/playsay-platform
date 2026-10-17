@@ -1,3 +1,4 @@
+import { isLessonMaterial } from "../../materials/model/materialCategory";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpenCheck, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -87,8 +88,8 @@ export function HomeworkPanel({
   }, [studentSearch, studentUsers]);
 
   useEffect(() => {
-    if (!selectedMaterialId && assignableMaterials[0]) {
-      setSelectedMaterialId(assignableMaterials[0].id);
+    if (!selectedMaterialId && assignableMaterials.some(material => !isLessonMaterial(material))) {
+      setSelectedMaterialId(assignableMaterials.find(material => !isLessonMaterial(material))!.id);
     }
   }, [assignableMaterials, selectedMaterialId]);
 

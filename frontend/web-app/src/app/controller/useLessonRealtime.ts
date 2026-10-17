@@ -353,6 +353,11 @@ export function useLessonRealtime({
       return;
     }
 
+    if (message.type === "lesson.whiteboard.changed" && message.lessonId) {
+      window.dispatchEvent(new CustomEvent("honey-whiteboard-changed", { detail: message.lessonId }));
+      return;
+    }
+
     if (message.type === "schedule.changed") {
       void syncScheduleFromServer();
       return;

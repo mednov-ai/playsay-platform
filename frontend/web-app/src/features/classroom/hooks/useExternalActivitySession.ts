@@ -1,6 +1,7 @@
+import { CollaborationSuspensionContext } from "../model/collaborationSuspension";
 import { useRoomContext } from "@livekit/components-react";
 import { RoomEvent, Track, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication, type TrackPublishOptions } from "livekit-client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { MaterialEditorBlock, MaterialExternalActivitySync } from "../../materials/model/materialDocument";
 import {
   externalActivityCaptureErrorCode,
@@ -48,6 +49,7 @@ export function useExternalActivitySession({
   participantName,
   realtime,
   trustedHostIdentity,
+  suspended = false,
 }: {
   blocks: MaterialEditorBlock[];
   enabled: boolean;
@@ -56,8 +58,11 @@ export function useExternalActivitySession({
   participantName: string;
   realtime?: ExternalActivityRealtime | null;
   trustedHostIdentity?: string | null;
+  suspended?: boolean;
 }): MaterialExternalActivitySync {
   const room = useRoomContext();
+  const contextSuspended = useContext(CollaborationSuspensionContext);
+  const suspendedRef = useRef(false); suspendedRef.current = suspended || contextSuspended;
   const [active, setActive] = useState<ExternalActivityState | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [cursorsByIdentity, setCursorsByIdentity] = useState<Record<string, { identity: string; name: string; color: string; x: number; y: number }>>({});
@@ -180,6 +185,7 @@ export function useExternalActivitySession({
     input: ExternalActivityInput;
     sessionId: string;
   }) => {
+    if (suspendedRef.current) return;
     const remembered = inputResultsRef.current.get(message.eventId);
     if (remembered) {
       broadcastInputResult(message.blockId, message.sessionId, message.eventId, remembered);
@@ -691,6 +697,7 @@ export function useExternalActivitySession({
   }, [clearInputTimers, clearRemoteTrackLossTimer, clearTimers, isHost, stopHostSession]);
 
   const open = useCallback((block: MaterialEditorBlock) => {
+    if (suspendedRef.current) return;
     if (block.type !== "externalActivity" || !block.url) return;
     const sessionId = crypto.randomUUID();
     if (!enabled) {
@@ -732,6 +739,7 @@ export function useExternalActivitySession({
   }, [clearRemoteSession, isHost, stopHostSession]);
 
   const sendInput = useCallback((input: ExternalActivityInput) => {
+    if (suspendedRef.current) return;
     const current = activeRef.current;
     if (!current || current.phase !== "ACTIVE") return;
     const eventId = crypto.randomUUID();

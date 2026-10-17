@@ -82,6 +82,8 @@ class LessonMaterialCatalogService(
                 cefrLevel = values.cefrLevel,
                 visibility = values.visibility,
                 status = values.status,
+                isLessonMaterial = request.isLessonMaterial ?: false,
+                lessonMaterialCategorySet = request.isLessonMaterial != null,
                 document = objectMapper.writeValueAsString(values.document),
                 sourceMeta = objectMapper.writeValueAsString(values.sourceMeta),
                 scoringRubric = objectMapper.writeValueAsString(values.scoringRubric),
@@ -120,8 +122,14 @@ class LessonMaterialCatalogService(
         entity.cefrLevel = values.cefrLevel
         entity.visibility = values.visibility
         entity.status = values.status
+        request.isLessonMaterial?.let { entity.isLessonMaterial = it; entity.lessonMaterialCategorySet = true }
         entity.document = objectMapper.writeValueAsString(values.document)
-        entity.sourceMeta = objectMapper.writeValueAsString(values.sourceMeta)
+        val previousMeta = objectMapper.readTree(entity.sourceMeta)
+        val nextMeta = values.sourceMeta.deepCopy<com.fasterxml.jackson.databind.JsonNode>()
+        if (previousMeta.path("kind").asText() in setOf("LIVE_LESSON_COPY", "LIVE_LESSON_CREATE") && nextMeta is com.fasterxml.jackson.databind.node.ObjectNode) {
+            listOf("kind", "sourceLessonId", "sourceMaterialId", "sourceMeta").forEach { field -> previousMeta.get(field)?.let { nextMeta.set<com.fasterxml.jackson.databind.JsonNode>(field, it) } }
+        }
+        entity.sourceMeta = objectMapper.writeValueAsString(nextMeta)
         entity.scoringRubric = objectMapper.writeValueAsString(values.scoringRubric)
         entity.topicTags = objectMapper.writeValueAsString(values.topicTags)
         entity.skillTags = objectMapper.writeValueAsString(values.skillTags)

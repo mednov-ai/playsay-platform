@@ -10,6 +10,7 @@ import {
   type CollaborationDocument,
   type CollaborationDocumentToken,
 } from "../../../shared/api/playsay";
+import { createYjsWorkspaceRuntime } from "./yjsRuntime";
 import { isInvalidCollaborationDocumentError, useYjsWorkspace } from "./useYjsWorkspace";
 
 const apiMocks = vi.hoisted(() => ({ createToken: vi.fn() }));
@@ -34,17 +35,17 @@ vi.mock("../../../shared/api/playsay", () => {
 });
 
 vi.mock("./yjsRuntime", () => ({
-  createYjsWorkspaceRuntime: () => ({
+  createYjsWorkspaceRuntime: vi.fn(() => ({
     destroy: vi.fn(),
     getClientId: () => 42,
     handleSocketMessage: vi.fn(),
     setSocket: vi.fn(),
     startSocketSync: vi.fn(),
-  }),
+  })),
 }));
 
 vi.mock("../model/gameRealtimeClient", () => ({
-  createGameRealtimeClient: () => ({ close: vi.fn() }),
+  createGameRealtimeClient: () => ({ close: vi.fn(), setSuspended: vi.fn() }),
 }));
 
 vi.mock("../model/gameSyncSessionController", () => ({
@@ -135,6 +136,15 @@ describe("foreground responsiveness through the connection owner", () => {
     const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, 4); encoding.writeVarString(encoder, JSON.stringify(value));
     socket.onmessage?.(new MessageEvent("message", { data: encoding.toUint8Array(encoder).buffer }));
   }
+  it("suspends the material socket while retaining its runtime and resumes with fresh credentials", async () => {
+    vi.mocked(createYjsWorkspaceRuntime).mockClear(); apiMocks.createToken.mockResolvedValue(token("wss://example.test/collab"));
+    const hook=renderHook(({suspended})=>useYjsWorkspace({...options,suspended}),{initialProps:{suspended:false}});
+    await act(async()=>{await Promise.resolve();});act(()=>FakeWebSocket.instances[0].open());
+    hook.rerender({suspended:true});await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});
+    expect(FakeWebSocket.instances).toHaveLength(1);expect(FakeWebSocket.instances[0].readyState).toBe(FakeWebSocket.CLOSED);
+    hook.rerender({suspended:false});await act(async()=>{await Promise.resolve();});
+    expect(FakeWebSocket.instances).toHaveLength(2);expect(createYjsWorkspaceRuntime).toHaveBeenCalledTimes(1);expect(hook.result.current.workspaceClientId).toBe(42);hook.unmount();
+  });
   it("replaces a half-open negotiated socket using a fresh token", async () => {
     vi.spyOn(globalThis.document, "visibilityState", "get").mockReturnValue("visible");
     apiMocks.createToken.mockResolvedValue(token("wss://example.test/collab"));

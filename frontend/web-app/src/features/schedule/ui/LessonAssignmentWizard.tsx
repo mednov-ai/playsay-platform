@@ -1,3 +1,4 @@
+import { isLessonMaterial } from "../../materials/model/materialCategory";
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, CalendarClock, Check, Loader2, Plus, Users, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -63,7 +64,8 @@ export function LessonAssignmentWizard({
   const [draftStudentSubjects, setDraftStudentSubjects] = useState<string[]>([]);
   const [previewMaterial, setPreviewMaterial] = useState<LessonMaterial | null>(null);
   const [createdLesson, setCreatedLesson] = useState<ScheduledLesson | null>(null);
-  const activeMaterials = materials.filter((material) => material.status !== "ARCHIVED");
+  const [includeLessonMaterials, setIncludeLessonMaterials] = useState(false);
+  const activeMaterials = materials.filter(material => material.status !== "ARCHIVED" && (includeLessonMaterials || !isLessonMaterial(material) || material.id === form.materialId));
   const selectedSubjects = selectedParticipantSubjects(form.participantSubjects);
   const selectedStudents = selectedSubjects.map((subject) => studentUsers.find((student) => student.subject === subject));
   const selectedMaterial = activeMaterials.find((material) => material.id === form.materialId) ?? null;
@@ -296,6 +298,7 @@ export function LessonAssignmentWizard({
                   <BookOpen className="playsay-schedule-wizard-icon" />
                   <h3>{t("schedule.wizard.materialTitle")}</h3>
                   <p>{t("schedule.wizard.materialSubtitle")}</p>
+                  <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={includeLessonMaterials} onChange={event => setIncludeLessonMaterials(event.target.checked)} />{t("lessonMaterials.include")}</label>
                   {activeMaterials.length ? (
                     <div className="playsay-schedule-material-grid">
                       <div className="playsay-schedule-material-option playsay-schedule-material-option--single" data-selected={!form.materialId ? "true" : "false"}>

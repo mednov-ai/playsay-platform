@@ -9,6 +9,8 @@ import java.util.UUID
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 
+// JPA keeps mapped columns explicit in the entity constructor.
+@Suppress("LongParameterList")
 @Entity
 @Table(name = "collaboration_document")
 class CollaborationDocumentEntity(
@@ -17,8 +19,8 @@ class CollaborationDocumentEntity(
     var id: UUID = UUID.randomUUID(),
     @Column(name = "lesson_id", nullable = false)
     var lessonId: UUID = UUID.randomUUID(),
-    @Column(name = "material_id", nullable = false)
-    var materialId: UUID = UUID.randomUUID(),
+    @Column(name = "material_id")
+    var materialId: UUID? = null,
     @Column(name = "student_user_id")
     var studentUserId: UUID? = null,
     @Column(name = "document_kind", nullable = false, length = 40)

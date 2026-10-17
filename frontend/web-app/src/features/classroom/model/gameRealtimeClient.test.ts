@@ -79,6 +79,17 @@ describe("createGameRealtimeClient", () => {
     vi.useRealTimers();
   });
 
+  it("pauses the socket and outbound input while retaining game registrations", async () => {
+    const fallback = vi.fn(), getUrl = vi.fn(async () => "ws://localhost/collab/ws");
+    const client = createGameRealtimeClient({ fallback, getActorId: () => "student", getUrl });
+    const release = client.acquire({ blockId: "game-a", runId: "run-a", getRevision: () => 0, isAuthority: false, onMessage: vi.fn() });
+    await vi.waitFor(() => expect(sockets.length).toBe(1)); sockets[0].open("primary");
+    client.setSuspended(true); client.publish(requestMessage);
+    expect(sockets[0].readyState).toBe(FakeWebSocket.CLOSED); expect(fallback).not.toHaveBeenCalled();
+    client.setSuspended(false); await vi.waitFor(() => expect(sockets.length).toBe(2));
+    expect(getUrl).toHaveBeenCalledTimes(2); release(); client.close();
+  });
+
   it("dual-publishes in shadow and uses only the fast lane in primary", async () => {
     const fallback = vi.fn();
     const client = createGameRealtimeClient({

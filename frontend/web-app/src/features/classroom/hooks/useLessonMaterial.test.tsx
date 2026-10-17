@@ -279,4 +279,16 @@ describe("useLessonMaterial live uploads", () => {
     expect(onAssignMaterial).not.toHaveBeenCalled();
   });
 
+  it("marks both saves of a new lesson document while keeping its prepared source untouched", async () => {
+    const ready = material("new-document", "page-document");
+    const input = { title: "Slides", sourceMeta: {} };
+    documentUploadMocks.create.mockImplementationOnce(async ({save}) => { await save(input); await save(input, ready.id); return ready; });
+    apiMocks.saveMaterial.mockResolvedValue(ready);
+    const {result} = renderHook(() => useLessonMaterial({session,onAssignMaterial:vi.fn()}));
+    await act(async () => { await result.current.uploadDocumentPage(new File(["pdf"], "slides.pdf")); });
+    expect(apiMocks.saveMaterial).toHaveBeenNthCalledWith(1, expect.objectContaining({isLessonMaterial:true, sourceMeta:{kind:"LIVE_LESSON_CREATE",sourceLessonId:session.lessonId}}), undefined);
+    expect(apiMocks.saveMaterial).toHaveBeenNthCalledWith(2, expect.objectContaining({isLessonMaterial:true}), ready.id);
+    expect(input.sourceMeta).toEqual({});
+  });
+
 });

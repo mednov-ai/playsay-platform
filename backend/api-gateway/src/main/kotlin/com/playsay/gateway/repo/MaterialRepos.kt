@@ -30,6 +30,7 @@ data class LessonMaterialRow(
     val estimatedDurationMin: Int?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val isLessonMaterial: Boolean = false,
 )
 
 interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
@@ -83,7 +84,8 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.ageBand,
             m.estimatedDurationMin,
             m.createdAt,
-            m.updatedAt
+            m.updatedAt,
+            m.isLessonMaterial
         )
           from LessonMaterialEntity m
           left join AppUserEntity owner on owner.id = m.ownerTeacherUserId
@@ -114,7 +116,8 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.ageBand,
             m.estimatedDurationMin,
             m.createdAt,
-            m.updatedAt
+            m.updatedAt,
+            m.isLessonMaterial
         )
           from LessonMaterialEntity m
           left join AppUserEntity owner on owner.id = m.ownerTeacherUserId
@@ -156,7 +159,8 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.ageBand,
             m.estimatedDurationMin,
             m.createdAt,
-            m.updatedAt
+            m.updatedAt,
+            m.isLessonMaterial
         )
           from LessonMaterialEntity m
           left join AppUserEntity owner on owner.id = m.ownerTeacherUserId
@@ -188,7 +192,8 @@ interface LessonMaterialRepo : JpaRepository<LessonMaterialEntity, UUID> {
             m.ageBand,
             m.estimatedDurationMin,
             m.createdAt,
-            m.updatedAt
+            m.updatedAt,
+            m.isLessonMaterial
         )
           from LessonMaterialEntity m
           left join AppUserEntity owner on owner.id = m.ownerTeacherUserId

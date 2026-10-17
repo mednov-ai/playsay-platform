@@ -33,7 +33,7 @@ export class SnapshotQueue {
   private interval: NodeJS.Timeout | undefined;
   private flushing: Promise<void> | null = null;
   private retainedBytes = 0;
-  onOutcome?: (claims: CollaborationClaims, outcome: SnapshotOutcome) => void;
+  onOutcome?: (claims: CollaborationClaims, outcome: SnapshotOutcome, snapshot?: Record<string, unknown>) => void;
   constructor(private readonly config: SnapshotConfig, private readonly metrics?: SnapshotMetrics) {}
   hasPending(documentId?: string): boolean {
     return documentId ? this.pending.has(documentId) : this.pending.size > 0;
@@ -43,11 +43,11 @@ export class SnapshotQueue {
     try {
       Y.applyUpdate(candidate, Y.encodeStateAsUpdate(doc));
       Y.applyUpdate(candidate, update);
-      this.assertCapacity(claims, this.serialize(candidate).bytes);
+      this.assertCapacity(claims, this.serialize(candidate, claims).bytes);
     } finally { candidate.destroy(); }
   }
   markDirty(claims: CollaborationClaims, doc: Y.Doc): void {
-    const encoded = this.serialize(doc);
+    const encoded = this.serialize(doc, claims);
     this.assertCapacity(claims, encoded.bytes);
     const previous = this.pending.get(claims.documentId);
     this.retainedBytes += encoded.bytes - (previous?.bytes ?? 0);
@@ -58,11 +58,12 @@ export class SnapshotQueue {
     });
     this.metrics?.setSnapshotQueueSize(this.pending.size);
   }
-  private serialize(doc: Y.Doc): { body: string; bytes: number } {
+  private serialize(doc: Y.Doc, claims: CollaborationClaims): { body: string; bytes: number } {
     const snapshot = {
       schemaVersion: 1, encoding: "yjs-update-v1",
       yjsUpdateBase64: Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64"),
       savedAt: new Date().toISOString(),
+      ...(claims.documentKind === "LESSON_WHITEBOARD" ? { contentEpoch: claims.contentEpoch, coordinateSpace: "whiteboard-world", stateVectorBase64: Buffer.from(Y.encodeStateVector(doc)).toString("base64"), deleteSetBase64: Buffer.from(Y.encodeStateAsUpdate(doc, Y.encodeStateVector(doc))).toString("base64") } : {}),
     };
     const body = JSON.stringify({ snapshot });
     if (Buffer.byteLength(JSON.stringify(snapshot)) > 1_000_000) throw new SnapshotCapacityError();
@@ -139,7 +140,8 @@ export class SnapshotQueue {
     }
     this.metrics?.recordSnapshotFlush(outcome === "saved" ? "saved" : outcome === "document_invalid" ? "discard" : "retry", (performance.now() - start) / 1_000);
     if (outcome !== "saved") console.warn(JSON.stringify({ event: "snapshot_outcome", outcome, severity: "warn" }));
-    this.onOutcome?.(entry.claims, outcome);
+    if (entry.claims.documentKind === "LESSON_WHITEBOARD" && outcome === "saved") this.onOutcome?.(entry.claims, outcome, JSON.parse(entry.body).snapshot);
+    else this.onOutcome?.(entry.claims, outcome);
   }
   private remove(id: string): void {
     const current = this.pending.get(id);

@@ -112,6 +112,7 @@ export type StudentInviteReplacedResult = {
 export type StudentInviteConsumeResult = StudentInviteAuthenticatedResult | StudentInviteWaitingResult | StudentInviteReplacedResult;
 export type LessonMaterialJson = Record<string, unknown>;
 export type LessonMaterial = {
+  isLessonMaterial?: boolean;
   id: string;
   ownerTeacherUserId?: string | null;
   ownerTeacherSubject?: string | null;
@@ -168,6 +169,7 @@ export type LiveLessonImagePageResult = MaterialImagePageResult & {
 };
 export type LiveLessonHtmlGamePageResult = LiveLessonImagePageResult;
 export type LessonMaterialInput = {
+  isLessonMaterial?: boolean;
   title: string;
   description?: string | null;
   language?: string;
@@ -473,7 +475,7 @@ export type CollaborationDocumentScope = "INDIVIDUAL" | "GROUP";
 export type CollaborationDocument = {
   id: string;
   lessonId: string;
-  materialId: string;
+  materialId: string | null;
   studentUserId?: string | null;
   studentSubject?: string | null;
   studentName?: string | null;

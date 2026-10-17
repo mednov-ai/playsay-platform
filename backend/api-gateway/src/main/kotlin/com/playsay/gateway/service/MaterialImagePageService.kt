@@ -145,6 +145,8 @@ class MaterialImagePageService(
                 status = source.status,
                 document = source.document,
                 sourceMeta = objectMapper.writeValueAsString(liveLessonCopyMeta(lessonId, source)),
+                isLessonMaterial = true,
+                lessonMaterialCategorySet = true,
                 scoringRubric = source.scoringRubric,
                 topicTags = source.topicTags,
                 skillTags = source.skillTags,
@@ -216,6 +218,8 @@ class MaterialImagePageService(
                     },
                 ),
                 sourceMeta = objectMapper.writeValueAsString(liveLessonCopyMeta(lessonId, source = null)),
+                isLessonMaterial = true,
+                lessonMaterialCategorySet = true,
                 scoringRubric = objectMapper.writeValueAsString(
                     objectMapper.createObjectNode().apply {
                         put("maxScore", 10)

@@ -25,6 +25,7 @@ import type { ClassroomMediaRecoveryPhase } from "../model/mediaRecovery";
 import { Button } from "../../../components/ui/button";
 import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabularyPractice";
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
+import { useWhiteboardPresentation } from "../hooks/useLessonWhiteboard";
 
 export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
 
@@ -111,11 +112,14 @@ export function LiveLessonExperience({
     lessonId: session.lessonId,
     ownerSubject: canManageLesson ? undefined : profile?.subject,
   });
-  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice;
+  const [teacherBoardPresented, setTeacherBoardPresented] = useState(false);
+  const remoteBoardPresented = useWhiteboardPresentation(session.lessonId, !canManageLesson);
+  const whiteboardPresented = teacherBoardPresented || remoteBoardPresented;
+  const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !whiteboardPresented;
   const rawViewportMode = useClassroomViewportMode();
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
-  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
-  const externalActivityFocus = presentationMode === "external-activity-focus";
+  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
+  const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
     : videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
@@ -123,7 +127,7 @@ export function LiveLessonExperience({
       : videoOnly
         ? "videoOnly"
         : "lesson";
-  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const showWorkspace = whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],
@@ -192,7 +196,7 @@ export function LiveLessonExperience({
   return (
     <div
       className="playsay-classroom-shell"
-      data-presentation-mode={presentationMode}
+      data-presentation-mode={whiteboardPresented ? "default" : presentationMode}
       data-connection-role={canManageLesson ? "teacher" : "learner"}
       data-media-all-relayed={mediaTransportEvidence.allRelayed ? "true" : "false"}
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
@@ -280,11 +284,12 @@ export function LiveLessonExperience({
 
         {showWorkspace ? (
           <LessonWorkspace
+            onWhiteboardActiveChange={setTeacherBoardPresented}
             displayName={displayName}
             liveVocabulary={liveVocabulary}
             materials={materials}
             onAssignMaterial={onAssignMaterial}
-            onPresentationModeChange={setPresentationMode}
+            onPresentationModeChange={mode => { if (!whiteboardPresented) setPresentationMode(mode); }}
             presentationMode={presentationMode}
             profile={profile}
             session={session}

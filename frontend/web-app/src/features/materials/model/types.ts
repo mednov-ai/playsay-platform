@@ -559,6 +559,7 @@ export type MaterialExerciseSync = {
 };
 
 export type MaterialFormState = {
+  isLessonMaterial?: boolean;
   id: string | null;
   updatedAt: string | null;
   title: string;

@@ -11,6 +11,7 @@ import {
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import type { LessonAccessOrigin } from "../../../shared/api/types";
 import { useAppTranslation } from "../../../shared/i18n";
+import { WhiteboardHistoryAction } from "../../classroom/ui/WhiteboardHistoryAction";
 
 export function ScheduledLessonCard({
   canManage,
@@ -99,6 +100,7 @@ export function ScheduledLessonCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {archived ? <WhiteboardHistoryAction lessonId={lesson.id}/> : null}
           {readyToStart ? (
             <>
               <Button

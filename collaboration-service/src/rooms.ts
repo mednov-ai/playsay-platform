@@ -4,7 +4,9 @@ export interface CollaborationClaims {
   subject: string;
   documentId: string;
   lessonId: string;
-  materialId: string;
+  materialId: string | null;
+  whiteboardId?: string;
+  contentEpoch?: number;
   studentUserId?: string;
   documentKind: string;
   scope: CollaborationScope;
@@ -13,6 +15,11 @@ export interface CollaborationClaims {
 }
 
 export function collaborationRoomName(claims: CollaborationClaims): string {
+  if (claims.documentKind === "LESSON_WHITEBOARD") {
+    if (!claims.whiteboardId || !Number.isSafeInteger(claims.contentEpoch) || claims.contentEpoch! < 0 || claims.materialId != null) throw new Error("invalid whiteboard claims");
+    return `lesson:${claims.lessonId}:whiteboard:${claims.whiteboardId}:epoch:${claims.contentEpoch}`;
+  }
+  if (!claims.materialId) throw new Error("missing materialId");
   if (claims.scope === "GROUP") {
     return `lesson:${claims.lessonId}:material:${claims.materialId}:group:kind:${claims.documentKind}`;
   }
@@ -34,7 +41,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const subject = requiredString(payload, "sub");
   const documentId = requiredString(payload, "documentId");
   const lessonId = requiredString(payload, "lessonId");
-  const materialId = requiredString(payload, "materialId");
+  const materialId = payload.documentKind === "LESSON_WHITEBOARD" ? null : requiredString(payload, "materialId");
   const documentKind = requiredString(payload, "documentKind");
   const scope = requiredScope(payload);
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
@@ -50,6 +57,8 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
     scope,
     yjsDocumentId,
     canPublishMaterialViewport,
+    whiteboardId: optionalString(payload, "whiteboardId"),
+    contentEpoch: typeof payload.contentEpoch === "number" ? payload.contentEpoch : undefined,
   };
 
   assertRoomMatchesClaims(yjsDocumentId, claims);

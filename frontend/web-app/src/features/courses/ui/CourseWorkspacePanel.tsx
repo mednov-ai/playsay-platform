@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type Ref } from "react";
 import {
   ArrowDown,
@@ -963,19 +964,15 @@ function CourseLessonCreateForm({
           type="number"
           value={form.plannedDurationMin}
         />
-        <select
+        <CategorizedMaterialSelect materials={materials}
           className="playsay-input min-w-0 max-w-full flex-[3_1_12rem]"
           disabled={disabled || materials.length === 0}
           onChange={(event) => updateField("materialId", event.target.value)}
           value={form.materialId}
         >
           <option value="">{t("courses.form.noInitialCard")}</option>
-          {materials.map((material) => (
-            <option key={material.id} value={material.id}>
-              {material.title}
-            </option>
-          ))}
-        </select>
+
+        </CategorizedMaterialSelect>
       </div>
       <Button className="h-auto min-h-10 max-w-full whitespace-normal text-center" disabled={disabled || form.title.trim().length === 0} type="submit">
         <Plus className="h-4 w-4" />
@@ -1148,19 +1145,15 @@ function LessonCardAddForm({
 
   return (
     <form className="mt-2 flex min-w-0 max-w-full flex-wrap gap-2" data-testid="curriculum-card-add-form" onSubmit={submit}>
-      <select
+      <CategorizedMaterialSelect materials={materials}
         className="playsay-input min-w-0 max-w-full flex-[3_1_12rem]"
         disabled={disabled || materials.length === 0}
         onChange={(event) => updateField("materialId", event.target.value)}
         value={form.materialId}
       >
         <option value="">{materials.length === 0 ? t("courses.empty.noMaterials") : t("courses.form.cardSelect")}</option>
-        {materials.map((material) => (
-          <option key={material.id} value={material.id}>
-            {material.title}
-          </option>
-        ))}
-      </select>
+
+      </CategorizedMaterialSelect>
       <select
         className="playsay-input min-w-[8rem] max-w-full flex-[1_1_8rem]"
         disabled={disabled}

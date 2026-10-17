@@ -8,6 +8,7 @@ import com.playsay.gateway.dto.ScheduledLessonRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -69,6 +70,8 @@ class HtmlGameOptimizationUploadIntegrationTest : MaterialControllerTestFixture(
             lesson.id,
             htmlFile(content = source),
         ).body!!
+        assertTrue(live.material.isLessonMaterial)
+        assertFalse(materialCrudController.get(teacher, material.id).isLessonMaterial)
         val liveAssets = materialAssetController.listAssets(teacher, live.material.id)
         assertEquals(2, liveAssets.size)
         assertTrue(liveAssets.all { it.metadata["imageOptimizationStatus"].asText() == "OPTIMIZED" })

@@ -23,6 +23,7 @@ data class LessonMaterialRequest(
     val document: JsonNode? = null,
     val sourceMeta: JsonNode? = null,
     val scoringRubric: JsonNode? = null,
+    val isLessonMaterial: Boolean? = null,
     val topicTags: List<String> = emptyList(),
     val skillTags: List<String> = emptyList(),
     @field:Schema(maxLength = 32, nullable = true)
@@ -50,6 +51,7 @@ data class LessonMaterialResponse(
     val ageBand: String?,
     val estimatedDurationMin: Int?,
     val blockCount: Int,
+    val isLessonMaterial: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

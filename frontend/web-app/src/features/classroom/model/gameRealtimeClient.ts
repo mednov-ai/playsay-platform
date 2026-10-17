@@ -35,7 +35,7 @@ export function createGameRealtimeClient({
   fallback: (message: MaterialHtmlGameRealtimeMessage) => void;
   getActorId: () => string;
   getUrl: () => Promise<string>;
-}): MaterialHtmlGameRealtime & { close: () => void } {
+}): MaterialHtmlGameRealtime & { close: () => void } & { setSuspended: (value: boolean) => void } {
   const registrations = new Map<symbol, Registration>();
   const registrationsBySession = new Map<string, Set<Registration>>();
   const pendingRequests = new Map<string, MaterialHtmlGameRealtimeMessage>();
@@ -43,6 +43,7 @@ export function createGameRealtimeClient({
   let socket: WebSocket | null = null;
   let mode: GameRealtimeMode | null = null;
   let disposed = false;
+  let suspended = false;
   let reconnectAttempt = 0;
   let reconnectTimer: number | null = null;
   let closeTimer: number | null = null;
@@ -59,6 +60,7 @@ export function createGameRealtimeClient({
   const registrationKey = historyKey;
 
   const fallbackDataMessage = (message: MaterialHtmlGameRealtimeMessage) => {
+    if (suspended) return;
     if (
       message.kind === "action-request"
       || message.kind === "ordered-action"
@@ -123,6 +125,7 @@ export function createGameRealtimeClient({
   };
 
   const publish = (message: MaterialHtmlGameRealtimeMessage) => {
+    if (suspended) return;
     if (message.kind === "action-request") {
       pendingRequests.set(message.request.eventId, message);
       while (pendingRequests.size > maximumHistory) {
@@ -225,7 +228,7 @@ export function createGameRealtimeClient({
   };
 
   const scheduleReconnect = () => {
-    if (disposed || registrations.size === 0 || reconnectTimer !== null) {
+    if (disposed || suspended || registrations.size === 0 || reconnectTimer !== null) {
       return;
     }
     // A server with GAME_REALTIME_MODE=off rejects the optional subprotocol.
@@ -241,7 +244,7 @@ export function createGameRealtimeClient({
 
   const connect = async () => {
     if (
-      disposed
+      disposed || suspended
       || registrations.size === 0
       || socket?.readyState === WebSocket.OPEN
       || socket?.readyState === WebSocket.CONNECTING
@@ -249,12 +252,14 @@ export function createGameRealtimeClient({
       return;
     }
     try {
-      const next = new WebSocket(await getUrl(), gameRealtimeSubprotocol);
+      const url = await getUrl();
+      if (disposed || suspended) return;
+      const next = new WebSocket(url, gameRealtimeSubprotocol);
       reportStatus("connecting", null);
       next.binaryType = "arraybuffer";
       socket = next;
       next.onmessage = (event) => {
-        if (socket !== next || !(event.data instanceof ArrayBuffer)) {
+        if (suspended || socket !== next || !(event.data instanceof ArrayBuffer)) {
           return;
         }
         try {
@@ -294,6 +299,11 @@ export function createGameRealtimeClient({
   };
 
   return {
+    setSuspended(value: boolean) {
+      suspended = value;
+      if (value) { if (reconnectTimer !== null) window.clearTimeout(reconnectTimer); reconnectTimer = null; socket?.close(1000, "surface paused"); socket = null; }
+      else void connect();
+    },
     acknowledge(eventId) {
       pendingRequests.delete(eventId);
     },

@@ -1,6 +1,6 @@
 import { decodeRecoveryControl, encodeRecoveryProbe } from "../model/collaborationRecoveryProtocol";
 import { observeConnection } from "../../../shared/routing/connectionDiagnostics";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCollaborationDocumentToken,
   isApiStatus,
@@ -43,6 +43,8 @@ import { createGameRealtimeClient } from "../model/gameRealtimeClient";
 import { createExternalActivityRealtimeClient } from "../model/externalActivityRealtimeClient";
 import { createGameSyncSessionController } from "../model/gameSyncSessionController";
 
+import { CollaborationSuspensionContext } from "../model/collaborationSuspension";
+
 export type { CollaborationCursor, CollaborationParticipant };
 
 export type YjsWorkspaceStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
@@ -53,13 +55,18 @@ export function useYjsWorkspace({
   enabled = true,
   onDocumentInvalid,
   participantName,
+  suspended = false,
 }: {
   color: string;
   document: CollaborationDocument | null;
   enabled?: boolean;
   onDocumentInvalid?: (documentId: string) => void;
   participantName: string;
+  suspended?: boolean;
 }) {
+  const contextSuspended = useContext(CollaborationSuspensionContext);
+  const pauseRef = useRef(suspended || contextSuspended);
+  pauseRef.current = suspended || contextSuspended;
   const [participants, setParticipants] = useState<CollaborationParticipant[]>([]);
   const [status, setStatus] = useState<YjsWorkspaceStatus>("idle");
   const [annotationElements, setAnnotationElementsState] = useState<AnnotationElement[]>([]);
@@ -84,6 +91,7 @@ export function useYjsWorkspace({
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
   const exerciseInteractionRef = useRef<MaterialExerciseInteraction | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const gameRealtimeRef = useRef<ReturnType<typeof createGameRealtimeClient> | null>(null);
   const gameSyncControllerRef = useRef<ReturnType<typeof createGameSyncSessionController> | null>(null);
   const externalActivityRealtime = useMemo(() => {
     if (!enabled || !document) return null;
@@ -93,6 +101,13 @@ export function useYjsWorkspace({
       ),
     });
   }, [document?.id, document?.lessonId, enabled]);
+
+  useEffect(() => {
+    gameRealtimeRef.current?.setSuspended(suspended || contextSuspended);
+    externalActivityRealtime?.setSuspended(suspended || contextSuspended);
+    if (suspended || contextSuspended) socketRef.current?.close(1000);
+    else retryConnectionRef.current?.();
+  }, [suspended, contextSuspended, externalActivityRealtime]);
 
   useEffect(() => {
     if (!enabled || !document) {
@@ -180,7 +195,10 @@ export function useYjsWorkspace({
         await createCollaborationDocumentToken(document.lessonId, document.id),
       ),
     });
+    gameRealtimeRef.current = gameRealtime;
+    gameRealtime.setSuspended(pauseRef.current);
     gameSyncController = createGameSyncSessionController({
+      isSuspended: () => pauseRef.current,
       publishCheckpoint: (blockId, checkpoint) => {
         runtime.setHtmlGameSdkCheckpoint(blockId, checkpoint);
       },
@@ -234,7 +252,7 @@ export function useYjsWorkspace({
       }
     };
     const connect = async () => {
-      if (connectInFlight || terminal) return;
+      if (connectInFlight || terminal || pauseRef.current) return;
       if (disposed || !navigator.onLine) {
         scheduleReconnect();
         return;
@@ -251,7 +269,7 @@ export function useYjsWorkspace({
             tokenTimer = window.setTimeout(() => reject(new Error("collaboration token timeout")), 5_000);
           }),
         ]);
-        if (disposed || generation !== attemptGeneration || terminal) return;
+        if (disposed || generation !== attemptGeneration || terminal || pauseRef.current) return;
         if (tokenResponse.documentId !== document.id) {
           terminal = true; setStatus("error"); onDocumentInvalid?.(document.id); return;
         }
@@ -381,6 +399,7 @@ export function useYjsWorkspace({
       gameRealtime.close();
       externalActivityRealtime?.close();
       gameSyncControllerRef.current = null;
+      gameRealtimeRef.current = null;
       runtimeRef.current = null;
       annotationElementsRef.current = [];
       setAnnotationElementsState([]);

@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, BookOpen, CalendarClock, Check, CircleAlert, Copy, Loader2, Play, Users } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -101,15 +102,15 @@ export function LessonPreparationPanel({
             ) : null}
           </div>
           <div className="playsay-preparation-material-picker">
-            <select
+            <CategorizedMaterialSelect materials={activeMaterials}
               className="playsay-input"
               disabled={disabled || isClosed}
               onChange={(event) => void assignMaterial(event.target.value)}
               value={currentLesson.materialId ?? ""}
             >
               <option value="">{t("schedule.form.noMaterial")}</option>
-              {activeMaterials.map((material) => <option key={material.id} value={material.id}>{material.title}</option>)}
-            </select>
+
+            </CategorizedMaterialSelect>
             {selectedMaterial ? (
               <div className="playsay-preparation-material-card">
                 <BookOpen className="h-6 w-6" />

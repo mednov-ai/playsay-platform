@@ -1,3 +1,4 @@
+import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import {
   ChevronDown,
   FileCode2,
@@ -106,7 +107,7 @@ export function TeacherLessonToolbar({
 
       {canManageMaterial && !compact ? (
         <div className="playsay-teacher-toolbar-material">
-          <select
+          <CategorizedMaterialSelect materials={materials}
             aria-label={t("classroom.material.pickerLabel")}
             className="playsay-input playsay-teacher-toolbar-material-select"
             disabled={assigningMaterial || materials.length === 0}
@@ -115,12 +116,8 @@ export function TeacherLessonToolbar({
             value={selectedMaterialId}
           >
             <option value="">{t("classroom.material.pickerEmpty")}</option>
-            {materials.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
+
+          </CategorizedMaterialSelect>
           <Button
             className="playsay-teacher-toolbar-assign"
             disabled={assignDisabled}

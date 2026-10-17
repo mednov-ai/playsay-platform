@@ -40,6 +40,8 @@ import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, 
 
 import { decodeProbe, encodeRecovery, messageRecovery } from "./recoveryProtocol.js";
 
+import { assertWhiteboardSync, loadWhiteboardPolicy, applyWhiteboardCamera, messageWhiteboard, messageWhiteboardPersistence } from "./whiteboardAuthorization.js";
+
 const messageSync = 0;
 const messageAwareness = 1;
 const messageEphemeral = 2;
@@ -55,15 +57,20 @@ interface CollaborationRoom {
   connections: Map<WebSocket, Set<number>>;
   destroy: () => void;
   idleTimer: NodeJS.Timeout | null;
+  inbound: Promise<void>;
+  inboundCount: number;
+  inboundBytes: number;
 }
 
 const rooms = new Map<string, Promise<CollaborationRoom>>();
 const lastProbe = new WeakMap<WebSocket, number>();
 const probeEnabled = new WeakSet<WebSocket>();
 const connectionClaims = new Map<WebSocket, CollaborationClaims>();
+let whiteboardConfig: { playsayApiBaseUrl: string; collaborationServiceToken: string };
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  whiteboardConfig = config;
   const metrics = new CollaborationMetrics();
   const snapshots = new SnapshotQueue(config, metrics);
   const backpressurePolicy = {
@@ -149,10 +156,12 @@ async function main(): Promise<void> {
     metrics,
   );
 
-  snapshots.onOutcome = (claims, outcome) => {
+  snapshots.onOutcome = (claims, outcome, snapshot) => {
     void rooms.get(claims.yjsDocumentId)?.then(room => {
       if (room.claims.documentId !== claims.documentId) return;
-      if (outcome === "document_invalid") {
+      if (outcome === "saved" && claims.documentKind === "LESSON_WHITEBOARD" && snapshot) {
+        for (const ws of room.connections.keys()) if (ws.readyState === ws.OPEN) sendWhiteboardControl(ws, messageWhiteboardPersistence, { type: "persisted", version: 1, contentEpoch: claims.contentEpoch, stateVector: snapshot.stateVectorBase64, deleteSet: snapshot.deleteSetBase64 });
+      } else if (outcome === "document_invalid") {
         room.invalid = true;
         if (rooms.get(claims.yjsDocumentId)) rooms.delete(claims.yjsDocumentId);
         for (const ws of room.connections.keys()) ws.close(4404, "document unavailable");
@@ -190,8 +199,9 @@ async function main(): Promise<void> {
 
     const tokenValue = token.value as string;
     void verifyCollaborationToken(tokenValue, { tokenSecret: config.collaborationTokenSecret })
-      .then((claims) => {
+      .then(async (claims) => {
         assertRoomMatchesClaims(roomName, claims);
+        if (claims.documentKind === "LESSON_WHITEBOARD") await loadWhiteboardPolicy(config, claims);
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit("connection", ws, request, claims);
         });
@@ -247,6 +257,10 @@ async function main(): Promise<void> {
   server.listen(config.port, () => {
     console.log(`collaboration-service listening on :${config.port}`);
   });
+}
+
+function sendWhiteboardControl(ws: WebSocket, type: number, value: Record<string, unknown>): void {
+  const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, type); encoding.writeVarString(encoder, JSON.stringify(value)); ws.send(encoding.toUint8Array(encoder));
 }
 
 function serviceTokenMatches(presented: string | string[] | undefined, expected: string): boolean {
@@ -319,6 +333,10 @@ async function createRoom(
   metrics: CollaborationMetrics,
 ): Promise<CollaborationRoom> {
   const persistedSnapshot = await snapshots.load(claims);
+  if (claims.documentKind === "LESSON_WHITEBOARD" && persistedSnapshot) {
+    const snapshot = persistedSnapshot as Record<string, unknown>;
+    if (snapshot.encoding !== "yjs-update-v1" || snapshot.coordinateSpace !== "whiteboard-world" || snapshot.contentEpoch !== claims.contentEpoch || typeof snapshot.yjsUpdateBase64 !== "string") throw new Error("invalid whiteboard restore");
+  }
   const doc = new Y.Doc();
   applyPersistedSnapshot(doc, persistedSnapshot);
   const room = {
@@ -330,6 +348,9 @@ async function createRoom(
     connections: new Map(),
     destroy: () => undefined,
     idleTimer: null,
+    inbound: Promise.resolve(),
+    inboundCount: 0,
+    inboundBytes: 0,
   } satisfies CollaborationRoom;
   const updateHandler = (update: Uint8Array, origin: unknown) => {
     if (room.invalid) return;
@@ -399,12 +420,13 @@ function bindWebSocket(
   room.connections.set(ws, new Set());
 
   ws.on("message", (message) => {
-    processMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
+    enqueueMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
   });
 
   ws.on("close", () => {
     const controlledIds = room.connections.get(ws);
     room.connections.delete(ws);
+    if (room.claims.documentKind === "LESSON_WHITEBOARD") void room.inbound.finally(() => snapshots.flushAll());
     if (controlledIds && controlledIds.size > 0) {
       awarenessProtocol.removeAwarenessStates(room.awareness, [...controlledIds], ws);
     }
@@ -423,6 +445,17 @@ function bindWebSocket(
     }
   });
 
+  if (room.claims.documentKind === "LESSON_WHITEBOARD") {
+    sendWhiteboardControl(ws, messageWhiteboard, { type: "hello", version: 1, whiteboard: true });
+    let checking = false;
+    const policyTimer = setInterval(() => {
+      if (checking || ws.readyState !== ws.OPEN) return;
+      const claims = connectionClaims.get(ws); if (!claims) { ws.close(1008); return; }
+      checking = true;
+      void loadWhiteboardPolicy(whiteboardConfig, claims).catch(() => ws.close(1008, "whiteboard access expired")).finally(() => { checking = false; });
+    }, 5000);
+    policyTimer.unref(); ws.once("close", () => clearInterval(policyTimer));
+  }
   if (isYjsSocket(ws) && probeEnabled.has(ws)) {
     ws.send(encodeRecovery({ type: "hello", version: 1, liveness: true }));
   }
@@ -444,8 +477,33 @@ function bindWebSocket(
     sendCurrentAwareness(ws, room.awareness, backpressurePolicy, metrics);
   }
   pendingMessages.forEach((message) => {
-    processMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
+    enqueueMessage(room, ws, message, backpressurePolicy, externalActivityBackpressurePolicy, metrics);
   });
+}
+
+function enqueueMessage(room: CollaborationRoom, ws: WebSocket, message: RawData, bp: CollaborationBackpressurePolicy, externalBp: CollaborationBackpressurePolicy, metrics: CollaborationMetrics): void {
+  if (room.claims.documentKind !== "LESSON_WHITEBOARD") { processMessage(room, ws, message, bp, externalBp, metrics); return; }
+  const queued = rawDataToUint8Array(message).byteLength;
+  if (room.inboundCount >= 100 || room.inboundBytes + queued > 2 * 1024 * 1024) { ws.close(4409, "whiteboard queue limit"); return; }
+  room.inboundCount++; room.inboundBytes += queued;
+  room.inbound = room.inbound.then(async () => {
+    if (ws.readyState !== ws.OPEN) return;
+    const claims = connectionClaims.get(ws);
+    if (!claims) throw new Error("missing whiteboard claims");
+    const policy = await loadWhiteboardPolicy(whiteboardConfig, claims);
+    if (ws.readyState !== ws.OPEN) return;
+    const bytes = rawDataToUint8Array(message);
+    if (bytes[0] === messageWhiteboard) {
+      const decoder = decoding.createDecoder(bytes); decoding.readVarUint(decoder);
+      const payload = decoding.readVarString(decoder);
+      if (payload.length > 2048 || decoding.hasContent(decoder)) throw new Error("invalid whiteboard command");
+      applyWhiteboardCamera(room.doc, JSON.parse(payload), policy.canManage, room.connections.get(ws) ?? new Set());
+      return;
+    }
+    if (![messageSync, messageAwareness, messageRecovery].includes(bytes[0])) throw new Error("invalid whiteboard channel");
+    assertWhiteboardSync(room.doc, bytes, claims, policy);
+    processMessage(room, ws, message, bp, externalBp, metrics);
+  }).catch(() => ws.close(1008, "whiteboard update denied")).finally(() => { room.inboundCount--; room.inboundBytes -= queued; });
 }
 
 function processMessage(
@@ -518,7 +576,7 @@ function handleMessage(
     if (!claims) {
       throw new Error("missing collaboration claims");
     }
-    if (!claims.canPublishMaterialViewport) {
+    if (claims.documentKind !== "LESSON_WHITEBOARD" && !claims.canPublishMaterialViewport) {
       assertSyncMessageDoesNotModifyMaterialViewport(room.doc, bytes);
     }
     const validationDecoder = decoding.createDecoder(bytes);
@@ -526,7 +584,7 @@ function handleMessage(
     const syncType = decoding.readVarUint(validationDecoder);
     if (syncType === syncProtocol.messageYjsSyncStep2 || syncType === syncProtocol.messageYjsUpdate) {
       const update = decoding.readVarUint8Array(validationDecoder);
-      assertGameLifecycleUpdate(room.doc, update);
+      if (claims.documentKind !== "LESSON_WHITEBOARD") assertGameLifecycleUpdate(room.doc, update);
       room.snapshots.assertCanApply(room.claims, room.doc, update);
     }
     const encoder = encoding.createEncoder();
@@ -552,7 +610,7 @@ function handleMessage(
     applyMaterialViewportCommand(
       room.doc,
       decoding.readVarUint8Array(decoder),
-      claims.materialId,
+      claims.materialId!,
       room.connections.get(ws) ?? new Set(),
     );
     return;

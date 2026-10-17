@@ -3367,3 +3367,43 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   border: 1px solid hsl(var(--border));
   border-radius: 0.75rem;
 }
+
+.playsay-material-category-filter{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}
+.playsay-material-category-filter button{padding:.55rem .8rem;min-height:44px;border:1px solid hsl(var(--border));border-radius:.65rem;background:hsl(var(--background));color:hsl(var(--foreground));font-size:.85rem}
+.playsay-material-category-filter button[aria-pressed=true]{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:hsl(var(--primary))}
+.playsay-material-category-check{display:flex;align-items:flex-start;gap:.6rem;min-height:44px;padding:.6rem 0}
+.playsay-material-category-check input{margin-top:.2rem;width:18px;height:18px;flex-shrink:0}
+.playsay-material-category-check small{display:block;color:hsl(var(--muted-foreground));margin-top:.3rem}
+
+.playsay-whiteboard-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid hsl(var(--border))}
+.playsay-whiteboard{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:hsl(var(--background));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:.8rem;overflow:hidden}
+.playsay-whiteboard button,.playsay-whiteboard select,.playsay-whiteboard-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:44px;min-width:44px;padding:.5rem .7rem;border:1px solid hsl(var(--border));border-radius:.6rem;background:hsl(var(--background));color:hsl(var(--foreground));font-size:.85rem}
+.playsay-whiteboard button[aria-pressed=true],.playsay-whiteboard-tabs button[aria-pressed=true]{background:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.playsay-whiteboard button:disabled,.playsay-whiteboard-tabs button:disabled{opacity:.55}
+.playsay-whiteboard svg:not(.playsay-annotation-layer):not(.playsay-whiteboard-cursors){width:18px;height:18px;flex-shrink:0}
+.playsay-whiteboard-controls,.playsay-whiteboard-tools,.playsay-whiteboard-footer{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.5rem .65rem;border-bottom:1px solid hsl(var(--border))}
+.playsay-whiteboard-controls label,.playsay-whiteboard-tools label{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;font-size:.8rem}
+.playsay-whiteboard input[type=color]{width:36px;height:36px;padding:2px;border:1px solid hsl(var(--border));border-radius:.4rem;background:hsl(var(--background))}
+.playsay-whiteboard input[type=checkbox]{width:18px;height:18px}
+.playsay-whiteboard-target{font-size:.8rem;color:hsl(var(--muted-foreground));margin-right:auto}
+.playsay-whiteboard-stage{position:relative;height:clamp(300px,58vh,700px);min-height:260px;touch-action:none;overflow:hidden;isolation:isolate}
+.playsay-whiteboard-stage .playsay-annotation-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;touch-action:none}
+.playsay-whiteboard-stage[data-hand=true] .playsay-annotation-layer{cursor:grab}
+.playsay-whiteboard-cursors{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.playsay-whiteboard-footer{border-top:1px solid hsl(var(--border));border-bottom:0;font-size:.8rem;padding-bottom:calc(.5rem + env(safe-area-inset-bottom,0px))}
+.playsay-whiteboard-footer output{min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
+.playsay-whiteboard-confirm{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;background:hsl(var(--background));color:hsl(var(--foreground))}
+.playsay-whiteboard-confirm>div{display:flex;gap:.75rem;flex-wrap:wrap}
+.playsay-whiteboard[data-expanded=true] .playsay-whiteboard-stage{height:clamp(360px,70vh,900px)}
+.playsay-workbench[data-whiteboard-active=true]>.playsay-workbench-layout[hidden]{display:none!important}
+.playsay-workbench[data-whiteboard-active=true]{min-width:0;overflow:auto}
+@media(max-width:640px){.playsay-whiteboard-controls{gap:.3rem}.playsay-whiteboard-target{flex-basis:100%}.playsay-whiteboard-tools{gap:.25rem}.playsay-whiteboard-stage{height:42vh;min-height:280px}.playsay-whiteboard-footer{gap:.3rem}}
+@media(orientation:landscape) and (max-height:640px){.playsay-whiteboard-stage{height:50vh;min-height:180px}}
+.playsay-whiteboard-history-backdrop{position:fixed;inset:0;z-index:110;background:hsl(var(--foreground)/.3);display:flex;align-items:center;justify-content:center;padding:1rem}
+.playsay-whiteboard-history-dialog{width:min(1100px,100%);max-height:95dvh;overflow:auto;border-radius:1rem;background:hsl(var(--background));color:hsl(var(--foreground));padding:.75rem;box-shadow:0 10px 40px hsl(var(--foreground)/.2)}
+.playsay-whiteboard-history-dialog>header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem;padding-bottom:.75rem}
+.playsay-whiteboard-history-dialog button,.playsay-whiteboard-history-actions button{min-height:44px;padding:.5rem .8rem;border:1px solid hsl(var(--border));border-radius:.6rem;background:hsl(var(--background));color:hsl(var(--foreground))}
+.playsay-whiteboard-history-actions{display:inline-flex;flex-wrap:wrap;gap:.4rem;min-width:1px;min-height:1px}
+
+@media(min-width:1024px){.playsay-classroom-shell:has(.playsay-whiteboard[data-expanded="true"]){grid-template-columns:clamp(14rem,18vw,20rem) minmax(0,1fr)}}
+.playsay-whiteboard select{appearance:none;height:44px;padding-right:1.6rem;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 11px) 50%,calc(100% - 7px) 50%;background-size:4px 4px;background-repeat:no-repeat}

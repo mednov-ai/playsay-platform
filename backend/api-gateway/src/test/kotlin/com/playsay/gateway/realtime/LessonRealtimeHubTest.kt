@@ -26,6 +26,20 @@ class LessonRealtimeHubTest {
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     @Test
+    fun `individual whiteboard event reaches only its subscribed learner and managers`() {
+        val hub = LessonRealtimeHub(objectMapper)
+        val current = lesson(id = UUID.randomUUID(), status = "IN_PROGRESS", participantSubjects = listOf("student-a", "student-b"))
+        val teacher = RecordingWebSocketSession(); val a = RecordingWebSocketSession(); val b = RecordingWebSocketSession(); val elsewhere = RecordingWebSocketSession()
+        listOf(teacher to LessonRealtimePrincipal("teacher-1", setOf("TEACHER")), a to LessonRealtimePrincipal("student-a", setOf("STUDENT")), b to LessonRealtimePrincipal("student-b", setOf("STUDENT")), elsewhere to LessonRealtimePrincipal("student-a", setOf("STUDENT"))).forEach { (socket, principal) -> hub.register(socket, principal) }
+        listOf(teacher, a, b).forEach { hub.subscribe(it, current) }
+        hub.publishWhiteboardChanged(current.id, "student-a")
+        fun events(socket: RecordingWebSocketSession) = socket.sentMessages.map(objectMapper::readTree).filter { it["type"].asText() == "lesson.whiteboard.changed" }
+        assertEquals(1, events(teacher).size); assertEquals(1, events(a).size); assertTrue(events(b).isEmpty()); assertTrue(events(elsewhere).isEmpty())
+        assertEquals(setOf("type", "lessonId"), events(a).single().fieldNames().asSequence().toSet())
+        hub.publishWhiteboardChanged(current.id, null); assertEquals(1, events(b).size)
+    }
+
+    @Test
     fun `extension is delivered to both subscribed participants without managing actor capability`() {
         val hub = LessonRealtimeHub(objectMapper)
         val active = lesson(id = UUID.randomUUID(), status = "IN_PROGRESS", participantSubjects = listOf("student-1"))

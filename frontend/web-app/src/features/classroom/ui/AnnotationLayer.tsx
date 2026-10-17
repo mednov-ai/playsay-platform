@@ -35,7 +35,9 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   readOnly = false,
   selectedElementId,
   tool,
+  viewport,
 }: {
+  viewport?: { x: number; y: number; width: number; height: number };
   anchorId?: string;
   anchorBounds?: AnnotationLayerBounds | null;
   editingElementId: string | null;
@@ -67,7 +69,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   const { t } = useAppTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
   const htmlRef = useRef<HTMLDivElement>(null);
-  const htmlSurface = useAnnotationHtmlSurface(svgRef, htmlRef, anchorBounds);
+  const htmlSurface = useAnnotationHtmlSurface(svgRef, htmlRef, anchorBounds, viewport);
   const markerId = `playsay-arrow-${useId().split(":").join("")}`;
   const selectedElement = selectedElementId
     ? elements.find((element) => element.id === selectedElementId) ?? null
@@ -131,7 +133,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
         preserveAspectRatio="none"
         ref={svgRef}
         style={anchorStyle}
-        viewBox="0 0 1000 1000"
+        viewBox={viewport ? `${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}` : "0 0 1000 1000"}
       >
         <defs>
           <marker
@@ -204,12 +206,15 @@ type AnnotationHtmlSurface = {
   parent: HTMLElement;
   scaleX: number;
   scaleY: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 function useAnnotationHtmlSurface(
   svgRef: RefObject<SVGSVGElement | null>,
   htmlRef: RefObject<HTMLDivElement | null>,
   bounds?: AnnotationLayerBounds | null,
+  viewport?: { x: number; y: number; width: number; height: number },
 ): AnnotationHtmlSurface | null {
   const [surface, setSurface] = useState<AnnotationHtmlSurface | null>(null);
   useLayoutEffect(() => {
@@ -224,11 +229,14 @@ function useAnnotationHtmlSurface(
       }
       const next = {
         parent,
-        scaleX: rect.width / 1000,
-        scaleY: rect.height / 1000,
+        scaleX: rect.width / (viewport?.width ?? 1000),
+        scaleY: rect.height / (viewport?.height ?? 1000),
+        offsetX: -(viewport?.x ?? 0) * rect.width / (viewport?.width ?? 1000),
+        offsetY: -(viewport?.y ?? 0) * rect.height / (viewport?.height ?? 1000),
       };
       setSurface((current) => current && current.parent === next.parent
-        && current.scaleX === next.scaleX && current.scaleY === next.scaleY ? current : next);
+        && current.scaleX === next.scaleX && current.scaleY === next.scaleY
+        && current.offsetX === next.offsetX && current.offsetY === next.offsetY ? current : next);
     };
     measure();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
@@ -239,7 +247,7 @@ function useAnnotationHtmlSurface(
       observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [svgRef, htmlRef, bounds?.left, bounds?.top, bounds?.width, bounds?.height]);
+  }, [svgRef, htmlRef, bounds?.left, bounds?.top, bounds?.width, bounds?.height, viewport?.x, viewport?.y, viewport?.width, viewport?.height]);
   return surface;
 }
 
@@ -512,8 +520,8 @@ const AnnotationElementView = memo(function AnnotationElementView({
           tabIndex={commonProps.tabIndex}
           style={{
             position: "absolute",
-            left: element.x * htmlSurface.scaleX,
-            top: element.y * htmlSurface.scaleY,
+            left: element.x * htmlSurface.scaleX + htmlSurface.offsetX,
+            top: element.y * htmlSurface.scaleY + htmlSurface.offsetY,
             width: element.width,
             height: element.height,
             transform: `scale(${htmlSurface.scaleX}, ${htmlSurface.scaleY})`,

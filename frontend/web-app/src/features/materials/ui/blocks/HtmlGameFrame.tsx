@@ -46,6 +46,7 @@ type BridgeMessage =
   | { channel: string; runId?: string; sequence: number; type: "snapshotApplied" }
   | { channel: string; operations: MaterialHtmlGamePatchOperation[]; sequence: number; type: "patch" }
   | { channel: string; runId?: string; sequence: number; type: "patchRejected" }
+  | { channel: string; type: "escape" }
   | { channel: string; type: "sdkReady" }
   | { channel: string; message: string; type: "runtimeError" }
   | { channel: string; type: "runtimeReady" }
@@ -161,12 +162,14 @@ function orderSdkAction(
 }
 
 type HtmlGameFrameProps = {
+  runIdentity?: string;
   blockId: string;
   contentState?: HtmlGameContentState;
   fillAvailable?: boolean;
   height: number;
   html?: string;
   onClose?: () => void;
+  onEscape?: () => void;
   onRetry?: () => void;
   onRuntimeStatusChange?: (status: HtmlGameRuntimeStatus) => void;
   sync?: MaterialHtmlGameSync;
@@ -176,12 +179,14 @@ type HtmlGameFrameProps = {
 export type HtmlGameContentState = "loading" | "ready" | "unavailable";
 
 function HtmlGameFrameComponent({
+  runIdentity,
   blockId,
   contentState,
   fillAvailable = false,
   height,
   html,
   onClose,
+  onEscape,
   onRetry,
   onRuntimeStatusChange,
   sync,
@@ -197,12 +202,14 @@ function HtmlGameFrameComponent({
   const isMirror = Boolean(sync && !sync.isAuthority && !sdkRuntime);
   const authorityRunId = sync?.authorityRuns[blockId];
   const predictiveMirror = Boolean(isMirror && html && supportsPredictiveHtmlGame(html));
+  const authorityRuntimeRunId = runIdentity ?? channel;
   const runtimeRunId = (isMirror || (sdkRuntime && !sync?.isAuthority))
-    ? authorityRunId ?? blockId
-    : channel;
+    ? authorityRunId ?? runIdentity ?? blockId
+    : authorityRuntimeRunId;
+  const escapeToHost = Boolean(onEscape);
   const srcDoc = useMemo(
-    () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror) : "",
-    [channel, html, isMirror, predictiveMirror, runtimeRunId],
+    () => html ? createSandboxedGameDocument(html, channel, isMirror, runtimeRunId, predictiveMirror, escapeToHost) : "",
+    [channel, escapeToHost, html, isMirror, predictiveMirror, runtimeRunId],
   );
   const handledInputsRef = useRef<Set<string> | null>(null);
   const latestInputSequenceRef = useRef<Map<string, number>>(new Map());
@@ -229,6 +236,21 @@ function HtmlGameFrameComponent({
   const syncClientId = sync?.clientId;
   const syncIsAuthority = sync?.isAuthority ?? true;
   const presentedBlockId = sync?.presentedBlockId ?? null;
+  const attachSdkSession = useCallback(() => {
+    sdkSessionRef.current?.release();
+    sdkSessionRef.current = null;
+    if (!sdkRuntime || !sdkChannel || presentedBlockId !== blockId || !sdkHelloAcceptedRef.current || !sdkPortRef.current) return;
+    sdkSessionRef.current = sdkChannel.attach({
+      actorId: String(syncClientId ?? channel),
+      blockId,
+      getCheckpoint: () => sdkChannel.getCheckpoint(blockId),
+      getPort: () => sdkPortRef.current,
+      isAuthority: syncIsAuthority,
+      onFailure: () => setRuntimeStatus("failed"),
+      runId: runtimeRunId,
+      validateRequest: (request) => sdkHelloAcceptedRef.current && validSdkActionRequest(request, embeddedManifest),
+    });
+  }, [blockId, channel, embeddedManifest, presentedBlockId, runtimeRunId, sdkChannel, sdkRuntime, syncClientId, syncIsAuthority]);
   const sdkReplicaAuthorityReady = Boolean(authorityRunId && sync?.ready);
   const authorityAvailable = sdkRuntime
     ? !sync || sync.isAuthority || sdkReplicaAuthorityReady
@@ -321,9 +343,9 @@ function HtmlGameFrameComponent({
     if (!html || !sync?.isAuthority || !sync.ready) {
       return undefined;
     }
-    sync.setAuthorityRun(blockId, channel);
+    sync.setAuthorityRun(blockId, authorityRuntimeRunId);
     return () => sync.setAuthorityRun(blockId, null);
-  }, [blockId, channel, html, sync?.isAuthority, sync?.ready, sync?.setAuthorityRun]);
+  }, [blockId, authorityRuntimeRunId, html, sync?.isAuthority, sync?.ready, sync?.setAuthorityRun]);
 
   useEffect(() => {
     function handleMessage(messageEvent: MessageEvent<BridgeMessage>) {
@@ -331,6 +353,10 @@ function HtmlGameFrameComponent({
         return;
       }
       const message = messageEvent.data;
+      if (message.type === "escape") {
+        onEscape?.();
+        return;
+      }
       if (sdkRuntime && message.type !== "sdkReady" && message.type !== "runtimeError") {
         return;
       }
@@ -339,7 +365,7 @@ function HtmlGameFrameComponent({
           canvases: message.canvases,
           controls: message.controls,
           html: message.html,
-          runId: channel,
+          runId: authorityRuntimeRunId,
           scroll: message.scroll,
           sequence: message.sequence,
           updatedAt: Date.now(),
@@ -372,7 +398,7 @@ function HtmlGameFrameComponent({
           at: Date.now(),
           blockId,
           id: crypto.randomUUID(),
-          runId: sync.isAuthority ? channel : sync.authorityRuns[blockId],
+          runId: sync.isAuthority ? authorityRuntimeRunId : sync.authorityRuns[blockId],
           sequence: ++nextInputSequenceRef.current,
         };
         (handledInputsRef.current ??= new Set()).add(input.id);
@@ -384,7 +410,7 @@ function HtmlGameFrameComponent({
           blockId,
           id: crypto.randomUUID(),
           operations: message.operations,
-          runId: channel,
+          runId: authorityRuntimeRunId,
           sequence: message.sequence,
         });
       } else if (message.type === "patchRejected" && isMirror) {
@@ -401,6 +427,9 @@ function HtmlGameFrameComponent({
       } else if (message.type === "runtimeReady" && !sdkRuntime) {
         setRuntimeStatus((current) => current === "failed" ? current : "ready");
       } else if (message.type === "sdkReady" && sdkRuntime) {
+        sdkSessionRef.current?.release();
+        sdkSessionRef.current = null;
+        sdkHelloAcceptedRef.current = false;
         sdkPortRef.current?.close();
         const ports = new MessageChannel();
         sdkPortRef.current = ports.port1;
@@ -433,6 +462,8 @@ function HtmlGameFrameComponent({
               seed: seedFromRunId(runtimeRunId),
             };
             ports.port1.postMessage(context);
+            // Fast-lane resume can replay immediately: the iframe must receive context first.
+            attachSdkSession();
           } else if (outbound.kind === "diagnostic") {
             recordGameSyncDiagnostic({
               ...outbound.diagnostic,
@@ -538,7 +569,7 @@ function HtmlGameFrameComponent({
         bridgeMessageHandlerRef.current = () => undefined;
       }
     };
-  }, [activeSnapshot, authorityRunId, blockId, channel, embeddedManifest, isMirror, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
+  }, [activeSnapshot, attachSdkSession, authorityRuntimeRunId, authorityRunId, blockId, channel, embeddedManifest, isMirror, onEscape, runtimeRunId, sdkRuntime, sendMirrorSnapshot, sync]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<BridgeMessage>) => {
@@ -553,49 +584,18 @@ function HtmlGameFrameComponent({
   }, []);
 
   useEffect(() => {
-    if (
-      !sdkRuntime
-      || !sdkChannel
-      || presentedBlockId !== blockId
-    ) {
-      return;
-    }
-    const attachment = sdkChannel.attach({
-      actorId: String(syncClientId ?? channel),
-      blockId,
-      getCheckpoint: () => sdkChannel.getCheckpoint(blockId),
-      getPort: () => sdkPortRef.current,
-      isAuthority: syncIsAuthority,
-      onFailure: () => setRuntimeStatus("failed"),
-      runId: runtimeRunId,
-      validateRequest: (request) => (
-        sdkHelloAcceptedRef.current
-        && validSdkActionRequest(request, embeddedManifest)
-      ),
-    });
-    sdkSessionRef.current = attachment;
+    attachSdkSession();
     return () => {
-      if (sdkSessionRef.current === attachment) {
-        sdkSessionRef.current = null;
-      }
-      attachment.release();
+      sdkSessionRef.current?.release();
+      sdkSessionRef.current = null;
     };
-  }, [
-    blockId,
-    embeddedManifest,
-    presentedBlockId,
-    runtimeRunId,
-    sdkChannel,
-    sdkRuntime,
-    syncClientId,
-    syncIsAuthority,
-  ]);
+  }, [attachSdkSession]);
 
   useEffect(() => {
     if (!sync) {
       return;
     }
-    const expectedRunId = sync.isAuthority ? channel : authorityRunId;
+    const expectedRunId = sync.isAuthority ? authorityRuntimeRunId : authorityRunId;
     if (!expectedRunId) return;
     if (handledInputsRef.current === null) {
       handledInputsRef.current = new Set(
@@ -621,7 +621,7 @@ function HtmlGameFrameComponent({
       }
       iframeRef.current?.contentWindow?.postMessage({ channel, type: "applyInput", event }, "*");
     });
-  }, [authorityRunId, blockId, channel, sync, sync?.inputs, sync?.isAuthority]);
+  }, [authorityRuntimeRunId, authorityRunId, blockId, channel, sync, sync?.inputs, sync?.isAuthority]);
 
   useEffect(() => {
     if (!sync || sync.isAuthority) {
@@ -745,10 +745,12 @@ function sameHtmlGameFrameProps(
   if (
     previous.blockId !== next.blockId
     || previous.contentState !== next.contentState
+    || previous.runIdentity !== next.runIdentity
     || previous.fillAvailable !== next.fillAvailable
     || previous.height !== next.height
     || previous.html !== next.html
     || previous.onClose !== next.onClose
+    || previous.onEscape !== next.onEscape
     || previous.onRetry !== next.onRetry
     || previous.onRuntimeStatusChange !== next.onRuntimeStatusChange
     || previous.title !== next.title
@@ -787,6 +789,7 @@ export function createSandboxedGameDocument(
   mirror: boolean,
   runId = channel,
   predictive = false,
+  escapeToHost = false,
 ): string {
   const sdkRuntime = classifyGameHtml(html) === "SDK_V1";
   const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">`;
@@ -799,7 +802,10 @@ export function createSandboxedGameDocument(
   const legacyBridge = sdkRuntime
     ? ""
     : `<script data-playsay-game-bridge>${gameBridgeSource(channel, mirror, runId, predictive)}</script>`;
-  const headContent = `${csp}${sdkBridge}${diagnosticsBridge}${legacyBridge}`;
+  const escapeBridge = escapeToHost
+    ? `<script data-playsay-game-bridge data-playsay-preview-escape>window.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); window.parent.postMessage({ channel: ${JSON.stringify(channel)}, type: 'escape' }, '*'); } }, true);</script>`
+    : "";
+  const headContent = `${csp}${escapeBridge}${sdkBridge}${diagnosticsBridge}${legacyBridge}`;
   const withHead = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, (head) => `${head}${headContent}`)
     : html.replace(/<html\b[^>]*>/i, (root) => `${root}<head>${headContent}</head>`);

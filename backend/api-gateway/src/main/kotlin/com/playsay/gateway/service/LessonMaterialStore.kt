@@ -52,7 +52,9 @@ class LessonMaterialStore(
     private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
     private val materialAnnotationService: MaterialAnnotationService,
+    private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val gameUploadCommands: com.playsay.gateway.service.game.LegacyGameUploadCommandService? = null,
 ) {
     @Transactional
     fun list(authentication: JwtAuthenticationToken): List<LessonMaterialResponse> =
@@ -278,13 +280,16 @@ class LessonMaterialStore(
         authentication: JwtAuthenticationToken,
         materialId: UUID,
         file: MultipartFile,
+        commandId: UUID? = null,
     ): MaterialAssetResponse {
         lessonMaterialCatalogService.requireEditable(
             authentication,
             materialId,
             MetaData.ErrorCodes.MATERIAL_ASSET_EDIT_FORBIDDEN,
         )
-        return materialAssetService.uploadHtmlGameAsset(materialId, file)
+        return com.playsay.gateway.service.game.uploadRegisteredMaterialGame(
+            materialId, file, commandId, materialAssetService, gameRegistration, gameUploadCommands,
+        )
     }
 
     @Transactional

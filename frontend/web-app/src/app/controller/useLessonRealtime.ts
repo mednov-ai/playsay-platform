@@ -1,3 +1,4 @@
+import { subscribeLessonClockResume } from "../../features/classroom/model/lessonClockResume";
 import { serverNowMs, invalidateServerClock, serverClockSynchronized } from "../../shared/lib/serverClock";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { isArchivedScheduleLesson } from "../../entities/schedule/model";
@@ -278,20 +279,13 @@ export function useLessonRealtime({
       void syncScheduleFromServerRef.current();
     };
     const pollActiveLesson = () => { void syncScheduleFromServerRef.current(); };
-    const handleResume = () => { if (document.visibilityState === "visible") reconcileActiveLesson(); };
-    document.addEventListener("visibilitychange", handleResume);
-    window.addEventListener("pageshow", reconcileActiveLesson);
-    window.addEventListener("online", reconcileActiveLesson);
+    const unsubscribeResume = subscribeLessonClockResume(reconcileActiveLesson);
     window.addEventListener("offline", invalidateServerClock);
     const intervalId = window.setInterval(pollActiveLesson, 15_000);
-    window.addEventListener("focus", reconcileActiveLesson);
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", reconcileActiveLesson);
-      window.removeEventListener("pageshow", reconcileActiveLesson);
-      window.removeEventListener("online", reconcileActiveLesson);
+      unsubscribeResume();
       window.removeEventListener("offline", invalidateServerClock);
-      document.removeEventListener("visibilitychange", handleResume);
     };
   }, [activeLessonId, status]);
 
@@ -377,7 +371,13 @@ export function useLessonRealtime({
       return;
     }
 
+    if (message.type === "lesson.game.changed" && message.lessonId) {
+      window.dispatchEvent(new CustomEvent("honey-school:lesson-game-changed", { detail: message.lessonId }));
+      return;
+    }
+
     if (message.type === "lesson.updated" && message.lesson) {
+      window.dispatchEvent(new CustomEvent("honey-school:lesson-game-changed", { detail: message.lesson.id }));
       applyRealtimeLessonSnapshot(message.lesson);
       return;
     }
@@ -463,7 +463,7 @@ export function useLessonRealtime({
   }
 
   function sendLessonRealtimeSubscribe(lessonId: string) {
-    sendLessonRealtimeMessage({ type: "subscribe.lesson", lessonId });
+    sendLessonRealtimeMessage({ type: "subscribe.lesson", lessonId, gameLibraryVersion: 1 });
   }
 
   function sendLessonPresenceUpdate(lessonId: string, state: Exclude<LessonParticipantPresenceState, "OFFLINE">) {
@@ -501,7 +501,7 @@ export function useLessonRealtime({
     }, DICE_RESPONSE_TIMEOUT_MS);
   }
 
-  function sendLessonRealtimeMessage(message: Record<string, string>): boolean {
+  function sendLessonRealtimeMessage(message: Record<string, string | number>): boolean {
     const socket = realtimeSocketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setRealtimeOpen(false);

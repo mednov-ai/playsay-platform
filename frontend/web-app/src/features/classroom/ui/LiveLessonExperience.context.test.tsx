@@ -7,8 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LessonRoomSession } from "../model/session";
 import { LiveLessonExperience } from "./LiveLessonExperience";
 
-const liveState = vi.hoisted(() => ({ practice: null as unknown, teacher: true, remoteBoard: false }));
+const liveState = vi.hoisted(() => ({ practice: null as unknown, teacher: true, remoteBoard: false, launch: null as unknown, stop: vi.fn() }));
 vi.mock("../hooks/useLessonWhiteboard", () => ({ useWhiteboardPresentation: () => liveState.remoteBoard }));
+vi.mock("../../games/hooks/useLessonLibraryGame", () => ({
+  useLessonLibraryGame: () => ({ canControl: liveState.teacher, error: "temporarily-unavailable", launch: liveState.launch, protocolReady: true, refresh: vi.fn(), stop: liveState.stop }),
+}));
+vi.mock("../../games/ui/LessonLibraryGameStage", () => ({
+  LessonLibraryGameStage: ({ suspended }: { suspended: boolean }) => <div data-testid="library-game-stage" data-suspended={suspended} />,
+}));
 vi.mock("../../vocabulary/hooks/useLiveVocabularyPractice", () => ({
   useLiveVocabularyPractice: () => ({ practice: liveState.practice }),
 }));
@@ -69,9 +75,23 @@ vi.mock("./LessonWorkspace", () => ({
   ),
 }));
 
-afterEach(() => { cleanup(); liveState.practice = null; liveState.teacher = true; liveState.remoteBoard = false; });
+afterEach(() => { cleanup(); liveState.practice = null; liveState.teacher = true; liveState.remoteBoard = false; liveState.launch = null; liveState.stop.mockClear(); });
 
 describe("LiveLessonExperience room context", () => {
+  it("suspends and restores a library game around board presentation without a shared stop or media remount", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    liveState.launch = { id: "launch-one" };
+    render(<LiveLessonExperience materials={[]} onAssignMaterial={vi.fn()} onComplete={vi.fn()} onLeave={vi.fn()} onMediaLifecycleChange={vi.fn()} onRetryMedia={vi.fn()} profile={{ subject: "teacher-1" } as never} recoveryPhase="idle" session={classroomSession()} />);
+    const media = screen.getByTestId("livekit-room"), game = screen.getByTestId("library-game-stage");
+    expect(game).toHaveAttribute("data-suspended", "false");
+    fireEvent.click(screen.getByText("present board"));
+    expect(game).toHaveAttribute("data-suspended", "true");
+    fireEvent.click(screen.getByText("return material"));
+    expect(screen.getByTestId("library-game-stage")).toBe(game);
+    expect(game).toHaveAttribute("data-suspended", "false");
+    expect(screen.getByTestId("livekit-room")).toBe(media);
+    expect(liveState.stop).not.toHaveBeenCalled();
+  });
   it("keeps the media owner while board presentation overrides and restores the prior activity", () => {
     vi.stubGlobal("matchMedia", () => ({ addEventListener:vi.fn(),matches:false,removeEventListener:vi.fn() }));
     const view=render(<LiveLessonExperience materials={[]} onAssignMaterial={vi.fn()} onComplete={vi.fn()} onLeave={vi.fn()} onMediaLifecycleChange={vi.fn()} onRetryMedia={vi.fn()} profile={{subject:"teacher-1"} as never} recoveryPhase="idle" session={classroomSession()}/>);
@@ -160,6 +180,11 @@ describe("LiveLessonExperience room context", () => {
     const room = screen.getByTestId("livekit-room");
     expect(within(room).getByTestId("video-stage")).toBeInTheDocument();
     expect(within(room).getByTestId("lesson-workspace")).toBeInTheDocument();
+    const primary = room.querySelector(".playsay-classroom-primary");
+    expect(primary).toContainElement(within(room).getByTestId("lesson-workspace"));
+    expect(primary).toContainElement(within(room).getByRole("alert"));
+    expect(room.querySelector(".playsay-video-header")).toContainElement(within(room).getByRole("button", { name: "games.title" }));
+    expect(primary?.parentElement).toBe(room);
   });
 
   it("switches the lesson shell to the external activity overlay mode", () => {

@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import * as decoding from "lib0/decoding";
 import * as Y from "yjs";
+import * as awarenessProtocol from "y-protocols/awareness";
 import {
   createYjsWorkspaceRuntime,
   normalizeExerciseInteraction,
@@ -10,6 +11,22 @@ import {
 } from "./yjsRuntime";
 
 describe("yjs workspace runtime annotations", () => {
+  it("reclaims teacher awareness after a server disconnect tombstone", () => {
+    const runtime = createYjsWorkspaceRuntime({ color: "#ff5c00", participantName: "Teacher", onAnnotationChange: () => {}, onHtmlGameEffectsChange: () => {}, onHtmlGameInputsChange: () => {}, onHtmlGameSnapshotsChange: () => {}, onParticipantsChange: () => {}, onTextChange: () => {} });
+    const doc = new Y.Doc(), server = new awarenessProtocol.Awareness(doc);
+    const messages: Uint8Array[] = [];
+    const socket = { OPEN: 1, readyState: 1, send: (message: Uint8Array) => messages.push(message) } as unknown as WebSocket;
+    const apply = () => { for (const frame of messages.splice(0)) { const decoder = decoding.createDecoder(frame); if (decoding.readVarUint(decoder) === 1) awarenessProtocol.applyAwarenessUpdate(server, decoding.readVarUint8Array(decoder), "socket"); } };
+    runtime.startSocketSync(socket); apply();
+    const id = runtime.getClientId();
+    expect(server.getStates().has(id)).toBe(true);
+    awarenessProtocol.removeAwarenessStates(server, [id], "disconnect");
+    runtime.setSocket(null);
+    expect(server.getStates().has(id)).toBe(false);
+    runtime.startSocketSync(socket); apply();
+    expect(server.getStates().has(id)).toBe(true);
+    runtime.destroy(); server.destroy(); doc.destroy();
+  });
   it("normalizes the regressed text default after realtime restore", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({
@@ -882,6 +899,7 @@ describe("yjs workspace runtime annotations", () => {
         stateVersion: "1",
         type: "answer",
       };
+      runtime.publishHtmlGameSdkControl({ kind: "resume", blockId: "game-a", runId: "run-a", requesterId: "student", lastRevision: 0 });
       runtime.publishHtmlGameSdkRequest(request);
       runtime.publishHtmlGameSdkAction({
         ...request,
@@ -904,6 +922,7 @@ describe("yjs workspace runtime annotations", () => {
       expect(requests.at(-1)?.at(-1)?.id).toBe("event-1");
       expect(actions.at(-1)?.at(-1)?.id).toBe("event-1:ordered");
       expect(directMessages.map((message) => message.kind)).toEqual([
+        "resume",
         "action-request",
         "ordered-action",
       ]);

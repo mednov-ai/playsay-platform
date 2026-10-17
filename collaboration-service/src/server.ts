@@ -604,7 +604,7 @@ function handleMessage(
 
   if (messageType === messageMaterialViewport) {
     const claims = connectionClaims.get(ws);
-    if (!claims?.canPublishMaterialViewport) {
+    if (!claims?.canPublishMaterialViewport || !claims.materialId || claims.documentKind === "LESSON_GAME") {
       throw new Error("material viewport publication is forbidden");
     }
     applyMaterialViewportCommand(

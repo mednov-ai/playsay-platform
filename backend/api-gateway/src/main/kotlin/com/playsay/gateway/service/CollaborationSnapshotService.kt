@@ -25,6 +25,7 @@ class CollaborationSnapshotService(
     private val lessonMaterialStore: LessonMaterialStore,
     private val whiteboards: com.playsay.gateway.repo.LessonWhiteboardRepo,
     private val objectMapper: ObjectMapper,
+    private val gameAccess: com.playsay.gateway.service.game.LessonGameAccessService? = null,
     @param:Value("\${playsay.collaboration.service-token:}") private val collaborationServiceToken: String,
 ) {
     @Transactional
@@ -61,6 +62,7 @@ class CollaborationSnapshotService(
         val document = collaborationDocumentRepo.findById(documentId).orElse(null)
             ?.takeIf { found -> found.lessonId == lessonId }
             ?: documentNotFound()
+        if (document.documentKind == "LESSON_GAME") requireNotNull(gameAccess).requireActiveDocument(lessonId, documentId)
         return collaborationDocumentService.response(document)
     }
 
@@ -113,6 +115,7 @@ class CollaborationSnapshotService(
         snapshot: JsonNode,
         storageKey: String?,
     ) {
+        if (document.documentKind == "LESSON_GAME") requireNotNull(gameAccess).requireActiveDocument(document.lessonId, document.id)
         validateSnapshot(snapshot)
         document.snapshotJson = objectMapper.writeValueAsString(snapshot)
         document.snapshotStorageKey = storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }

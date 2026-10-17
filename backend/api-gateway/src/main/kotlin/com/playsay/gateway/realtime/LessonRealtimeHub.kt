@@ -230,6 +230,13 @@ class LessonRealtimeHub(
         }
     }
 
+    fun publishGameChanged(lessonId: UUID) {
+        lessonSubscriptions[lessonId].orEmpty().forEach { sessionId ->
+            val session = sessions[sessionId] ?: return@forEach
+            sendToSession(session, LessonRealtimeOutboundMessage(type = "lesson.game.changed", lessonId = lessonId))
+        }
+    }
+
     fun publishLobbyChanged(lessonId: UUID) {
         principals.forEach { (sessionId, principal) ->
             if (!principal.canManagePresence()) return@forEach

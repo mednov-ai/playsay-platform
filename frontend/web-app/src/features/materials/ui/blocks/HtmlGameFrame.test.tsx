@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import type { MaterialHtmlGameSync } from "../../model/materialDocument";
+import type { MaterialHtmlGameSync, MaterialHtmlGameSdkSessionRegistration } from "../../model/materialDocument";
 import {
   HtmlGameFrame,
   createSandboxedGameDocument,
@@ -30,6 +30,40 @@ afterEach(() => {
 });
 
 describe("HTML game sandbox", () => {
+  it.each([false, true])("only the active preview frame can close its dialog via Escape (SDK=%s)", (sdk) => {
+    const onEscape = vi.fn();
+    const nextEscape = vi.fn();
+    const html = sdk ? '<html><head><script type="application/playsay-game+json">{"protocol":"playsay-game-sync/v1","gameId":"preview","stateVersion":"1","reducerVersion":"1","buildHash":"test"}</script></head><body><script>PlaySayGameSync.defineGame({})</script></body></html>' : gameHtml;
+    const view = render(<HtmlGameFrame blockId="preview" height={640} html={html} onEscape={onEscape} title="Preview" />);
+    const iframe = view.container.querySelector("iframe")!;
+    const source = iframe.getAttribute("srcdoc")!;
+    const channel = JSON.parse(source.match(/channel: ("[^"]+")/)![1]) as string;
+    const send = (sourceWindow: MessageEventSource | null, value: string) => act(() => {
+      window.dispatchEvent(new MessageEvent("message", { data: { channel: value, type: "escape" }, source: sourceWindow }));
+    });
+    send(window, channel); send(iframe.contentWindow, "other-preview");
+    expect(onEscape).not.toHaveBeenCalled();
+    send(iframe.contentWindow, channel);
+    expect(onEscape).toHaveBeenCalledTimes(1);
+    view.rerender(<HtmlGameFrame blockId="preview" height={640} html={html} onEscape={nextEscape} title="Preview" />);
+    expect(view.container.querySelector("iframe")).toBe(iframe);
+    expect(iframe.getAttribute("srcdoc")).toBe(source);
+    send(iframe.contentWindow, channel);
+    expect(nextEscape).toHaveBeenCalledTimes(1);
+    expect(onEscape).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps lesson game close behavior unchanged when preview Escape is not configured", () => {
+    const onClose = vi.fn();
+    const { container } = render(<HtmlGameFrame blockId="lesson-game" height={640} html={gameHtml} onClose={onClose} title="Game" />);
+    const iframe = container.querySelector("iframe")!;
+    const source = iframe.getAttribute("srcdoc")!;
+    expect(source).not.toContain("data-playsay-preview-escape");
+    const channel = JSON.parse(source.match(/const channel = ("[^"]+");/)![1]) as string;
+    act(() => window.dispatchEvent(new MessageEvent("message", { data: { channel, type: "escape" }, source: iframe.contentWindow })));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("shows a terminal recoverable error instead of a spinner for unavailable content", () => {
     const onClose = vi.fn();
     const onRetry = vi.fn();
@@ -319,9 +353,15 @@ describe("HTML game sandbox", () => {
     expect(publishInput).not.toHaveBeenCalled();
   });
 
-  it("acquires the fast lane only while this SDK game is presented", () => {
+  it("acquires the fast lane after iframe context and only while this SDK game is presented", () => {
     const release = vi.fn();
-    const attach = vi.fn(() => ({ handleOutbound: vi.fn(), release }));
+    const port1 = { close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null, postMessage: vi.fn(), start: vi.fn() };
+    vi.stubGlobal("MessageChannel", class { port1 = port1; port2 = { close: vi.fn(), postMessage: vi.fn(), start: vi.fn() }; });
+    const attach = vi.fn((registration: MaterialHtmlGameSdkSessionRegistration) => {
+      expect(registration.getPort()).toBe(port1);
+      registration.getPort()?.postMessage({ kind: "ordered-action", action: { authorityRevision: 1 } });
+      return { handleOutbound: vi.fn(), release };
+    });
     const sdkGame = `<html><head><script type="application/playsay-game+json">{
       "protocol":"playsay-game-sync/v1","gameId":"quiz","stateVersion":"1",
       "reducerVersion":"1","buildHash":"test"
@@ -361,7 +401,14 @@ describe("HTML game sandbox", () => {
         title="Game"
       />,
     );
+    expect(attach).not.toHaveBeenCalled();
+    const iframe = view.container.querySelector("iframe")!;
+    const channel = JSON.parse(iframe.getAttribute("srcdoc")!.match(/const channel = ("[^"]+");/)![1]) as string;
+    act(() => { window.dispatchEvent(new MessageEvent("message", { data: { channel, type: "sdkReady" }, source: iframe.contentWindow })); });
+    expect(attach).not.toHaveBeenCalled();
+    act(() => { port1.onmessage?.({ data: { kind: "hello", manifest: { protocol: "playsay-game-sync/v1", gameId: "quiz", stateVersion: "1", reducerVersion: "1", buildHash: "test" } } } as MessageEvent); });
     expect(attach).toHaveBeenCalledOnce();
+    expect(port1.postMessage.mock.calls.map(([message]) => message.kind)).toEqual(["context", "ordered-action"]);
 
     for (let index = 0; index < 100; index += 1) {
       view.rerender(

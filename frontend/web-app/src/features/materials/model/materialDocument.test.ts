@@ -14,6 +14,8 @@ import {
   newMaterialBlock,
   materialExerciseItemKey,
   materialItemAnswerMatches,
+  materialFormToInput,
+  materialToForm,
   materialLiveScore,
   materialWordBankUsedOptionIds,
   materialPromptWithInsertedGapMarker,
@@ -773,5 +775,21 @@ describe("material document accepted answers", () => {
     expect(document.pages[0]?.blocks[0]).toMatchObject({ type: "interactiveWorksheet", intrinsicWidth: 800 });
     expect(document.pages[0]?.blocks[0]?.worksheetGroups?.[0]?.gaps?.[0]?.region).toEqual({ x: 100, y: 200, width: 250, height: 50 });
     expect(editorDocumentFromJson({ schemaVersion: 1, pages: [{ id: "old", title: "Old", layout: "FLOW", blocks: [] }] }).schemaVersion).toBe(1);
+  });
+});
+
+
+describe("library game reference round trip", () => {
+  it("preserves pinned identities, instructions and distinct occurrences", () => {
+    const source = { schemaVersion: 1, pages: [{ id: "page", title: "Games", layout: "FLOW", blocks: [
+      { id: "first", type: "htmlGame", title: "Race", gameId: "game", gameRevisionId: "revision", prompt: "Play together", gameTitleSource: "HTML" },
+      { id: "second", type: "htmlGame", title: "Race again", gameId: "game", gameRevisionId: "revision", gameTitleSource: "HTML" },
+    ] }] };
+    const parsed = editorDocumentFromJson(source);
+    expect(parsed.pages[0]?.blocks[0]).toMatchObject(source.pages[0]!.blocks[0]!);
+    const input = materialFormToInput({ ...materialToForm({ id: "test", title: "Games", document: source } as never), document: parsed });
+    const reread = editorDocumentFromJson(input.document);
+    expect(reread.pages[0]?.blocks.map((block) => [block.id, block.gameId, block.gameRevisionId])).toEqual([["first", "game", "revision"], ["second", "game", "revision"]]);
+    expect(reread.pages[0]?.blocks[0]?.prompt).toBe("Play together");
   });
 });

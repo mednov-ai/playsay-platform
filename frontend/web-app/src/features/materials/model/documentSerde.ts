@@ -243,6 +243,8 @@ export function materialBlockFromJson(value: unknown): MaterialEditorBlock | nul
     result.height = Math.min(800, Math.max(120, height));
   }
   if (type === "htmlGame") {
+    result.gameId = asString(block.gameId) || undefined;
+    result.gameRevisionId = asString(block.gameRevisionId) || undefined;
     result.gameIconUrl = gameIconUrl || undefined;
     result.gameSyncCompatibility = gameSyncCompatibility;
     result.gameAdaptationSourceAssetId = gameAdaptationSourceAssetId || undefined;
@@ -387,6 +389,7 @@ export function cleanMaterialBlock(block: MaterialEditorBlock): MaterialEditorBl
     clean.height = Math.min(800, Math.max(120, block.height));
   }
   if (block.type === "htmlGame") {
+    if (block.gameId && block.gameRevisionId) { clean.gameId = block.gameId; clean.gameRevisionId = block.gameRevisionId; delete clean.url; }
     if (block.gameIconUrl?.trim()) {
       clean.gameIconUrl = block.gameIconUrl.trim();
     }

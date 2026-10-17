@@ -4,9 +4,10 @@ export interface CollaborationClaims {
   subject: string;
   documentId: string;
   lessonId: string;
-  materialId: string | null;
+  materialId?: string | null;
   whiteboardId?: string;
   contentEpoch?: number;
+  gameLaunchId?: string;
   studentUserId?: string;
   documentKind: string;
   scope: CollaborationScope;
@@ -16,10 +17,15 @@ export interface CollaborationClaims {
 
 export function collaborationRoomName(claims: CollaborationClaims): string {
   if (claims.documentKind === "LESSON_WHITEBOARD") {
-    if (!claims.whiteboardId || !Number.isSafeInteger(claims.contentEpoch) || claims.contentEpoch! < 0 || claims.materialId != null) throw new Error("invalid whiteboard claims");
+    if (!claims.whiteboardId || !Number.isSafeInteger(claims.contentEpoch) || claims.contentEpoch! < 0 || claims.materialId != null || claims.gameLaunchId || (claims.scope === "INDIVIDUAL" && !claims.studentUserId)) throw new Error("invalid whiteboard claims");
     return `lesson:${claims.lessonId}:whiteboard:${claims.whiteboardId}:epoch:${claims.contentEpoch}`;
   }
-  if (!claims.materialId) throw new Error("missing materialId");
+  if (claims.whiteboardId || claims.contentEpoch != null) throw new Error("invalid whiteboard binding");
+  if (claims.documentKind === "LESSON_GAME") {
+    if (claims.materialId || !claims.gameLaunchId || claims.scope !== "GROUP") throw new Error("invalid game launch binding");
+    return `lesson:${claims.lessonId}:game:${claims.gameLaunchId}:group:kind:LESSON_GAME`;
+  }
+  if (!claims.materialId || claims.gameLaunchId) throw new Error("invalid material binding");
   if (claims.scope === "GROUP") {
     return `lesson:${claims.lessonId}:material:${claims.materialId}:group:kind:${claims.documentKind}`;
   }
@@ -41,8 +47,9 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
   const subject = requiredString(payload, "sub");
   const documentId = requiredString(payload, "documentId");
   const lessonId = requiredString(payload, "lessonId");
-  const materialId = payload.documentKind === "LESSON_WHITEBOARD" ? null : requiredString(payload, "materialId");
   const documentKind = requiredString(payload, "documentKind");
+  const materialId = ["LESSON_GAME", "LESSON_WHITEBOARD"].includes(documentKind) ? optionalString(payload, "materialId") : requiredString(payload, "materialId");
+  const gameLaunchId = optionalString(payload, "gameLaunchId");
   const scope = requiredScope(payload);
   const yjsDocumentId = requiredString(payload, "yjsDocumentId");
   const studentUserId = optionalString(payload, "studentUserId");
@@ -52,6 +59,7 @@ export function validateCollaborationClaims(payload: Record<string, unknown>): C
     documentId,
     lessonId,
     materialId,
+    gameLaunchId,
     studentUserId,
     documentKind,
     scope,

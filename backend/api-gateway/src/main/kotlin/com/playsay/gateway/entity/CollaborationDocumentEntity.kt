@@ -21,6 +21,8 @@ class CollaborationDocumentEntity(
     var lessonId: UUID = UUID.randomUUID(),
     @Column(name = "material_id")
     var materialId: UUID? = null,
+    @Column(name = "game_launch_id")
+    var gameLaunchId: UUID? = null,
     @Column(name = "student_user_id")
     var studentUserId: UUID? = null,
     @Column(name = "document_kind", nullable = false, length = 40)

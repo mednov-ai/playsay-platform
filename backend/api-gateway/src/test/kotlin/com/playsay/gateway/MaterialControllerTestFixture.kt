@@ -48,6 +48,7 @@ import liquibase.integration.spring.SpringLiquibase
         "spring.liquibase.enabled=false",
         "playsay.storage.provider=memory",
         "playsay.ai.html-game-enrichment.enabled=false",
+        "playsay.games.processing.enabled=false",
     ],
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

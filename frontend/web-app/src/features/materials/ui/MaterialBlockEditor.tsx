@@ -1,5 +1,5 @@
 import { MaterialVideoMetadataFields } from "./MaterialVideoMetadataFields";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { FormField } from "../../../shared/ui/FormField";
@@ -21,6 +21,8 @@ import { MatchingPairsEditor } from "./MatchingPairsEditor";
 import { useAppTranslation } from "../../../shared/i18n";
 import { resolveMaterialExternalActivity, type MaterialExternalActivityResolution, type MaterialGameAdaptation, type MaterialHtmlGameEnrichment } from "../../../shared/api/playsay";
 import { isEnglishHtmlGameTitle } from "../model/htmlGameTitle";
+
+const HtmlGamePicker = lazy(() => import("../../games/ui/HtmlGameLibraryPanel").then((module) => ({ default: module.HtmlGamePicker })));
 
 export function MaterialBlockEditor({
   active,
@@ -88,6 +90,7 @@ export function MaterialBlockEditor({
   const [videoClipStartSource, setVideoClipStartSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.startSeconds));
   const [videoClipEndSource, setVideoClipEndSource] = useState(() => formatMaterialVideoClipTime(block.videoClip?.endSeconds));
   const [uploading, setUploading] = useState(false);
+  const [gamePickerOpen, setGamePickerOpen] = useState(false);
   const [externalActivityStatus, setExternalActivityStatus] = useState<"idle" | "validating" | "saving" | "error">("idle");
   const uploadAttemptRef = useRef(0);
   const externalActivityAttemptRef = useRef(0);
@@ -458,7 +461,9 @@ export function MaterialBlockEditor({
           <div className="playsay-material-field-grid gap-3" data-layout="html-game">
             <FormField label={t("materials.blockEditor.htmlGameFile")}>
               <div className="grid gap-2">
-                <div className="playsay-asset-reference">{block.url || t("materials.blockEditor.htmlGameEmpty")}</div>
+                <div className="playsay-asset-reference">{block.gameId || block.url ? block.title : t("materials.blockEditor.htmlGameEmpty")}</div>
+                <Button disabled={disabled || uploading} onClick={() => setGamePickerOpen(true)} type="button" variant="outline">{t("games.choose")}</Button>
+                {gamePickerOpen ? <Suspense fallback={<p>{t("games.loading")}</p>}><HtmlGamePicker onClose={() => setGamePickerOpen(false)} onSelect={(game) => { onUpdate({ gameId: game.id, gameRevisionId: game.revisionId, title: game.title, url: undefined, gameTitleSource: "HTML", gameSyncCompatibility: game.compatibility as MaterialEditorBlock["gameSyncCompatibility"], gameIconUrl: undefined, gameAdaptationJobId: undefined, gameAdaptationSourceAssetId: undefined }); setGamePickerOpen(false); }} /></Suspense> : null}
                 <label className="playsay-inline-upload">
                   <input
                     accept="text/html,.html"

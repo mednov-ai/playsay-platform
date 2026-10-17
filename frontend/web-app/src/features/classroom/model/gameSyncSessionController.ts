@@ -258,10 +258,14 @@ export function createGameSyncSessionController({
       }
     } else if (message.kind === "recovery-required") {
       const checkpoint = checkpoints.get(session.blockId);
-      if (checkpoint?.runId === session.runId) {
+      if (checkpoint?.runId === session.runId && checkpoint.revision >= session.revision) {
+        const advanced = checkpoint.revision > session.revision;
         session.revision = checkpoint.revision;
         session.logicalTime = checkpoint.logicalTime;
         deliver(session, { checkpoint, kind: "checkpoint" });
+        if (advanced && !session.isAuthority) {
+          publish({ kind: "resume", blockId: session.blockId, runId: session.runId, requesterId: session.actorId, lastRevision: session.revision });
+        }
       }
     }
   };
@@ -366,6 +370,15 @@ export function createGameSyncSessionController({
       checkpoints.clear();
       Object.entries(nextCheckpoints).forEach(([blockId, checkpoint]) => {
         checkpoints.set(blockId, checkpoint);
+        sessions.forEach((session) => {
+          if (session.blockId !== blockId || session.runId !== checkpoint.runId || checkpoint.revision <= session.revision) return;
+          session.revision = checkpoint.revision;
+          session.logicalTime = Math.max(session.logicalTime, checkpoint.logicalTime);
+          deliver(session, { checkpoint, kind: "checkpoint" });
+          if (!session.isAuthority) {
+            publish({ kind: "resume", blockId: session.blockId, runId: session.runId, requesterId: session.actorId, lastRevision: session.revision });
+          }
+        });
       });
     },
   };

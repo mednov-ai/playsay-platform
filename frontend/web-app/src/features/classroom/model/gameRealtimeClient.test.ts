@@ -84,6 +84,7 @@ describe("createGameRealtimeClient", () => {
     const client = createGameRealtimeClient({ fallback, getActorId: () => "student", getUrl });
     const release = client.acquire({ blockId: "game-a", runId: "run-a", getRevision: () => 0, isAuthority: false, onMessage: vi.fn() });
     await vi.waitFor(() => expect(sockets.length).toBe(1)); sockets[0].open("primary");
+    fallback.mockClear();
     client.setSuspended(true); client.publish(requestMessage);
     expect(sockets[0].readyState).toBe(FakeWebSocket.CLOSED); expect(fallback).not.toHaveBeenCalled();
     client.setSuspended(false); await vi.waitFor(() => expect(sockets.length).toBe(2));
@@ -129,6 +130,7 @@ describe("createGameRealtimeClient", () => {
     });
     await Promise.resolve();
     sockets.at(-1)?.open("primary");
+    fallback.mockClear();
     primary.publish(requestMessage);
 
     expect(fallback).not.toHaveBeenCalled();
@@ -167,6 +169,7 @@ describe("createGameRealtimeClient", () => {
     const socket = sockets[0];
     socket?.open("primary");
 
+    fallback.mockClear();
     client.publish(requestMessage);
     expect(fallback).not.toHaveBeenCalled();
 
@@ -175,4 +178,18 @@ describe("createGameRealtimeClient", () => {
     expect(fallback).toHaveBeenCalledWith(requestMessage);
     client.close();
   });
+  it.each(["unavailable", "shadow"] as const)("replays the first two actions over fallback after a fresh replica joins (%s)", async (mode) => {
+    const fallback = vi.fn();
+    const authority = createGameRealtimeClient({ fallback, getActorId: () => "teacher", getUrl: async () => "ws://localhost" });
+    authority.acquire({ blockId: "game-a", runId: "run-a", getRevision: () => 2, isAuthority: true, onMessage: vi.fn() });
+    await Promise.resolve();
+    if (mode === "shadow") sockets[0]?.open("shadow");
+    const actions = [1, 2].map(revision => ({ ...requestMessage.request, id: `action-${revision}`, authorityRevision: revision, logicalTime: revision }));
+    actions.forEach(action => authority.publish({ kind: "ordered-action", action }));
+    fallback.mockClear();
+    authority.receiveFallback({ kind: "resume", blockId: "game-a", runId: "run-a", requesterId: "new-student", lastRevision: 0 });
+    expect(fallback.mock.calls.map(([message]) => message)).toEqual(actions.map(action => ({ kind: "ordered-action", action })));
+    authority.close();
+  });
+
 });

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+  <changeSet id="2026-10-16-001-shared-html-game-library" author="codex">
+    <sql>
+      CREATE TABLE html_game (id UUID PRIMARY KEY, creator_user_id UUID REFERENCES app_user(id) ON DELETE SET NULL, title VARCHAR(160) NOT NULL, title_source VARCHAR(16) NOT NULL DEFAULT 'UPLOAD', topic VARCHAR(120) NOT NULL DEFAULT '', cefr_level VARCHAR(8), status VARCHAR(16) NOT NULL, current_revision_id UUID, derived_from_revision_id UUID, version BIGINT NOT NULL DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE NOT NULL, updated_at TIMESTAMP WITH TIME ZONE NOT NULL);
+      CREATE TABLE html_game_blob (id UUID PRIMARY KEY, storage_key VARCHAR(1024) NOT NULL UNIQUE, sha256 VARCHAR(64) NOT NULL, byte_size BIGINT NOT NULL, content_type VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE NOT NULL);
+      CREATE TABLE html_game_revision (id UUID PRIMARY KEY, game_id UUID NOT NULL REFERENCES html_game(id), blob_id UUID NOT NULL REFERENCES html_game_blob(id), cover_blob_id UUID REFERENCES html_game_blob(id), source_revision_id UUID REFERENCES html_game_revision(id), compatibility VARCHAR(32) NOT NULL, metadata TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE NOT NULL, UNIQUE(game_id,id));
+      ALTER TABLE html_game ADD CONSTRAINT fk_game_current_revision FOREIGN KEY (id,current_revision_id) REFERENCES html_game_revision(game_id,id);
+      ALTER TABLE html_game ADD CONSTRAINT fk_game_derived_revision FOREIGN KEY (derived_from_revision_id) REFERENCES html_game_revision(id);
+      CREATE TABLE html_game_legacy_alias (asset_id UUID PRIMARY KEY, source_material_id UUID NOT NULL, game_id UUID NOT NULL, revision_id UUID NOT NULL, sha256 VARCHAR(64) NOT NULL, FOREIGN KEY(game_id,revision_id) REFERENCES html_game_revision(game_id,id));
+      CREATE TABLE html_game_command (command_key VARCHAR(64) PRIMARY KEY, payload_hash VARCHAR(64) NOT NULL, game_id UUID NOT NULL, revision_id UUID NOT NULL, FOREIGN KEY(game_id,revision_id) REFERENCES html_game_revision(game_id,id));
+      CREATE TABLE html_game_material_command (command_key VARCHAR(64) PRIMARY KEY, game_id UUID NOT NULL, revision_id UUID NOT NULL, material_id UUID REFERENCES lesson_material(id) ON DELETE SET NULL, FOREIGN KEY(game_id,revision_id) REFERENCES html_game_revision(game_id,id));
+      CREATE TABLE lesson_game_launch (id UUID PRIMARY KEY, lesson_id UUID NOT NULL REFERENCES lesson(id) ON DELETE CASCADE, game_id UUID NOT NULL, revision_id UUID NOT NULL, status VARCHAR(16) NOT NULL, document_id UUID UNIQUE REFERENCES collaboration_document(id) ON DELETE SET NULL, return_kind VARCHAR(32) NOT NULL DEFAULT 'MATERIAL', initiator_user_id UUID REFERENCES app_user(id) ON DELETE SET NULL, command_key VARCHAR(64) NOT NULL UNIQUE, created_at TIMESTAMP WITH TIME ZONE NOT NULL, stopped_at TIMESTAMP WITH TIME ZONE, UNIQUE(lesson_id,id), FOREIGN KEY(game_id,revision_id) REFERENCES html_game_revision(game_id,id));
+      CREATE TABLE lesson_presentation (lesson_id UUID PRIMARY KEY REFERENCES lesson(id) ON DELETE CASCADE, kind VARCHAR(32) NOT NULL, game_launch_id UUID, revision BIGINT NOT NULL DEFAULT 0, FOREIGN KEY(lesson_id,game_launch_id) REFERENCES lesson_game_launch(lesson_id,id));
+      ALTER TABLE collaboration_document ALTER COLUMN material_id DROP NOT NULL;
+      ALTER TABLE collaboration_document ADD COLUMN game_launch_id UUID UNIQUE;
+      ALTER TABLE collaboration_document ADD CONSTRAINT ck_collaboration_game_binding CHECK ((document_kind='LESSON_GAME' AND material_id IS NULL AND game_launch_id IS NOT NULL AND collaboration_scope='GROUP') OR (document_kind&lt;&gt;'LESSON_GAME' AND material_id IS NOT NULL AND game_launch_id IS NULL));
+      CREATE TABLE html_game_migration_checkpoint (asset_id UUID PRIMARY KEY, outcome VARCHAR(32) NOT NULL, error_code VARCHAR(80), source_sha256 VARCHAR(64), provenance TEXT NOT NULL DEFAULT '{}', retained_blob_id UUID REFERENCES html_game_blob(id), updated_at TIMESTAMP WITH TIME ZONE NOT NULL);
+      CREATE TABLE html_game_legacy_upload_command (command_key VARCHAR(64) PRIMARY KEY, payload_hash VARCHAR(64) NOT NULL, result TEXT NOT NULL);
+      CREATE TABLE html_game_processing (id UUID PRIMARY KEY, game_id UUID NOT NULL, source_revision_id UUID NOT NULL, kind VARCHAR(16) NOT NULL, status VARCHAR(32) NOT NULL, command_key VARCHAR(64) NOT NULL UNIQUE, candidate_blob_id UUID REFERENCES html_game_blob(id), applied_revision_id UUID REFERENCES html_game_revision(id), evidence TEXT NOT NULL DEFAULT '{}', attempts INTEGER NOT NULL DEFAULT 0, lease_until TIMESTAMP WITH TIME ZONE, error_code VARCHAR(80), created_at TIMESTAMP WITH TIME ZONE NOT NULL, updated_at TIMESTAMP WITH TIME ZONE NOT NULL, FOREIGN KEY(game_id,source_revision_id) REFERENCES html_game_revision(game_id,id));
+      CREATE INDEX idx_game_processing_claim ON html_game_processing(status,lease_until,created_at);
+      CREATE INDEX idx_html_game_catalog ON html_game(status,updated_at,id);
+      CREATE INDEX idx_html_game_revision_game ON html_game_revision(game_id,created_at);
+      CREATE INDEX idx_lesson_game_active ON lesson_game_launch(lesson_id,status);
+    </sql>
+  </changeSet>
+</databaseChangeLog>

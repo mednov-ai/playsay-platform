@@ -29,8 +29,11 @@
     </changeSet>
     <changeSet id="2026-10-16-lesson-whiteboards" author="codex">
         <dropNotNullConstraint tableName="collaboration_document" columnName="material_id" columnDataType="uuid"/>
-        <sql>ALTER TABLE collaboration_document ADD CONSTRAINT ck_collaboration_material_kind CHECK
-            ((document_kind = 'LESSON_WHITEBOARD' AND material_id IS NULL) OR (document_kind != 'LESSON_WHITEBOARD' AND material_id IS NOT NULL))</sql>
+        <sql>ALTER TABLE collaboration_document DROP CONSTRAINT ck_collaboration_game_binding</sql>
+        <sql>ALTER TABLE collaboration_document ADD CONSTRAINT ck_collaboration_game_binding CHECK
+            ((document_kind = 'LESSON_GAME' AND material_id IS NULL AND game_launch_id IS NOT NULL AND collaboration_scope = 'GROUP')
+            OR (document_kind = 'LESSON_WHITEBOARD' AND material_id IS NULL AND game_launch_id IS NULL)
+            OR (document_kind NOT IN ('LESSON_GAME', 'LESSON_WHITEBOARD') AND material_id IS NOT NULL AND game_launch_id IS NULL))</sql>
         <createTable tableName="lesson_whiteboard">
             <column name="id" type="uuid"><constraints primaryKey="true" nullable="false"/></column>
             <column name="lesson_id" type="uuid"><constraints nullable="false"/></column>

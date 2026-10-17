@@ -24,6 +24,7 @@ class LessonMaterialCatalogService(
     private val materialRequestValidator: MaterialRequestValidator,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
     private val youtubeVideoCacheService: YoutubeVideoCacheService,
+    private val gameReferences: com.playsay.gateway.service.game.MaterialGameReferenceService? = null,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -68,6 +69,7 @@ class LessonMaterialCatalogService(
         requireMaterialManager(authentication)
         val ownerTeacherUserId = userProfileStore.currentUserId(authentication)
         val values = materialRequestValidator.validate(request)
+        gameReferences?.validate(values.document)
         val now = Instant.now()
 
         val material = lessonMaterialRepo.saveAndFlush(
@@ -112,6 +114,7 @@ class LessonMaterialCatalogService(
         val values = materialRequestValidator.validate(request)
         val entity = lessonMaterialRepo.findById(materialId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+        gameReferences?.validate(values.document, objectMapper.readTree(entity.document))
         YoutubeVideoSupport.clearMetadataForChangedSources(objectMapper.readTree(entity.document), values.document)
         entity.title = values.title
         entity.description = values.description

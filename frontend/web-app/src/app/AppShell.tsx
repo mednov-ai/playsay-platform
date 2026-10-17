@@ -63,6 +63,8 @@ const LiveLessonExperience = lazy(() => (
 const ClassroomPreJoin = lazy(() => (
   import("../features/classroom/ui/ClassroomPreJoin").then((module) => ({ default: module.ClassroomPreJoin }))
 ));
+const HtmlGameLibraryPanel = lazy(() => import("../features/games/ui/HtmlGameLibraryPanel").then((module) => ({ default: module.HtmlGameLibraryPanel })));
+
 const MaterialLibraryPanel = lazy(() => (
   import("../features/materials/ui/MaterialLibraryPanel").then((module) => ({ default: module.MaterialLibraryPanel }))
 ));
@@ -529,6 +531,8 @@ export function AppShell(props: AppShellProps) {
               {workspaceTab === "users" ? <AdminUsersPanel /> : null}
 
               {workspaceTab === "emails" ? <EmailDeliveriesPanel /> : null}
+
+              {workspaceTab === "games" && profile?.roles.some((role) => role === "TEACHER" || role === "ADMIN") ? <HtmlGameLibraryPanel materials={materials} profile={profile} onMaterialSaved={() => void refreshMaterials()} /> : null}
 
               {workspaceTab === "materials" ? (
                 <MaterialLibraryPanel

@@ -21,6 +21,7 @@ class LessonRealtimeWebSocketHandler(
     private val hub: LessonRealtimeHub,
     private val admissionGuard: LessonAdmissionGuard,
     private val objectMapper: ObjectMapper,
+    private val gameCompatibility: com.playsay.gateway.service.game.GameProtocolCompatibilityService,
 ) : TextWebSocketHandler(), SubProtocolCapable {
     override fun getSubProtocols(): List<String> = listOf(PLAY_SAY_WEBSOCKET_PROTOCOL)
 
@@ -54,7 +55,7 @@ class LessonRealtimeWebSocketHandler(
         }
 
         when (inbound.type) {
-            "subscribe.lesson" -> subscribeToLesson(session, authentication, inbound.lessonId)
+            "subscribe.lesson" -> subscribeToLesson(session, authentication, inbound.lessonId, inbound.gameLibraryVersion)
             "presence.update" -> updatePresence(session, authentication, inbound.lessonId, inbound.state)
             "tool.dice.roll" -> rollDice(session, authentication, inbound.lessonId, inbound.requestId)
             else -> hub.sendError(session, "Unsupported realtime message.")
@@ -62,10 +63,12 @@ class LessonRealtimeWebSocketHandler(
     }
 
     override fun handleTransportError(session: WebSocketSession, exception: Throwable) {
+        gameCompatibility.unregister(session.id).forEach(hub::publishGameChanged)
         hub.unregister(session)
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
+        gameCompatibility.unregister(session.id).forEach(hub::publishGameChanged)
         hub.unregister(session)
     }
 
@@ -73,6 +76,7 @@ class LessonRealtimeWebSocketHandler(
         session: WebSocketSession,
         authentication: JwtAuthenticationToken,
         lessonId: UUID?,
+        gameLibraryVersion: Int? = null,
     ) {
         if (lessonId == null) {
             hub.sendError(session, "lessonId is required.")
@@ -86,6 +90,8 @@ class LessonRealtimeWebSocketHandler(
             }
             val lesson = store.get(authentication, lessonId)
             hub.subscribe(session, lesson)
+            gameCompatibility.subscribe(session.id, lesson.id, gameLibraryVersion)
+            hub.publishGameChanged(lesson.id)
             hub.sendLessonSnapshot(session, lesson)
         } catch (caught: ResponseStatusException) {
             hub.sendError(session, caught.reason ?: "Lesson is not available.")

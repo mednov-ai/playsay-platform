@@ -47,6 +47,7 @@ class MaterialAssetService(
     private val materialAssetUploadService: MaterialAssetUploadService,
     private val materialHtmlGameOptimizationService: MaterialHtmlGameOptimizationService,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val gameRepository: com.playsay.gateway.repo.game.HtmlGameRepository? = null,
 ) {
     fun list(materialId: UUID): List<MaterialAssetResponse> =
         materialAssetRepo.findByMaterialIdOrderByCreatedAtDesc(materialId)
@@ -60,7 +61,7 @@ class MaterialAssetService(
         val asset = findAsset(assetId)
             ?.takeIf { found -> found.materialId == materialId }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
-        val storageKey = asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
+        val storageKey = gameStorageKey(asset) ?: asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_CONTENT_NOT_FOUND)
         val content = try {
             materialObjectStorage.getObject(storageKey)
@@ -128,7 +129,7 @@ class MaterialAssetService(
     fun storedAssetBytes(materialId: UUID, assetId: UUID): ByteArray {
         val asset = findAsset(assetId)?.takeIf { found -> found.materialId == materialId }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
-        val storageKey = asset.storageKey?.takeIf { it.isNotBlank() }
+        val storageKey = gameStorageKey(asset) ?: asset.storageKey?.takeIf { it.isNotBlank() }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_CONTENT_NOT_FOUND)
         return try {
             materialObjectStorage.getObject(storageKey).bytes
@@ -141,57 +142,70 @@ class MaterialAssetService(
         findAsset(assetId)?.takeIf { asset -> asset.materialId == materialId && asset.kind == "HTML_GAME" }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
 
-    fun copyAssets(sourceMaterialId: UUID, targetMaterialId: UUID, assetIds: Set<UUID>): Map<UUID, UUID> {
-        if (assetIds.isEmpty()) {
-            return emptyMap()
-        }
+    private fun copyLibraryGame(sourceAsset: MaterialAssetEntity, copiedAssetId: UUID, targetMaterialId: UUID): Boolean {
+        if (sourceAsset.kind != "HTML_GAME") return false
+        val gameAlias = gameRepository?.alias(sourceAsset.id) ?: return false
+        val metadata = copiedAssetMetadata(sourceAsset, null).apply { put("gameId", gameAlias.gameId.toString()); put("gameRevisionId", gameAlias.revisionId.toString()) }
+        materialAssetRepo.saveAndFlush(MaterialAssetEntity(id = copiedAssetId, materialId = targetMaterialId, kind = "HTML_GAME", provider = "GAME_LIBRARY", storageKey = null, metadata = objectMapper.writeValueAsString(metadata), createdAt = Instant.now()))
+        gameRepository.insertAlias(copiedAssetId, targetMaterialId, gameAlias.gameId, gameAlias.revisionId, gameAlias.sha256)
+        return true
+    }
 
-        return assetIds.mapNotNull { assetId ->
-            val sourceAsset = findAsset(assetId)
-                ?.takeIf { asset -> asset.materialId == sourceMaterialId }
-                ?: return@mapNotNull null
-            val copiedAssetId = UUID.randomUUID()
-            val storageContent = sourceAsset.storageKey
-                ?.trim()
-                ?.takeIf { key -> key.isNotEmpty() }
-                ?.let { key ->
-                    try {
-                        materialObjectStorage.getObject(key)
-                    } catch (exception: MaterialObjectNotFoundException) {
-                        throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
-                    } catch (exception: MaterialObjectStorageException) {
-                        throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
-                    }
-                }
-            val copiedStorageKey = storageContent?.let { content ->
-                "material-assets/$targetMaterialId/$copiedAssetId.${copiedAssetExtension(sourceAsset, content.contentType)}"
-            }
+    fun copyAssets(sourceMaterialId: UUID, targetMaterialId: UUID, assetIds: Set<UUID>): Map<UUID, UUID> =
+        assetIds.mapNotNull { copyAsset(sourceMaterialId, targetMaterialId, it) }.toMap()
 
+    private fun copyAsset(sourceMaterialId: UUID, targetMaterialId: UUID, assetId: UUID): Pair<UUID, UUID>? {
+    val sourceAsset = findAsset(assetId)
+        ?.takeIf { asset -> asset.materialId == sourceMaterialId }
+        ?: return null
+    val copiedAssetId = UUID.randomUUID()
+    if (copyLibraryGame(sourceAsset, copiedAssetId, targetMaterialId)) return assetId to copiedAssetId
+    val storageContent = sourceAsset.storageKey
+        ?.trim()
+        ?.takeIf { key -> key.isNotEmpty() }
+        ?.let { key ->
             try {
-                if (storageContent != null && copiedStorageKey != null) {
-                    materialObjectStorage.putObject(copiedStorageKey, storageContent.bytes, storageContent.contentType)
-                }
-                materialAssetRepo.saveAndFlush(
-                    MaterialAssetEntity(
-                        id = copiedAssetId,
-                        materialId = targetMaterialId,
-                        kind = sourceAsset.kind,
-                        storageKey = copiedStorageKey,
-                        externalUrl = sourceAsset.externalUrl,
-                        provider = sourceAsset.provider,
-                        metadata = objectMapper.writeValueAsString(copiedAssetMetadata(sourceAsset, copiedStorageKey)),
-                        createdAt = Instant.now(),
-                    ),
-                )
+                materialObjectStorage.getObject(key)
+            } catch (exception: MaterialObjectNotFoundException) {
+                throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_ASSET_NOT_FOUND)
             } catch (exception: MaterialObjectStorageException) {
                 throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
-            } catch (exception: RuntimeException) {
-                copiedStorageKey?.let { key -> runCatching { materialObjectStorage.deleteObject(key) } }
-                throw exception
             }
+        }
+    val copiedStorageKey = storageContent?.let { content ->
+        "material-assets/$targetMaterialId/$copiedAssetId.${copiedAssetExtension(sourceAsset, content.contentType)}"
+    }
 
-            assetId to copiedAssetId
-        }.toMap()
+    try {
+        if (storageContent != null && copiedStorageKey != null) {
+            materialObjectStorage.putObject(copiedStorageKey, storageContent.bytes, storageContent.contentType)
+        }
+        materialAssetRepo.saveAndFlush(
+            MaterialAssetEntity(
+                id = copiedAssetId,
+                materialId = targetMaterialId,
+                kind = sourceAsset.kind,
+                storageKey = copiedStorageKey,
+                externalUrl = sourceAsset.externalUrl,
+                provider = sourceAsset.provider,
+                metadata = objectMapper.writeValueAsString(copiedAssetMetadata(sourceAsset, copiedStorageKey)),
+                createdAt = Instant.now(),
+            ),
+        )
+    } catch (exception: MaterialObjectStorageException) {
+        throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
+    } catch (exception: RuntimeException) {
+        copiedStorageKey?.let { key -> runCatching { materialObjectStorage.deleteObject(key) } }
+        throw exception
+    }
+
+    return assetId to copiedAssetId
+    }
+
+    private fun gameStorageKey(asset: MaterialAssetEntity): String? {
+        if (asset.kind != "HTML_GAME") return null
+        val alias = gameRepository?.alias(asset.id)?.takeIf { it.sourceMaterialId == asset.materialId } ?: return null
+        return gameRepository.blob(alias.revisionId)?.storageKey
     }
 
     fun findYoutubeThumbnailAsset(
@@ -420,7 +434,7 @@ internal fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Materia
         kind = kind,
         storageKey = storageKey,
         externalUrl = externalUrl,
-        contentUrl = storageKey?.takeIf { key -> key.isNotBlank() }?.let {
+        contentUrl = (storageKey?.takeIf { key -> key.isNotBlank() } ?: if (kind == "HTML_GAME" && objectMapper.readTree(metadata).hasNonNull("gameRevisionId")) "game-library" else null)?.let {
             "/api/materials/$materialId/assets/$id/content"
         },
         provider = provider,

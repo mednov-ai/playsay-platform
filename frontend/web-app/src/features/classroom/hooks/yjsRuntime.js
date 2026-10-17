@@ -189,6 +189,8 @@ export function createYjsWorkspaceRuntime({
       transientHtmlGameSdkEffects = appendBounded(transientHtmlGameSdkEffects, message.payload, 120);
       onHtmlGameSdkEffectsChange(transientHtmlGameSdkEffects);
       onHtmlGameSdkMessage({ effect: message.payload, kind: "effect" });
+    } else if (message.kind === "html-game-sdk-control" && (message.payload.kind === "resume" || message.payload.kind === "recovery-required")) {
+      onHtmlGameSdkMessage(message.payload);
     }
   };
   const publishEphemeral = (kind, payload) => {
@@ -346,6 +348,9 @@ export function createYjsWorkspaceRuntime({
     publishHtmlGameSdkEffect(effect) {
       publishEphemeral("html-game-sdk-effect", effect);
     },
+    publishHtmlGameSdkControl(message) {
+      publishEphemeral("html-game-sdk-control", { ...message, id: globalThis.crypto.randomUUID(), at: Date.now() });
+    },
     publishHtmlGameSdkRequest(request) {
       publishEphemeral("html-game-sdk-request", request);
     },
@@ -473,6 +478,10 @@ export function createYjsWorkspaceRuntime({
       };
     },
     startSocketSync(nextSocket) {
+      // A server removes disconnected awareness with the next clock. Advance
+      // beyond that tombstone before reclaiming the same client on reconnect.
+      const localState = awareness.getLocalState();
+      if (localState) { awareness.setLocalState(localState); awareness.setLocalState(localState); }
       socket = nextSocket;
       sendSyncStep1(nextSocket, ydoc);
       sendAwarenessUpdate(nextSocket, awareness, [ydoc.clientID]);

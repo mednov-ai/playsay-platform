@@ -40,7 +40,9 @@ class MaterialImagePageService(
     private val materialAnnotationService: MaterialAnnotationService,
     private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
     private val messageProvider: MessageProvider,
+    private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val gameUploadCommands: com.playsay.gateway.service.game.LegacyGameUploadCommandService? = null,
 ) {
     @Transactional
     fun appendReusableImagePage(
@@ -96,9 +98,19 @@ class MaterialImagePageService(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
         file: MultipartFile,
+        commandId: UUID? = null,
     ): LiveLessonHtmlGamePageResponse {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
         requireSupportedLiveLesson(lessonId, MetaData.ErrorCodes.MATERIAL_HTML_GAME_PARALLEL_UNSUPPORTED)
+        val commandResult = if (commandId == null) null else gameUploadCommands?.run("lesson", lessonId, commandId, file) {
+            val response = appendLiveLessonHtmlGamePage(authentication, lessonId, file, null)
+            objectMapper.createObjectNode().put("materialId", response.material.id.toString()).put("pageId", response.activePageId)
+        }
+        if (commandResult != null) return LiveLessonHtmlGamePageResponse(
+            lesson = scheduledLessonStore.get(authentication, lessonId),
+            material = lessonMaterialResponseMapper.toResponse(requireMaterialRow(UUID.fromString(commandResult.path("materialId").asText()))),
+            activePageId = commandResult.path("pageId").asText(),
+        )
         val optimized = materialHtmlGameOptimizationService.optimizeIfRequired(
             materialAssetUploadService.validateHtmlGameFile(file),
         )
@@ -274,6 +286,7 @@ class MaterialImagePageService(
             gameMetadata = gameMetadata,
             imageOptimization = optimized.metadata,
         )
+        gameRegistration?.register(assetId)
         pages.add(htmlGamePage(pageId, pageTitle, gameMetadata.titleSource, assetId))
         material.document = objectMapper.writeValueAsString(document)
         material.updatedAt = Instant.now()

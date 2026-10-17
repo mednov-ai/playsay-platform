@@ -405,7 +405,7 @@ export function RenderedMaterialBlock({
       }
     case "htmlGame":
       {
-        const hasGameAsset = Boolean(materialAssetIdFromUrl(block.url));
+        const hasGameAsset = Boolean((block.gameId && block.gameRevisionId) || materialAssetIdFromUrl(block.url));
         const gameContentState = hasGameAsset ? htmlGameContentState ?? "ready" : "unavailable";
         const gameIconUrl = resolveMaterialImageUrl(block.gameIconUrl, assetUrls);
         if (gameContentState !== "ready") {

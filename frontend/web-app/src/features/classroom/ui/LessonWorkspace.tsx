@@ -54,7 +54,9 @@ export function LessonWorkspace({
   profile,
   session,
   onWhiteboardActiveChange,
+  coveredByLibraryGame = false,
 }: {
+  coveredByLibraryGame?: boolean;
   onWhiteboardActiveChange?: (active: boolean) => void;
   displayName: string;
   liveVocabulary: ReturnType<typeof useLiveVocabularyPractice>;
@@ -183,7 +185,7 @@ export function LessonWorkspace({
     color: collaborationParticipantColor(profile?.subject ?? displayName),
     document: teacherAnnotationDocumentState.document,
     enabled: canMonitorSubmissions && Boolean(teacherAnnotationDocumentState.document),
-    suspended: whiteboard.active,
+    suspended: whiteboard.active || coveredByLibraryGame,
     onDocumentInvalid: teacherAnnotationDocumentState.invalidateDocument,
     participantName: displayName,
   });
@@ -242,7 +244,7 @@ export function LessonWorkspace({
   const externalActivitiesEnabled = externalActivityFeatureEnabled();
   const teacherExternalActivitySync = useExternalActivitySession({
     blocks: externalActivityBlocks,
-    suspended: whiteboard.active,
+    suspended: whiteboard.active || coveredByLibraryGame,
     enabled: canMonitorSubmissions && !isParallelWork && externalActivitiesEnabled,
     isHost: canMonitorSubmissions,
     participantColor: collaborationParticipantColor(profile?.subject ?? displayName),
@@ -293,7 +295,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench" data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active}>
+    <section className="playsay-workbench" data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -384,8 +386,8 @@ export function LessonWorkspace({
       {whiteboard.board ? <div hidden={!whiteboard.active}>
         <LessonWhiteboard key={whiteboard.board.document.id} board={whiteboard.board} actor={profile?.subject ?? session.identity} name={displayName} active={whiteboard.active} pending={whiteboard.pending} onUpdate={command => void whiteboard.update(command)} targetLabel={session.workMode === "PARALLEL" ? activeParticipantLabel || displayName : t("whiteboard.group")}/>
       </div> : null}
-      <CollaborationSuspensionContext.Provider value={whiteboard.active}>
-      <div className="playsay-workbench-layout" hidden={whiteboard.active} inert={whiteboard.active}>
+      <CollaborationSuspensionContext.Provider value={whiteboard.active || coveredByLibraryGame}>
+      <div className="playsay-workbench-layout" hidden={whiteboard.active || coveredByLibraryGame} inert={whiteboard.active || coveredByLibraryGame}>
       <div className="playsay-workbench-body">
 
         {assignmentMessage ? (

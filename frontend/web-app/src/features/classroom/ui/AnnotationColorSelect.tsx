@@ -21,7 +21,7 @@ export function AnnotationColorSelect({ color, onSelectColor }: {
 
   function closeAndFocus() {
     setPosition(null);
-    triggerRef.current?.focus();
+    triggerRef.current?.focus({ preventScroll: true });
   }
 
   function open() {
@@ -40,12 +40,19 @@ export function AnnotationColorSelect({ color, onSelectColor }: {
   }
 
   useLayoutEffect(() => {
-    if (position) listRef.current?.focus();
+    if (position) listRef.current?.focus({ preventScroll: true });
   }, [position]);
 
   useEffect(() => {
     if (!position) return;
-    listRef.current?.children[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+    const list = listRef.current;
+    const option = list?.children[activeIndex];
+    if (!list || !(option instanceof HTMLElement)) return;
+    // scrollIntoView can also scroll the classroom behind a portalled list.
+    const top = option.offsetTop;
+    const bottom = top + option.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
   }, [activeIndex, position]);
 
   useEffect(() => {
@@ -58,7 +65,7 @@ export function AnnotationColorSelect({ color, onSelectColor }: {
     function viewportChanged(event: Event) {
       // Scrolling the options themselves must keep the list open.
       if (event.target instanceof Node && listRef.current?.contains(event.target)) return;
-      if (listRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+      if (listRef.current?.contains(document.activeElement)) triggerRef.current?.focus({ preventScroll: true });
       setPosition(null);
     }
     document.addEventListener("pointerdown", outside, true);

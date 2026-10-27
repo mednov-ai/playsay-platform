@@ -12,6 +12,7 @@ import {
   Type as TypeIcon,
   Undo2,
 } from "lucide-react";
+import { AnnotationColorSelect } from "./AnnotationColorSelect";
 import { AnnotationToolButton } from "../../materials";
 import { useAppTranslation } from "../../../shared/i18n";
 import {
@@ -144,19 +145,17 @@ export function AnnotationToolbar({
           </button>
         </div>
       ) : null}
-      <div className="playsay-color-swatches" aria-label={t("classroom.annotation.color")}>
-        {["#ff5c00", "#00a878", "#2574ff"].map((color) => (
-          <button
-            aria-label={color}
-            className="playsay-color-swatch"
-            data-active={annotationColor === color ? "true" : "false"}
-            key={color}
-            onClick={() => onSelectColor(color)}
-            style={{ backgroundColor: color }}
-            type="button"
-          />
-        ))}
-      </div>
+      <AnnotationColorSelect
+        color={annotationColor}
+        onSelectColor={(color) => {
+          const selectedColor = selectedElement?.kind === "mindMapNode" && selectedElement.parentId === null
+            ? selectedElement.fill
+            : selectedElement?.color;
+          if (color !== annotationColor || (selectedElement && selectedElement.kind !== "stickyNote" && selectedColor !== color)) {
+            onSelectColor(color);
+          }
+        }}
+      />
     </aside>
   );
 }

@@ -10,10 +10,25 @@
     <keycloak.version>26.8.1</keycloak.version>
     <quarkus.version>3.40.1</quarkus.version>
     <netty.version>4.1.139.Final</netty.version>
+    <vertx.version>4.5.35</vertx.version>
     <kc.home.dir>${project.build.directory}/kc</kc.home.dir>
   </properties>
   <dependencyManagement>
     <dependencies>
+      <!-- Override only the Vert.x family in the upstream runtime. Importing the
+           entire Vert.x BOM would also change unrelated Jackson and logging deps. -->
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-auth-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-bridge-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-codegen</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-core</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-client</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-server</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-uri-template</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-client</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-common</artifactId><version>${vertx.version}</version></dependency>
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-utils</artifactId>

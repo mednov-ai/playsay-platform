@@ -8,6 +8,11 @@ Honey School uses OWASP Dependency-Check 13.0.0 to check resolved JVM dependenci
 
 The full entry point discovers JVM projects instead of maintaining an allowlist. A module selector scans the selected project and recursively referenced project dependencies, plus build-logic. Every resolvable configuration is included, covering compileOnly through compileClasspath, runtime, test and tool dependencies; buildscript classpaths are also scanned. Inventory resolution is strict and accounts for empty configurations. Included builds are scanned explicitly rather than assumed to participate in the backend aggregate.
 
+The full-backend Jenkins job reserves a 1.5 GiB Gradle heap inside a 3 GiB
+container for aggregate dependency inventory and scanning. A heap exhaustion
+or incomplete inventory is a failed gate, not vulnerability clearance;
+module-specific jobs keep their separately bounded resources.
+
 An unsuppressed CVSS score >= 7.0 fails verification unless an explicit, unexpired risk acceptance covers the exact CVE, Maven PURL/version and build/module, or the owner-authorized runtime-scope policy proves the exact finding is outside server runtime. Lower-severity and unscored findings remain in reports for review. Dependency resolution errors, advisory update failures and analysis errors fail verification; they are not a clean scan. There is no CI bypass or broad suppression baseline. Confirmed vulnerabilities with compatible fixes are remediated regardless of severity. Unavailable or incompatible fixes remain documented as unresolved; only an explicit bounded owner acceptance may temporarily permit release.
 
 ## Temporary accepted risks

@@ -11,6 +11,12 @@ when an upstream viewer dependency supports a single compatible Yjs and the
 patched security dependencies; rerun the complete audit, document-viewer and
 two-actor collaboration acceptance before doing so.
 
+Jenkins web build 407 exhausted its 3 GiB Node container while bundling the
+DEV viewer, despite the 2 GiB V8 heap limit. The DEV web pipeline reserves
+2 GiB and limits that container to 4 GiB so the scheduler accounts for the
+build and Node/esbuild have native-memory headroom. A repeated native build
+and CI node resource observation remain required.
+
 The fresh full DEV audit reports 18 moderate and two high findings. The two
 high findings are `body-parser@2.3.0` in the viewer's MCP tooling and Vite
 6.4.3/7.3.6 in build/test tooling. Rendered browser-module inventory found no

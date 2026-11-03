@@ -1,4 +1,4 @@
-FROM node:24-alpine AS deps
+FROM node:26.13.0-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:24-alpine AS runtime
+FROM node:26.13.0-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package*.json ./

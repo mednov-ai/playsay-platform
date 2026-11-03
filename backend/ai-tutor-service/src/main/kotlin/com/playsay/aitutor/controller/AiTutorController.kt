@@ -5,6 +5,7 @@ import com.playsay.aitutor.service.AiTutorCatalogService
 import com.playsay.aitutor.service.AiTutorSessionService
 import com.playsay.aitutor.service.DialogAllowanceService
 import com.playsay.aitutor.service.LearnerAgePolicyService
+import com.playsay.aitutor.config.security.requireSubject
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -20,41 +21,41 @@ class AiTutorController(
     private val allowances: DialogAllowanceService,
 ) {
     @GetMapping("/personas")
-    fun personas(authentication: JwtAuthenticationToken) = catalog.personas(agePolicy.resolve(authentication.token.subject))
+    fun personas(authentication: JwtAuthenticationToken) = catalog.personas(agePolicy.resolve(authentication.token.requireSubject()))
 
     @GetMapping("/scenarios")
-    fun scenarios(authentication: JwtAuthenticationToken) = catalog.scenarios(agePolicy.resolve(authentication.token.subject))
+    fun scenarios(authentication: JwtAuthenticationToken) = catalog.scenarios(agePolicy.resolve(authentication.token.requireSubject()))
 
     @PostMapping("/sessions")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(authentication: JwtAuthenticationToken, @Valid @RequestBody request: CreateSessionRequest) =
-        sessions.create(authentication.token.subject, request)
+        sessions.create(authentication.token.requireSubject(), request)
 
     @GetMapping("/dialog-allowance")
     fun dialogAllowance(authentication: JwtAuthenticationToken) =
-        allowances.currentAllowance(authentication.token.subject)
+        allowances.currentAllowance(authentication.token.requireSubject())
 
     @GetMapping("/teacher/dialog-allowances")
     fun teacherDialogAllowances(authentication: JwtAuthenticationToken) =
-        allowances.teacherAllowances(authentication.token.subject)
+        allowances.teacherAllowances(authentication.token.requireSubject())
 
     @PostMapping("/teacher/dialog-allowances/{studentUserId}/grants")
     fun grantDialogAllowance(
         authentication: JwtAuthenticationToken,
         @PathVariable studentUserId: UUID,
         @Valid @RequestBody request: GrantDialogCreditsRequest,
-    ) = allowances.grant(authentication.token.subject, studentUserId, request)
+    ) = allowances.grant(authentication.token.requireSubject(), studentUserId, request)
 
     @PostMapping("/sessions/{sessionId}/events")
     fun event(authentication: JwtAuthenticationToken, @PathVariable sessionId: UUID, @Valid @RequestBody request: SessionEventRequest) =
-        sessions.appendEvent(authentication.token.subject, sessionId, request)
+        sessions.appendEvent(authentication.token.requireSubject(), sessionId, request)
 
     @PostMapping("/sessions/{sessionId}/finish")
     fun finish(authentication: JwtAuthenticationToken, @PathVariable sessionId: UUID) =
-        sessions.finish(authentication.token.subject, sessionId)
+        sessions.finish(authentication.token.requireSubject(), sessionId)
 
     @GetMapping("/progress")
-    fun progress(authentication: JwtAuthenticationToken) = sessions.progress(authentication.token.subject)
+    fun progress(authentication: JwtAuthenticationToken) = sessions.progress(authentication.token.requireSubject())
 
     @PostMapping("/assessment")
     fun assessment(@Valid @RequestBody request: AssessmentRequest) = sessions.assess(request)

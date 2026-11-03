@@ -11,6 +11,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
 import com.playsay.gateway.utils.toApplicationRoles
+import com.playsay.gateway.utils.requireSubject
 import java.time.Clock
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -31,7 +32,7 @@ class WhiteboardAccessService(
 ) {
     fun canManage(authentication: JwtAuthenticationToken, lessonId: UUID): Boolean {
         val lesson = lessons.findById(lessonId).orElse(null) ?: return false
-        val user = users.findByKeycloakSubject(authentication.token.subject) ?: return false
+        val user = users.findByKeycloakSubject(authentication.token.requireSubject()) ?: return false
         if (user.deletedAt != null || users.hasDeletionIntent(user.keycloakSubject)) return false
         val roles = user.roles.toApplicationRoles()
         if ("ADMIN" in roles && authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }) return true
@@ -43,7 +44,7 @@ class WhiteboardAccessService(
     @Transactional(readOnly = true, noRollbackFor = [ProjectResponseException::class])
     fun context(authentication: JwtAuthenticationToken, lessonId: UUID, studentSubject: String?): Pair<LessonEntity, UUID?> {
         val lesson = lessons.findById(lessonId).orElse(null) ?: missing()
-        val user = users.findByKeycloakSubject(authentication.token.subject) ?: denied()
+        val user = users.findByKeycloakSubject(authentication.token.requireSubject()) ?: denied()
         if (user.deletedAt != null || users.hasDeletionIntent(user.keycloakSubject)) denied()
         val roster = participants.findByLessonId(lessonId)
         val manager = canManage(authentication, lessonId)

@@ -7,6 +7,7 @@ import com.playsay.gateway.realtime.*
 import com.playsay.gateway.repo.*
 import com.playsay.gateway.repo.schedule.*
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.time.Instant
 import java.util.UUID
 import org.springframework.context.ApplicationEventPublisher
@@ -41,7 +42,7 @@ class ScheduledLessonStore(
         } else {
             val now = clock.instant()
             lessonRepo.findScheduleRowsForStudent(
-                subject = authentication.token.subject,
+                subject = authentication.token.requireSubject(),
                 visibleUntil = lessonAccessEndsAfter(now),
                 excludedStatuses = expiredParticipantStatuses,
             )
@@ -264,7 +265,7 @@ class ScheduledLessonStore(
         val lesson = if (authentication.canManageSchedule()) {
             lessonRepo.findScheduleRowById(lessonId)?.takeIf { authorizationService.canManageLesson(authentication, lessonId) }
         } else {
-            lessonRepo.findScheduleRowByIdForStudent(lessonId, authentication.token.subject)
+            lessonRepo.findScheduleRowByIdForStudent(lessonId, authentication.token.requireSubject())
         } ?: return null
         if (authentication.canManageSchedule()) {
             return lesson
@@ -276,7 +277,7 @@ class ScheduledLessonStore(
 
         val isParticipant = lessonParticipantRepo.countByLessonIdAndStudentSubject(
             lessonId = lessonId,
-            subject = authentication.token.subject,
+            subject = authentication.token.requireSubject(),
         ) > 0
 
         return lesson.takeIf { isParticipant }

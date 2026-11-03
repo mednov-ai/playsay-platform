@@ -10,6 +10,7 @@
     <keycloak.version>26.8.1</keycloak.version>
     <quarkus.version>3.40.1</quarkus.version>
     <netty.version>4.1.139.Final</netty.version>
+    <vertx.version>4.5.35</vertx.version>
     <kc.home.dir>${project.build.directory}/kc</kc.home.dir>
   </properties>
   <dependencyManagement>
@@ -35,6 +36,14 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-bom</artifactId>
         <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Align the complete Vert.x family with the matching patched runtime. -->
+      <dependency>
+        <groupId>io.vertx</groupId>
+        <artifactId>vertx-dependencies</artifactId>
+        <version>${vertx.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

@@ -8,7 +8,7 @@ export default defineConfig({
       formats: ["es", "iife"],
       fileName: (format) => format === "es" ? "game-sync.js" : "game-sync.iife.js",
     },
-    minify: "esbuild",
+    minify: "oxc",
     sourcemap: true,
   },
 });

@@ -6,6 +6,7 @@ import com.playsay.keyboard.dto.ProgressResponse
 import com.playsay.keyboard.dto.SubmitResultRequest
 import com.playsay.keyboard.dto.SubmitTrainingResultResponse
 import com.playsay.keyboard.service.TrainingService
+import com.playsay.keyboard.utils.requireSubject
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -29,16 +30,16 @@ class TrainingController(
         @Valid @RequestBody request: SubmitResultRequest,
         locale: Locale = Locale.forLanguageTag("ru"),
     ): SubmitTrainingResultResponse =
-        trainingService.submit(authentication.token.subject, request, locale)
+        trainingService.submit(authentication.token.requireSubject(), request, locale)
 
     @GetMapping("/progress")
     fun progress(authentication: JwtAuthenticationToken): ProgressResponse =
-        trainingService.progress(authentication.token.subject)
+        trainingService.progress(authentication.token.requireSubject())
 
     @PostMapping("/claim-anonymous")
     fun claimAnonymous(
         authentication: JwtAuthenticationToken,
         @Valid @RequestBody request: ClaimAnonymousProgressRequest,
     ): ClaimAnonymousProgressResponse =
-        trainingService.claimAnonymous(authentication.token.subject, request)
+        trainingService.claimAnonymous(authentication.token.requireSubject(), request)
 }

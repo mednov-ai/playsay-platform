@@ -7,6 +7,7 @@ import com.playsay.vocabulary.dto.VocabularyActivePracticeResponse
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
 import com.playsay.vocabulary.dto.VocabularySelectionRecipeRequest
 import com.playsay.vocabulary.service.VocabularyPracticeService
+import com.playsay.vocabulary.config.security.requireSubject
 import jakarta.validation.Valid
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -32,7 +33,7 @@ class VocabularyPracticeController(
     fun learners(
         auth: JwtAuthenticationToken,
         @RequestParam(required = false) query: String?,
-    ) = practice.learners(auth.token.subject, query)
+    ) = practice.learners(auth.token.requireSubject(), query)
 
     @GetMapping("/dashboard")
     fun dashboard(
@@ -40,70 +41,70 @@ class VocabularyPracticeController(
         @RequestParam(required = false) ownerSubject: String?,
         @RequestParam(required = false) lessonId: UUID?,
         @RequestParam(required = false) query: String?,
-    ) = practice.dashboard(auth.token.subject, ownerSubject, lessonId, query)
+    ) = practice.dashboard(auth.token.requireSubject(), ownerSubject, lessonId, query)
 
     @PostMapping("/practices/preview")
     fun preview(
         auth: JwtAuthenticationToken,
         @Valid @RequestBody request: VocabularyPracticeSettingsRequest,
-    ) = practice.preview(auth.token.subject, request)
+    ) = practice.preview(auth.token.requireSubject(), request)
 
     @PostMapping("/practices/recommended-preview")
     fun recommendedPreview(
         auth: JwtAuthenticationToken,
         @Valid @RequestBody request: VocabularyPracticeSettingsRequest,
-    ) = practice.recommendedPreview(auth.token.subject, request)
+    ) = practice.recommendedPreview(auth.token.requireSubject(), request)
 
     @GetMapping("/selection-recipes")
-    fun recipes(auth: JwtAuthenticationToken) = practice.recipes(auth.token.subject)
+    fun recipes(auth: JwtAuthenticationToken) = practice.recipes(auth.token.requireSubject())
 
     @GetMapping("/selection-recipes/{recipeId}")
-    fun recipe(auth: JwtAuthenticationToken, @PathVariable recipeId: UUID) = practice.recipe(auth.token.subject, recipeId)
+    fun recipe(auth: JwtAuthenticationToken, @PathVariable recipeId: UUID) = practice.recipe(auth.token.requireSubject(), recipeId)
 
     @PostMapping("/selection-recipes")
     @ResponseStatus(HttpStatus.CREATED)
     fun createRecipe(
         auth: JwtAuthenticationToken,
         @Valid @RequestBody request: VocabularySelectionRecipeRequest,
-    ) = practice.createRecipe(auth.token.subject, request)
+    ) = practice.createRecipe(auth.token.requireSubject(), request)
 
     @PutMapping("/selection-recipes/{recipeId}")
     fun updateRecipe(
         auth: JwtAuthenticationToken,
         @PathVariable recipeId: UUID,
         @Valid @RequestBody request: VocabularySelectionRecipeRequest,
-    ) = practice.updateRecipe(auth.token.subject, recipeId, request)
+    ) = practice.updateRecipe(auth.token.requireSubject(), recipeId, request)
 
     @DeleteMapping("/selection-recipes/{recipeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteRecipe(auth: JwtAuthenticationToken, @PathVariable recipeId: UUID) =
-        practice.deleteRecipe(auth.token.subject, recipeId)
+        practice.deleteRecipe(auth.token.requireSubject(), recipeId)
 
     @PostMapping("/practices")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         auth: JwtAuthenticationToken,
         @Valid @RequestBody request: VocabularyPracticeSettingsRequest,
-    ) = practice.createLive(auth.token.subject, request)
+    ) = practice.createLive(auth.token.requireSubject(), request)
 
     @PostMapping("/practices/self")
     fun self(
         auth: JwtAuthenticationToken,
         @Valid @RequestBody request: VocabularyPracticeSettingsRequest,
-    ) = practice.selfPractice(auth.token.subject, request)
+    ) = practice.selfPractice(auth.token.requireSubject(), request)
 
     @GetMapping("/practices/active")
     fun active(
         auth: JwtAuthenticationToken,
         @RequestParam lessonId: UUID,
-    ) = VocabularyActivePracticeResponse(practice.activeForLesson(auth.token.subject, lessonId))
+    ) = VocabularyActivePracticeResponse(practice.activeForLesson(auth.token.requireSubject(), lessonId))
 
     @PatchMapping("/practices/{practiceId}/status")
     fun status(
         auth: JwtAuthenticationToken,
         @PathVariable practiceId: UUID,
         @RequestBody request: VocabularyPracticeStatusRequest,
-    ) = practice.status(auth.token.subject, practiceId, request)
+    ) = practice.status(auth.token.requireSubject(), practiceId, request)
 
     @GetMapping("/practice-sessions")
     fun history(
@@ -112,13 +113,13 @@ class VocabularyPracticeController(
         @RequestParam(required = false) lessonId: UUID?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "25") size: Int,
-    ) = practice.history(auth.token.subject, ownerSubject, lessonId, page, size)
+    ) = practice.history(auth.token.requireSubject(), ownerSubject, lessonId, page, size)
 
     @GetMapping("/practice-sessions/{sessionId}")
     fun session(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
-    ) = practice.session(auth.token.subject, sessionId)
+    ) = practice.session(auth.token.requireSubject(), sessionId)
 
     @PostMapping("/practice-sessions/{sessionId}/attempts")
     @ResponseStatus(HttpStatus.CREATED)
@@ -126,37 +127,37 @@ class VocabularyPracticeController(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
         @Valid @RequestBody request: VocabularyAttemptRequest,
-    ) = practice.attempt(auth.token.subject, sessionId, request)
+    ) = practice.attempt(auth.token.requireSubject(), sessionId, request)
 
     @PostMapping("/practice-sessions/{sessionId}/items/{itemId}/reveal")
     fun reveal(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
         @PathVariable itemId: UUID,
-    ) = practice.reveal(auth.token.subject, sessionId, itemId)
+    ) = practice.reveal(auth.token.requireSubject(), sessionId, itemId)
 
     @PostMapping("/practice-sessions/{sessionId}/hint")
     fun giveHint(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
-    ) = practice.giveHint(auth.token.subject, sessionId)
+    ) = practice.giveHint(auth.token.requireSubject(), sessionId)
 
     @PostMapping("/practice-sessions/{sessionId}/help-request")
     fun requestHelp(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
-    ) = practice.requestHelp(auth.token.subject, sessionId)
+    ) = practice.requestHelp(auth.token.requireSubject(), sessionId)
 
     @GetMapping("/practice-sessions/{sessionId}/key-set")
     fun keySet(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
-    ) = practice.keySet(auth.token.subject, sessionId)
+    ) = practice.keySet(auth.token.requireSubject(), sessionId)
 
     @PatchMapping("/practice-sessions/{sessionId}/key-acknowledgement")
     fun acknowledgeKeyPosition(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
         @Valid @RequestBody request: VocabularyKeyAcknowledgementRequest,
-    ) = practice.acknowledgeKeyPosition(auth.token.subject, sessionId, request)
+    ) = practice.acknowledgeKeyPosition(auth.token.requireSubject(), sessionId, request)
 }

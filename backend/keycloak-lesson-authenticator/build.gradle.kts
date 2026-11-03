@@ -6,7 +6,12 @@ group = "com.playsay.keycloak"
 version = "1.0.0"
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    // The official Keycloak runtime must be able to load the provider.
+    options.release.set(21)
 }
 
 // Security inventory covers the rebuilt server, not just the SPI compilation closure.
@@ -32,6 +37,10 @@ configurations.configureEach {
             "com.mysql" to "mysql-connector-j" -> useVersion("26.7.0")
             "io.airlift" to "aircompressor" -> useVersion("2.0.3")
             "org.codehaus.plexus" to "plexus-utils" -> useVersion("4.0.3")
+        }
+        if (requested.group == "io.vertx") {
+            useVersion("4.5.35")
+            because("Keep the Keycloak Vert.x runtime family on its security maintenance release")
         }
     }
 }

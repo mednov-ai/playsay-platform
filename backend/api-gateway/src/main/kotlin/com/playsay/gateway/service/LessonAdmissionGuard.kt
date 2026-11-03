@@ -2,6 +2,7 @@ package com.playsay.gateway.service
 
 import com.playsay.gateway.repo.LessonAdmissionRepo
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.util.UUID
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
@@ -18,5 +19,5 @@ class LessonAdmissionGuard(private val admissionRepo: LessonAdmissionRepo) {
         authentication.authorities.none {
             it.authority == MetaData.Authorities.TEACHER || it.authority == MetaData.Authorities.ADMIN
         } &&
-            isKicked(lessonId, authentication.token.subject)
+            isKicked(lessonId, authentication.token.requireSubject())
 }

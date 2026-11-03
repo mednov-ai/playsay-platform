@@ -1,8 +1,55 @@
 // Exact outside-runtime classification; scan and raw reports remain complete.
-return { String build, String project, Map dependency, String cve, Map configurations, List rules ->
+return { String build, String project, Map dependency, String cve, Map configurations, List rules, Map backendCoverage = null ->
     rules.find { rule ->
         def refs = dependency.projectReferences ?: []
         def packages = (dependency.packages ?: []).collect { it.id }
+        if (rule.kind == 'build-only-direct') {
+            if (rule.build != build || rule.project != project || build != 'playsay-backend-build-logic' || project != ':' ||
+                !rule.cves.contains(cve) || packages != [rule.packageUrl] || dependency.sha256 != rule.sha256 ||
+                dependency.fileName != rule.file || refs.sort() != rule.projectReferences.sort() ||
+                !(backendCoverage?.modules instanceof List) || backendCoverage.modules.empty ||
+                !(backendCoverage.build in ['playsay-backend', 'keycloak-lesson-authenticator'])) return false
+            def moduleNames = backendCoverage.modules.collect { it.project } as Set
+            if (backendCoverage.selection == 'all') {
+                if (!(backendCoverage.discoveredProjects instanceof List) ||
+                    moduleNames != (backendCoverage.discoveredProjects as Set)) return false
+            } else {
+                def selected = backendCoverage.selection?.startsWith(':')
+                    ? backendCoverage.selection : ':' + backendCoverage.selection
+                if (!backendCoverage.selection || !moduleNames.contains(selected)) return false
+            }
+
+            def parts = rule.packageUrl =~ /^pkg:maven\/([^\/]+)\/([^@]+)@(.+)$/
+            if (!parts.matches()) return false
+            def coordinate = "${parts[0][1]}:${parts[0][2]}:${parts[0][3]}"
+            def covered = refs.every { ref ->
+                def prefix = build + ':'
+                ref.startsWith(prefix) && configurations[ref.substring(prefix.length())]?.any {
+                    it.coordinate == coordinate && it.file == rule.file && it.sha256 == rule.sha256 && !it.directory
+                }
+            }
+            if (!covered) return false
+
+            // Every selected project's production classpath is mandatory. The
+            // custom Keycloak server has its own additional runtime graph.
+            def runtimeConfigurations = []
+            for (def module : backendCoverage.modules) {
+                def runtime = module.configurations?.find { it.name == 'runtimeClasspath' }
+                if (!runtime || !(runtime.artifacts instanceof List) ||
+                    runtime.artifacts.any { it.directory || !it.sha256 }) return false
+                runtimeConfigurations.add(runtime)
+                if (module.project == ':keycloak-lesson-authenticator' ||
+                    backendCoverage.build == 'keycloak-lesson-authenticator') {
+                    def server = module.configurations.find { it.name == 'serverRuntime' }
+                    if (!server || !(server.artifacts instanceof List) ||
+                        server.artifacts.any { it.directory || !it.sha256 }) return false
+                    runtimeConfigurations.add(server)
+                }
+            }
+            return !runtimeConfigurations.any { config -> config.artifacts.any {
+                it.coordinate == coordinate || it.sha256 == rule.sha256
+            } }
+        }
         def parent = configurations[rule.configuration]?.find {
             it.coordinate == rule.parentCoordinate && it.file == rule.parentFile && it.sha256 == rule.parentSha256
         }

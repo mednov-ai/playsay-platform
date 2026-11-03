@@ -1,4 +1,5 @@
 package com.playsay.gateway.service
+
 import com.playsay.gateway.client.RegistrationGateway
 
 import com.playsay.gateway.dto.ManagedStudentRequest
@@ -16,6 +17,7 @@ import com.playsay.gateway.repo.TeacherDelegationRepo
 import com.playsay.gateway.utils.MetaData
 import com.playsay.gateway.utils.toApplicationRoles
 import com.playsay.gateway.utils.toStoredRoles
+import com.playsay.gateway.utils.requireSubject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Clock
@@ -35,7 +37,7 @@ class UserProfileStore(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     private fun rejectDeletion(authentication: JwtAuthenticationToken) {
-        if (userRepo.hasDeletionIntent(authentication.token.subject)) {
+        if (userRepo.hasDeletionIntent(authentication.token.requireSubject())) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
         }
     }
@@ -320,7 +322,7 @@ private data class CurrentIdentity(
 
 private fun JwtAuthenticationToken.toIdentity(): CurrentIdentity =
     CurrentIdentity(
-        subject = token.subject,
+        subject = token.requireSubject(),
         username = token.getClaimAsString("preferred_username"),
         email = token.getClaimAsString("email"),
         name = token.getClaimAsString("name"),

@@ -6,15 +6,54 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.springframework.http.HttpHeaders
 import org.springframework.http.server.ServletServerHttpRequest
 import org.springframework.http.server.ServletServerHttpResponse
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.server.support.OriginHandshakeInterceptor
 
 class WebSocketConfigTest {
+    @Test
+    fun `websocket handshake requires a nonblank token subject`() {
+        val decoder = mock(JwtDecoder::class.java)
+        val interceptor = LessonWebSocketAuthInterceptor(
+            decoder,
+            JwtAuthenticationConverter(),
+            WebSocketOriginPolicy("https://online.honey.school"),
+        )
+        val request = MockHttpServletRequest("GET", "/ws/lessons").apply {
+            addHeader(HttpHeaders.ORIGIN, "https://online.honey.school")
+            addHeader("Sec-WebSocket-Protocol", "playsay, token")
+        }
+        val jwt = Jwt.withTokenValue("token").header("alg", "none").claim("test", "value").build()
+        `when`(decoder.decode("token")).thenReturn(jwt)
+        val attributes = mutableMapOf<String, Any>()
+
+        assertFalse(
+            interceptor.beforeHandshake(
+                ServletServerHttpRequest(request), ServletServerHttpResponse(MockHttpServletResponse()),
+                mock(WebSocketHandler::class.java), attributes,
+            ),
+        )
+        assertTrue(attributes.isEmpty())
+
+        `when`(decoder.decode("token")).thenReturn(
+            Jwt.withTokenValue("token").header("alg", "none").subject("student-1").build(),
+        )
+        assertTrue(
+            interceptor.beforeHandshake(
+                ServletServerHttpRequest(request), ServletServerHttpResponse(MockHttpServletResponse()),
+                mock(WebSocketHandler::class.java), attributes,
+            ),
+        )
+    }
+
     @Test
     fun `parses exact current application origins and removes duplicates`() {
         val patterns = websocketAllowedOriginPatterns(

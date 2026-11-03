@@ -21,7 +21,7 @@ spec:
           cpu: 300m
           memory: 384Mi
     - name: gradle
-      image: gradle:8-jdk21
+      image: gradle:9.5.1-jdk25
       command: ["cat"]
       tty: true
       env:

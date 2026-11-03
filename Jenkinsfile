@@ -21,7 +21,7 @@ spec:
           cpu: 300m
           memory: 384Mi
     - name: gradle
-      image: gradle:8-jdk21
+      image: gradle:9.5.1-jdk25
       command: ["cat"]
       tty: true
       env:
@@ -39,7 +39,7 @@ spec:
           cpu: "1"
           memory: 2Gi
     - name: node-frontend
-      image: node:22
+      image: node:26.13.0
       command: ["cat"]
       tty: true
       volumeMounts:
@@ -54,7 +54,7 @@ spec:
           cpu: "1"
           memory: 1Gi
     - name: node-collaboration
-      image: node:22
+      image: node:26.13.0
       command: ["cat"]
       tty: true
       volumeMounts:

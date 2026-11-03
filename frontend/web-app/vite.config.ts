@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         app: resolve(projectRoot, "index.html"),
         chatServiceWorker: resolve(projectRoot, "src/service-worker/chatServiceWorker.ts"),

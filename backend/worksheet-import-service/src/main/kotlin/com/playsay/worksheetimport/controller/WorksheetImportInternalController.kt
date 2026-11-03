@@ -14,6 +14,7 @@ import com.playsay.worksheetimport.service.WorksheetPacketNormalizer
 import com.playsay.worksheetimport.service.WorksheetPagePreviewService
 import com.playsay.worksheetimport.service.WorksheetSessionCleanupService
 import com.playsay.worksheetimport.service.WorksheetSessionCreateCommand
+import com.playsay.worksheetimport.config.security.requireSubject
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -58,7 +59,7 @@ class WorksheetImportInternalController(
                 if (packet.pages.isEmpty()) throw WorksheetPacketEmptyException()
                 val session = sessions.create(
                     WorksheetSessionCreateCommand(
-                        authentication.token.subject, metadata.title, metadata.language, metadata.cefrLevel.value, metadata.sourceNote,
+                        authentication.token.requireSubject(), metadata.title, metadata.language, metadata.cefrLevel.value, metadata.sourceNote,
                     ),
                     packet,
                 )

@@ -105,7 +105,9 @@ class LessonWebSocketAuthInterceptor(
             ?: return false
 
         return try {
-            val authentication = jwtAuthenticationConverter.convert(jwtDecoder.decode(token)) as? JwtAuthenticationToken
+            val jwt = jwtDecoder.decode(token)
+            if (jwt.subject.isNullOrBlank()) return false
+            val authentication = jwtAuthenticationConverter.convert(jwt) as? JwtAuthenticationToken
                 ?: return false
             attributes[authenticationAttribute] = authentication
             true

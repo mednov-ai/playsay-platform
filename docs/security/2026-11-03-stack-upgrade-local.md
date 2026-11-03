@@ -1,7 +1,8 @@
 # Stack upgrade: local dependency evidence
 
-This is preliminary evidence for the uncommitted hotfix based on platform
-`8982e00324136303d8119c9e8037cb3a11afbcd0`. It is not a publication,
+This is preliminary evidence for the uncommitted hotfix, which incorporates
+platform `e37bb8aa3107c71dd31edfaea8c3735b2025532d` along with the original
+hotfix base `8982e00324136303d8119c9e8037cb3a11afbcd0`. It is not a publication,
 production, or deployed-environment security clearance. Fresh full scans for
 the exact committed candidate and native CI artifacts remain mandatory.
 
@@ -10,15 +11,18 @@ the exact committed candidate and native CI artifacts remain mandatory.
 On 2026-11-03 the full frontend npm audit, including development dependencies,
 reported zero critical, zero high, and 11 moderate affected package nodes.
 The raw report is [retained](2026-11-03-stack-upgrade-frontend-audit.json);
-SHA-256 `92f2266f9210e52c8e48a914138b399562e8a66014aef077bf19aa2c9fdf2cd2`.
+SHA-256 `20abb158fe52ad090fbb2efd2a0003876dca2488add11bc41b870344fcc28f7b`.
 The affected frontend lockfile SHA-256 is
-`eb553dd499297bfdcbb2672f829ad42d24248f8a4c18180c96df2cc1ecc96753`.
+`903e58c6611d7d859dbae6422b68f2a3276498081d915c426676c31b02c704e0`.
 The underlying advisory is
 [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
 on minimatch below 11.0.1; the remaining nodes are indirect ESLint and
 TypeScript-ESLint findings. The report is not vulnerability clearance.
 
 Every affected package node in that lockfile is marked `dev: true`.
+`npm audit --omit=dev` reported no vulnerabilities; its
+[raw report](2026-11-03-stack-upgrade-frontend-production-audit.json) has
+SHA-256 `bbf80808f25c7c930be98f39026c4b0dd04ef2709084622ddafe9a8c1dc7dc76`.
 `npm ls --omit=dev` for all 11 listed nodes returned an empty tree, and
 searching the built web, keyboard and game-adapter JavaScript for the package
 names found no matches. The web and keyboard runtime Dockerfiles copy only
@@ -49,12 +53,33 @@ All nine upgraded services subsequently passed typed alpha.6 analysis with no
 compiler-resolution errors. A complete fresh JVM dependency scan and
 candidate-specific review remain necessary after the final committed changes.
 
+The merged but still uncommitted source was scanned in full on 2026-11-03.
+The gate reported `passed-with-accepted-risks`: build logic had five
+accepted matches and 24 outside-runtime matches, while backend modules had
+107 accepted matches and 68 outside-runtime matches, with zero blocking
+matches. Match counts include repeated project references and are not
+counts of distinct CVEs. The retained raw run is
+`backend/build/reports/dependency-security/run.EHjiDcyA`; its recorded
+revision is the pre-merge HEAD, so it is preliminary and does not attest
+to the eventual committed source. The approved Kotlin exception expires
+2026-11-14. Exact-source CI must rerun and archive the complete reports.
+
+The first native Jenkins trial exposed a fresh-checkout gap: internal project
+runtime JARs had not been built before the pre-scan inventory, so their hashes
+were missing and all 24 build-logic outside-runtime classifications correctly
+failed closed. The inventory now depends on the runtime configurations'
+producer tasks. A fresh full 18-module checkout produced complete hashed
+runtime graphs, and a separate clean multi-project regression fixture confirmed
+that its internal runtime JAR is built and hashed. Fresh native CI and scans of
+the resulting committed source remain required; the failed trial is not a
+release clearance.
+
 ### JVM build-only boundary
 
 The preliminary full scan detected CVE-2026-53914 in Gradle 9.5.1's Kotlin
-2.3.20 build tooling and a CVE-2022-31691 scanner match on
+2.3.20 build tooling, Detekt's Kotlin 2.4.10 analysis tooling, and a CVE-2022-31691 scanner match on
 `spring-boot-loader-tools:4.1.2`. The latter is a Spring Tools product
-misidentification, but is retained as a finding. None of those 24 exact
+misidentification, but is retained as a finding. None of those 31 exact
 artifact hashes is present in the selected application server runtime graphs
 or in the separately assembled Keycloak server. These are build-only
 findings under the owner's 2026-10-14 outside-server-runtime policy, not
@@ -75,14 +100,15 @@ inventories and verify actual packaged JARs before publication.
 ### Keycloak Vert.x
 
 The preliminary complete scan found Vert.x 4.5.34 in the Keycloak server
-runtime, with multiple high-severity CVE matches. The Maven runtime BOM and
-Gradle server inventory were aligned to 4.5.35, the
+runtime, with multiple high-severity CVE matches. The twelve specific Maven
+and Gradle server runtime coordinates from the independently merged Keycloak
+fix were aligned to 4.5.35, the
 [upstream security maintenance release](https://vertx.io/blog/eclipse-vert-x-4-5-35/).
 The Maven package completed locally with 12 Vert.x 4.5.35 JARs and 18 Netty
 4.1.139 components verified from packaged metadata. See the
 [Vert.x inventory](2026-11-03-keycloak-vertx-inventory.tsv). The selected
-fresh Keycloak dependency scan reports no blocking runtime findings, with five
-previously classified outside-runtime findings retained. The overall scan
-still failed on the build-logic findings described above. A native container
-build, authentication and deployed DEV acceptance are not established by
-the local Maven package.
+fresh Keycloak dependency scan before the merge reported no blocking runtime
+findings, with five previously classified outside-runtime findings retained.
+The later full scan against merged, uncommitted source also passed under the
+recorded scoped policy. A native container build, authentication and deployed
+DEV acceptance are not established by the local Maven package.

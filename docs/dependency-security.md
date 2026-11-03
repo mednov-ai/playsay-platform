@@ -27,6 +27,12 @@ The runner uses a unique writable database per invocation and refreshes it befor
 
 Reports are under `backend/build/reports/dependency-security/<run-id>/`: status/revision/timestamps, build-logic and backend `coverage.json`, and HTML/JSON scanner reports per project. `inventory` explicitly reports `inventory-only`; it does not establish vulnerability clearance. Jenkins must archive nonempty reports during the successful security stage before publication, and archives available failure reports in `post/always`. Report directories and files are readable across the Gradle and Jenkins container UIDs; advisory databases retain private permissions. Missing final status or a nonzero exit means an incomplete/failed run, never clearance. Local outputs and databases stay under ignored build directories.
 
+Before inventory hashes production classpaths, Gradle builds the project-owned
+runtime artifacts on which those classpaths depend. This matters in a fresh CI
+checkout, where internal JARs do not yet exist; missing hashes still block
+outside-runtime classification. The fresh-inventory regression test verifies
+that a clean multi-project build produces and hashes its local runtime JAR.
+
 ## Remediation evidence
 
 The current local remediation record is [2026-09-08 evidence](security/dependency-remediation-2026-09-08.md), including remaining blockers.

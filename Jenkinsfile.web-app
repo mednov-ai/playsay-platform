@@ -26,7 +26,7 @@ spec:
       tty: true
       env:
         - name: NODE_OPTIONS
-          value: "--max-old-space-size=2048"
+          value: "--max-old-space-size=3072"
       volumeMounts:
         - name: jenkins-agent-cache
           mountPath: /cache/npm
@@ -34,10 +34,10 @@ spec:
       resources:
         requests:
           cpu: 250m
-          memory: 768Mi
+          memory: 3Gi
         limits:
           cpu: "1"
-          memory: 3Gi
+          memory: 5Gi
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command: ["/busybox/cat"]

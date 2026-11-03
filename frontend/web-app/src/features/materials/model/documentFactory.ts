@@ -2,6 +2,7 @@ import type { MaterialBlockType, MaterialDraftSourceImage, MaterialEditorBlock, 
 import { asJsonObject, createClientId, materialBlockLabel } from "./formatters";
 import { defaultObjectiveAssessmentPolicy } from "./scoring";
 import { i18n } from "../../../shared/i18n";
+import { MAX_IMAGE_UPLOAD_BYTES } from "./imageUploadLimits";
 
 export function defaultMaterialForm(): MaterialFormState {
   return {
@@ -149,7 +150,7 @@ export async function prepareMaterialDraftSourceImage(file: File): Promise<Mater
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     throw new Error(i18n.t("materials.errors.imageType"));
   }
-  if (file.size > 12 * 1024 * 1024) {
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
     throw new Error(i18n.t("materials.errors.imageSize"));
   }
 

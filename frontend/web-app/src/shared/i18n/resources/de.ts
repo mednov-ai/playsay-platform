@@ -1528,7 +1528,7 @@ export const de = {
     },
     errors: {
       imageType: "JPEG, PNG und WebP werden unterstützt.",
-      imageSize: "Das Bild muss kleiner als 12 MB sein.",
+      imageSize: "Das Bild darf höchstens 20 MiB groß sein.",
       imagePrepare: "Der Browser konnte das Bild nicht vorbereiten.",
       imageCompressedSize: "Das Bild ist nach der Komprimierung noch zu groß. Schneiden Sie das Foto näher an der Aufgabe zu.",
       fileRead: "Datei konnte nicht gelesen werden.",

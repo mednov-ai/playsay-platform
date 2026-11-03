@@ -71,6 +71,8 @@ import org.springframework.transaction.support.TransactionTemplate
         "spring.datasource.password=",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.liquibase.enabled=false",
+        // The tests explicitly invoke the workers; background polling would race those assertions.
+        "playsay.scheduling.enabled=false",
         "playsay.chat-push.enabled=true",
         "playsay.chat-push.public-key=test-public-key",
         "playsay.chat-push.private-key=test-private-key",

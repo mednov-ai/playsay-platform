@@ -187,40 +187,73 @@ spec:
     }
 
 
-    stage('Generate, lint, test, and build') {
+    stage('Production web runtime inventory proof') {
       steps {
+        script {
+          if (env.CI_BRANCH != 'ci/hotfix-image-upload-413-prod-web-proof' || env.DEPLOY_IMAGE != 'false') {
+            error 'This diagnostic is restricted to its CI-only branch and must not deploy.'
+          }
+        }
         container('node') {
           dir('frontend') {
             sh 'npm install --cache /cache/npm --prefer-offline'
-            sh 'npm --workspace game-sync-sdk run typecheck && npm --workspace game-sync-sdk test && npm --workspace game-sync-sdk run build'
+            sh 'npm --workspace game-sync-sdk run build'
             sh 'npm --workspace web-app run generate'
-            sh 'npm --workspace web-app run lint'
-            sh 'npm --workspace web-app run test'
             sh '''
-              if [ "$DEPLOY_TO_DEV" = "true" ]; then
-                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
-                export VITE_VOCABULARY_PRACTICE_ENABLED=true
-                export VITE_VOCABULARY_HOMEWORK_ENABLED=true
-                export VITE_VOCABULARY_LIVE_ENABLED=true
-                export VITE_VOCABULARY_KEY_ENABLED=true
-                export VITE_PERSONAL_PRACTICE_V2_ENABLED=true
-                export VITE_VOCABULARY_COMPOSER_ENABLED=true
-                export VITE_VOCABULARY_ADAPTIVE_POLICY_ENABLED=true
-                export VITE_VOCABULARY_DELIVERY_POLICIES_ENABLED=true
-                export VITE_VOCABULARY_KEY_NGRAMS_ENABLED=true
-                export VITE_VOCABULARY_GENERATED_MEDIA_ENABLED=true
-                export VITE_KEYBOARD_ORIGIN=https://dev.key.honey.school
-              elif [ "$DEPLOY_TO_PROD" = "true" ]; then
-                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
-                export VITE_KEYBOARD_ORIGIN=https://key.honey.school
-              fi
+              set -eu
+              export VITE_EXTERNAL_ACTIVITY_ENABLED=true
+              export VITE_KEYBOARD_ORIGIN=https://key.honey.school
               npm --workspace web-app run build
+              node --input-type=module <<'NODE'
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync,spawnSync} from 'node:child_process';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const original=execFileSync('git',['-c','safe.directory='+path.resolve('..'),'-C','..','show','HEAD^:frontend/package-lock.json']);
+const lockRaw=fs.readFileSync('package-lock.json');
+const before=JSON.parse(original),after=JSON.parse(lockRaw);
+assert.deepEqual(Object.keys(before.packages).sort(),Object.keys(after.packages).sort());
+const fields=['version','resolved','integrity','dependencies','optionalDependencies','peerDependencies','peerDependenciesMeta','engines','optional','dev','devOptional','inBundle'];
+for(const name of Object.keys(before.packages)) for(const field of fields)
+  assert.deepEqual(after.packages[name][field],before.packages[name][field],name+' '+field);
+assert.equal(execFileSync('git',['-c','safe.directory='+path.resolve('..'),'-C','..','rev-parse','HEAD^'],{encoding:'utf8'}).trim(),'9bee01c9f0ff0ffc7dd5d4feeae8a73a8c8c10f0');
+assert.equal(execFileSync('git',['-c','safe.directory='+path.resolve('..'),'-C','..','diff','--name-only','HEAD^','HEAD'],{encoding:'utf8'}).trim(),'Jenkinsfile.web-app');
+assert.equal(execFileSync('git',['-c','safe.directory='+path.resolve('..'),'-C','..','diff','--name-only','--','frontend/web-app/src/generated'],{encoding:'utf8'}).trim(),'');
+const auditRun=spawnSync('npm',['audit','--json'],{encoding:'utf8',maxBuffer:12*1024*1024,timeout:120000});
+assert.ok(!auditRun.error && auditRun.stdout);
+const audit=JSON.parse(auditRun.stdout);assert.ok(!audit.error && audit.vulnerabilities && audit.metadata);
+fs.writeFileSync('image413-audit.json',auditRun.stdout);
+const root=path.resolve('web-app'),out='/tmp/image413-vite-inventory';
+const requireFromWeb=createRequire(path.join(root,'package.json'));
+const {build}=await import(pathToFileURL(requireFromWeb.resolve('vite')).href);
+const matches=new Map(Object.keys(audit.vulnerabilities).map(n=>[n,new Set()]));
+let recorded=false;
+await build({root,configFile:path.join(root,'vite.config.ts'),build:{outDir:out,emptyOutDir:true},plugins:[{
+ name:'image413-runtime-inventory',generateBundle(_options,bundle){
+  for(const chunk of Object.values(bundle)) if(chunk.type==='chunk') for(const id of Object.keys(chunk.modules)) {
+   const normalized=id.split(path.sep).join('/');
+   for(const name of matches.keys()) if(normalized.includes('/node_modules/'+name+'/')) matches.get(name).add(id);
+  }
+  recorded=true;
+ }
+}]});
+assert.ok(recorded);
+const findings=Object.fromEntries([...matches].map(([n,ids])=>[n,{severity:audit.vulnerabilities[n].severity,browserModuleCount:ids.size}]));
+const offending=Object.entries(findings).filter(([,v])=>v.browserModuleCount>0).map(([n])=>n);
+function files(rootDir){const result={};function visit(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())visit(file);else if(entry.isFile())result[path.relative(rootDir,file).split(path.sep).join('/')]=sha(fs.readFileSync(file));}}visit(rootDir);return result;}
+const dist=files(path.join(root,'dist')),inventory=files(out);
+const report={node:process.version,sourceParent:'9bee01c9f0ff0ffc7dd5d4feeae8a73a8c8c10f0',lockSha256:sha(lockRaw),sourceLockSha256:sha(original),dependencyGraphUnchanged:true,generatedClientsUnchanged:true,auditExit:auditRun.status,auditSha256:sha(Buffer.from(auditRun.stdout)),findings,offending,distFiles:dist,inventoryFiles:inventory};
+fs.writeFileSync('image413-proof.json',JSON.stringify(report,null,2));
+assert.equal(offending.length,0,'An audited finding is present in browser chunks');
+NODE
             '''
-            sh 'npm --workspace browser-extension run test'
-            sh 'npm --workspace browser-extension run package'
           }
         }
-        archiveArtifacts artifacts: 'frontend/browser-extension/playsay-browser-extension.zip', fingerprint: true
+        archiveArtifacts artifacts: 'frontend/image413-proof.json,frontend/image413-audit.json', fingerprint: true
       }
     }
 
@@ -324,6 +357,7 @@ EOF
 
   post {
     always {
+      archiveArtifacts allowEmptyArchive: true, artifacts: 'frontend/image413-proof.json,frontend/image413-audit.json'
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

@@ -1,4 +1,4 @@
-FROM node:26.13.0-bookworm-slim AS build
+FROM node:26.13.0-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS build
 WORKDIR /workspace/frontend
 COPY package.json package-lock.json ./
 COPY web-app/package.json web-app/package.json
@@ -13,15 +13,15 @@ COPY game-adapter-service game-adapter-service
 RUN npm --workspace game-sync-sdk run build \
     && npm --workspace game-adapter-service run build
 
-FROM node:26.13.0-bookworm-slim
+FROM node:26.13.0-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
 WORKDIR /app
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates chromium fonts-liberation \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 10001 playsay \
-    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin playsay \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates chromium font-liberation \
+    && addgroup -g 10001 -S playsay \
+    && adduser -S -D -H -u 10001 -G playsay -s /sbin/nologin playsay \
     && mkdir -p /tmp/playsay \
-    && chown 10001:10001 /tmp/playsay
+    && chown 10001:10001 /tmp/playsay \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build /workspace/frontend/game-adapter-service/dist /app/
 COPY --from=build /workspace/frontend/node_modules/playwright-core /app/node_modules/playwright-core
 COPY --from=build /workspace/frontend/node_modules/sharp /app/node_modules/sharp

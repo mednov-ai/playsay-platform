@@ -22,12 +22,12 @@ import {
   type WorksheetSectionType,
 } from "../../../shared/api/playsay";
 import { useAppTranslation } from "../../../shared/i18n";
+import { MAX_IMAGE_UPLOAD_BYTES } from "../model/imageUploadLimits";
 
 const SESSION_KEY = "honey-school:worksheet-import-session";
 const acceptedTypes = "image/jpeg,image/png,image/webp,application/pdf";
 const acceptedMimeTypes = new Set(acceptedTypes.split(","));
 const MAX_PACKET_FILES = 100;
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_PDF_BYTES = 64 * 1024 * 1024;
 type MarkTool = "GAP" | "PAIR" | "MULTIPLE_CHOICE" | "FLASHCARD";
 type Point = { x: number; y: number };
@@ -125,7 +125,7 @@ export function WorksheetImportWorkspace({ disabled, onClose, onMaterialized }: 
     const accepted: File[] = [];
     let rejected = 0;
     for (const file of selected) {
-      const maxBytes = file.type === "application/pdf" ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
+      const maxBytes = file.type === "application/pdf" ? MAX_PDF_BYTES : MAX_IMAGE_UPLOAD_BYTES;
       if (!acceptedMimeTypes.has(file.type) || file.size <= 0 || file.size > maxBytes || files.length + accepted.length >= MAX_PACKET_FILES) rejected += 1;
       else accepted.push(file);
     }

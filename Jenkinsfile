@@ -70,7 +70,8 @@ spec:
                   apk add --no-cache git yq helm
                   git config --global --add safe.directory "$WORKSPACE"
                   test "$(git rev-parse HEAD)" = "$PROOF_SHA"
-                  test "$(git rev-parse HEAD^)" = "$GIT_COMMIT"
+                  git merge-base --is-ancestor "$GIT_COMMIT" HEAD
+                  test "$(git diff --name-only "$GIT_COMMIT" HEAD)" = Jenkinsfile
                   git checkout --detach "$GIT_COMMIT"
                   test "$(git rev-parse HEAD)" = "$GIT_COMMIT"
                   test "$(git ls-remote --heads "$INFRA_REPO" "refs/heads/$CI_BRANCH" | cut -f1)" = "$EXPECTED_INFRA_SHA"

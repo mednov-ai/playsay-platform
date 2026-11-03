@@ -32,8 +32,21 @@ twelve Vert.x coordinates; Gradle serverRuntime also resolved all twelve at
 Vert.x/Netty verifiers passed. Of 354 locally packaged server-main JARs, the 341 non-Vert.x,
 non-platform-native JAR hashes match both live environments; the remaining
 non-Vert.x JAR is the expected macOS versus Linux native Brotli classifier.
-Fresh exact-source full and Keycloak module security scans, a native image and
-provider tests, native dependency comparison, actual DEV authentication and lesson
-entry, session continuity, native memory/rollout checks, production backup and
-schema gates, and a compatible rollback remain required. Do not promote a
-scanner-only change while the running Keycloak image remains on 4.5.34.
+The exact-release full security stage and Keycloak module job 25 subsequently
+passed under the existing scoped policy. The full-scan-only job was stopped
+after that successful stage and is not a successful full build. The verified
+release image contains all twelve 4.5.35 JARs; its remaining server JARs match
+the accepted DEV runtime. DEV provider authentication, lesson entry and
+pre-existing session continuity were exercised on both origins after deployment.
+The changed DEV pod became ready with no new restart.
+
+Before production promotion, four protected database backups
+passed checksum and archive checks, the Keycloak backup was restored in a
+temporary isolated database, and all seven exact-release schema status checks
+reported no pending changes. Production `release/01.007.24` was then deployed
+through GitOps in a verified lesson-safe window. Keycloak ran the verified
+4.5.35 image with zero pod restarts; two sessions created before rollout were
+refreshed afterwards. Its 237 changelog rows matched the protected pre-rollout
+backup. Native one-time lesson entry and PKCE passed on both production origins.
+Use only the compatible GitOps rollback described in the infrastructure
+runbook; a live rollback exercise has not been performed.

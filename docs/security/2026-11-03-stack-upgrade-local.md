@@ -64,6 +64,16 @@ revision is the pre-merge HEAD, so it is preliminary and does not attest
 to the eventual committed source. The approved Kotlin exception expires
 2026-11-14. Exact-source CI must rerun and archive the complete reports.
 
+The first native Jenkins trial exposed a fresh-checkout gap: internal project
+runtime JARs had not been built before the pre-scan inventory, so their hashes
+were missing and all 24 build-logic outside-runtime classifications correctly
+failed closed. The inventory now depends on the runtime configurations'
+producer tasks. A fresh full 18-module checkout produced complete hashed
+runtime graphs, and a separate clean multi-project regression fixture confirmed
+that its internal runtime JAR is built and hashed. Fresh native CI and scans of
+the resulting committed source remain required; the failed trial is not a
+release clearance.
+
 ### JVM build-only boundary
 
 The preliminary full scan detected CVE-2026-53914 in Gradle 9.5.1's Kotlin

@@ -171,6 +171,15 @@ gradle.projectsEvaluated {
         }
     }
     def inventory = root.tasks.register('dependencySecurityInventory') {
+        // A clean CI checkout has not built local project dependencies yet.
+        // Materialize their normal runtime artifacts before hashing; a missing
+        // artifact must not be silently treated as outside server runtime.
+        selected.each { project ->
+            ['runtimeClasspath', 'serverRuntime'].each { name ->
+                def configuration = project.configurations.findByName(name)
+                if (configuration?.canBeResolved) dependsOn(configuration.buildDependencies)
+            }
+        }
         doLast {
             reportRoot.mkdirs()
             def modules = selected.sort { it.path }.collect { p ->

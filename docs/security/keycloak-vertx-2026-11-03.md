@@ -40,12 +40,13 @@ the accepted DEV runtime. DEV provider authentication, lesson entry and
 pre-existing session continuity were exercised on both origins after deployment.
 The changed DEV pod became ready with no new restart.
 
-Before the attempted production promotion, four protected database backups
+Before production promotion, four protected database backups
 passed checksum and archive checks, the Keycloak backup was restored in a
 temporary isolated database, and all seven exact-release schema status checks
-reported no pending changes. Production promotion and acceptance remain
-pending a lesson-safe window; production continues to run the previous Keycloak
-image. Repeat the backup, schema and safety checks near promotion, verify
-pre-existing session continuity and live schema after rollout, and use only
-the compatible GitOps rollback described in the infrastructure runbook. A live
-rollback exercise has not been performed.
+reported no pending changes. Production `release/01.007.24` was then deployed
+through GitOps in a verified lesson-safe window. Keycloak ran the verified
+4.5.35 image with zero pod restarts; two sessions created before rollout were
+refreshed afterwards. Its 237 changelog rows matched the protected pre-rollout
+backup. Native one-time lesson entry and PKCE passed on both production origins.
+Use only the compatible GitOps rollback described in the infrastructure
+runbook; a live rollback exercise has not been performed.

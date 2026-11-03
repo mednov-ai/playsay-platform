@@ -198,7 +198,7 @@ spec:
             sh 'npm --workspace web-app run lint'
             sh 'npm --workspace web-app run test'
             sh '''
-              if [ "$DEPLOY_TO_DEV" = "true" ]; then
+              if [ "$DEPLOY_TO_DEV" = "true" ] || [ "$CI_BRANCH" = "ci/hotfix-image-upload-413-web-probe" ]; then
                 export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                 export VITE_DOCUMENT_MATERIALS_ENABLED=true
                 export VITE_VOCABULARY_PRACTICE_ENABLED=true

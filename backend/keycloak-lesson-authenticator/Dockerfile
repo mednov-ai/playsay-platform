@@ -23,7 +23,7 @@ RUN /opt/apache-maven-3.9.16/bin/mvn -B -ntp -s settings.xml package \
     && java VerifyVertx.java target/lib/lib/main > target/vertx-security-inventory.tsv \
     && java VerifyRuntime.java target/lib build-only-risk-sha256.txt /tmp/keycloak-provider.jar > target/server-runtime-sha256.txt
 
-# Rebuild the complete mutable-jar dependency model with Netty 4.1.139.
+# Rebuild the complete mutable-jar dependency model with patched Netty and Vert.x.
 # Keycloak implementations and runtime OS/JDK remain on the pinned official image.
 FROM quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244 AS keycloak-build
 RUN rm -rf /opt/keycloak/lib

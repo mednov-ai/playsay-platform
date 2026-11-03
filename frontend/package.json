@@ -21,6 +21,10 @@
     "vite": "8.3.5"
   },
   "overrides": {
-    "postcss-selector-parser": "7.1.6"
+    "postcss-selector-parser": "7.1.6",
+    "pptx-viewer-mcp": {
+      ".": "2.7.1",
+      "ooxml-core": "0.14.0"
+    }
   }
 }

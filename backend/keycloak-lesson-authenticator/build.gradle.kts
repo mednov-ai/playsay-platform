@@ -30,17 +30,24 @@ val serverRuntime by configurations.creating {
     isCanBeResolved = true
 }
 
+// Keep the scanned Keycloak server and provider closures aligned with the
+// selectively managed Vert.x runtime family in server-runtime/pom.xml.
+val keycloakVertxModules = setOf(
+    "vertx-auth-common", "vertx-bridge-common", "vertx-codegen", "vertx-core",
+    "vertx-grpc", "vertx-grpc-client", "vertx-grpc-common", "vertx-grpc-server",
+    "vertx-uri-template", "vertx-web", "vertx-web-client", "vertx-web-common",
+)
+
 // Compatible fixed versions for findings exposed by the complete server/tool scan.
 configurations.configureEach {
     resolutionStrategy.eachDependency {
+        if (requested.group == "io.vertx" && requested.name in keycloakVertxModules) {
+            useVersion("4.5.35")
+        }
         when (requested.group to requested.name) {
             "com.mysql" to "mysql-connector-j" -> useVersion("26.7.0")
             "io.airlift" to "aircompressor" -> useVersion("2.0.3")
             "org.codehaus.plexus" to "plexus-utils" -> useVersion("4.0.3")
-        }
-        if (requested.group == "io.vertx") {
-            useVersion("4.5.35")
-            because("Keep the Keycloak Vert.x runtime family on its security maintenance release")
         }
     }
 }

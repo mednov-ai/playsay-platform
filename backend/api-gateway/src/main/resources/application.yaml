@@ -10,7 +10,7 @@ spring:
   servlet:
     multipart:
       max-file-size: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_FILE_SIZE:64MB}
-      max-request-size: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_REQUEST_SIZE:128MB}
+      max-request-size: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_MAX_REQUEST_SIZE:129MB}
       file-size-threshold: ${PLAYSAY_WORKSHEET_GATEWAY_MULTIPART_FILE_SIZE_THRESHOLD:1MB}
   messages:
     fallback-to-system-locale: false

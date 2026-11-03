@@ -121,6 +121,16 @@ test('all JVM publication paths run the credential-bound gate before tests, migr
   }
 });
 
+test('full JVM inventory has a bounded heap and container headroom', () => {
+  const pipeline = readFileSync(resolve(repo, 'Jenkinsfile'), 'utf8');
+  const container = pipeline.match(/- name: gradle\n([\s\S]*?)(?=    - name: node-frontend)/)?.[1];
+  assert.ok(container, 'full-build Gradle container is missing');
+  const heap = Number(container.match(/org\.gradle\.jvmargs=-Xmx(\d+)m/)?.[1]);
+  const limit = Number(container.match(/limits:\s*\n\s*cpu: [^\n]+\n\s*memory: (\d+)Gi/)?.[1]) * 1024;
+  assert.ok(heap >= 1024, 'full dependency inventory needs at least a 1 GiB heap');
+  assert.ok(limit >= heap + 768, 'container must leave native and Gradle-client headroom');
+});
+
 test('local key file is read as raw data and never evaluated or logged', () => {
   const { result, calls, status } = exercise('all', '', true);
   assert.equal(result.status, 0, result.stderr);

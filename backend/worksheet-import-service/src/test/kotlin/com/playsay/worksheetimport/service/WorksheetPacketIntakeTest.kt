@@ -67,6 +67,21 @@ class WorksheetPacketIntakeTest {
         }
     }
 
+    @Test
+    fun `accepts worksheet images at twenty MiB and rejects one byte more`() {
+        val intake = WorksheetPacketIntake(WorksheetImportProperties())
+        val max = 20 * 1024 * 1024
+        val validPng = png(2, 2)
+        val atLimit = MockMultipartFile("files", "at-limit.png", "image/png", validPng.copyOf(max))
+        val tooLarge = MockMultipartFile("files", "too-large.png", "image/png", validPng.copyOf(max + 1))
+
+        intake.inspect(listOf(atLimit, tooLarge)).use { result ->
+            assertEquals(listOf("at-limit.png"), result.accepted.map(StagedWorksheetUpload::fileName))
+            assertEquals(max.toLong(), result.accepted.single().byteSize)
+            assertEquals(listOf(WorksheetUploadRejectionCode.FILE_TOO_LARGE), result.rejected.map { it.code })
+        }
+    }
+
     private fun png(width: Int, height: Int): ByteArray = ByteArrayOutputStream().use { output ->
         ImageIO.write(BufferedImage(width, height, BufferedImage.TYPE_INT_RGB), "png", output)
         output.toByteArray()

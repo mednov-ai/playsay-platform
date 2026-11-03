@@ -61,6 +61,19 @@ describe("WorksheetImportWorkspace", () => {
     expect(screen.getByTestId("worksheet-import-analyze")).toBeDisabled();
   });
 
+  it("accepts a twenty MiB image and rejects one byte more", () => {
+    render(<WorksheetImportWorkspace disabled={false} onClose={() => undefined} onMaterialized={() => undefined} />);
+    const input = screen.getByTestId("worksheet-import-files");
+    const atLimit = new File(["image"], "at-limit.jpg", { type: "image/jpeg" });
+    const tooLarge = new File(["image"], "too-large.jpg", { type: "image/jpeg" });
+    Object.defineProperty(atLimit, "size", { value: 20 * 1024 * 1024 });
+    Object.defineProperty(tooLarge, "size", { value: 20 * 1024 * 1024 + 1 });
+    fireEvent.change(input, { target: { files: [atLimit, tooLarge] } });
+    expect(screen.getByText(/at-limit\.jpg/)).toBeInTheDocument();
+    expect(screen.queryByText(/too-large\.jpg/)).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/1/);
+  });
+
   it("records pointer movement before React releases the event", async () => {
     const api = await import("../../../shared/api/playsay");
     window.localStorage.setItem("honey-school:worksheet-import-session", "session-1");

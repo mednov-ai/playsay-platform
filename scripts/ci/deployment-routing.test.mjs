@@ -24,6 +24,18 @@ const modulePipelines = [
   "Jenkinsfile.web-app",
 ];
 
+test("web CI container reserves memory and leaves headroom above the Node heap", () => {
+  const pipeline = readFileSync(resolve(platformRoot, "Jenkinsfile.web-app"), "utf8");
+  const node = pipeline.match(/- name: node\n([\s\S]*?)(?=    - name: kaniko)/)?.[1];
+  assert.ok(node, "web-build Node container is missing");
+  const heap = Number(node.match(/--max-old-space-size=(\d+)/)?.[1]);
+  const request = Number(node.match(/requests:\s*\n\s*cpu: [^\n]+\n\s*memory: (\d+)Gi/)?.[1]) * 1024;
+  const limit = Number(node.match(/limits:\s*\n\s*cpu: [^\n]+\n\s*memory: (\d+)Gi/)?.[1]) * 1024;
+  assert.ok(heap >= 3072, "viewer build needs a 3 GiB Node heap");
+  assert.ok(request >= 3072, "the CI scheduler must reserve build memory");
+  assert.ok(limit >= heap + 1536, "Node and esbuild need bounded native headroom");
+});
+
 test("module pipelines route numeric release branches to prod only", () => {
   for (const pipelineName of modulePipelines) {
     const pipeline = readFileSync(resolve(platformRoot, pipelineName), "utf8");

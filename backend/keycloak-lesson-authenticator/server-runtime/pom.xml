@@ -15,6 +15,20 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+      <!-- Override only the Vert.x family in the upstream runtime. Importing the
+           entire Vert.x BOM would also change unrelated Jackson and logging deps. -->
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-auth-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-bridge-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-codegen</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-core</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-client</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-common</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-grpc-server</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-uri-template</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-client</artifactId><version>${vertx.version}</version></dependency>
+      <dependency><groupId>io.vertx</groupId><artifactId>vertx-web-common</artifactId><version>${vertx.version}</version></dependency>
       <dependency>
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-utils</artifactId>
@@ -36,14 +50,6 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-bom</artifactId>
         <version>${netty.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <!-- Align the complete Vert.x family with the matching patched runtime. -->
-      <dependency>
-        <groupId>io.vertx</groupId>
-        <artifactId>vertx-dependencies</artifactId>
-        <version>${vertx.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

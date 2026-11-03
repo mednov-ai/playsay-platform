@@ -22,7 +22,7 @@ ff3e1eb9d807df8bc197950de5d555d1892a7ceed0fdff75b3eb2aa78bbe51c5  lib/lib/main/c
 f6d1c6281b44c93bf5a43c2687dd6b7011c15399edb2edc89d1248c4379fea42  lib/lib/main/com.google.api.grpc.proto-google-common-protos-2.71.0.jar
 2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f  lib/lib/main/com.google.code.gson.gson-2.14.0.jar
 3b1003e51b8ae56fdbd7c71073e81d1683b97e6c4dff5a9151164d59b769d13c  lib/lib/main/com.google.errorprone.error_prone_annotations-2.49.0.jar
-bc65dea7cfd9e4dacf8419d8af0e741655857d27885bb35d943d7187fc3a8fce  lib/lib/main/com.google.guava.guava-32.1.2-jre.jar
+dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3  lib/lib/main/com.google.guava.guava-33.6.0-jre.jar
 400621a8f0aac52fab7ec88f492edd356f5a4355caa8f92028f217a8b5e4ac3b  lib/lib/main/com.google.protobuf.protobuf-java-4.35.0.jar
 65004806a669234c698fbe0755258100375fb01fe93b538455f3903713d4a50d  lib/lib/main/com.google.zxing.core-3.4.0.jar
 7aeef746a544effcd9e499214d9f315e69c3a835e7c81abfb703be79f859a6d7  lib/lib/main/com.google.zxing.javase-3.4.0.jar
@@ -318,7 +318,7 @@ dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc  lib/lib/main/o
 1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c  lib/lib/main/org.ow2.asm.asm-util-9.10.1.jar
 6e0e4cc2d8cae902084f8a2b18728b073a6fd9d1f87c9d8bff8f298c18185b93  lib/lib/main/org.postgresql.postgresql-42.7.13.jar
 f75ca597789b3dac58f61857b9ac2e1034a68fa672db35055a8fb4509e325f28  lib/lib/main/org.reactivestreams.reactive-streams-1.0.4.jar
-5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4  lib/lib/main/org.slf4j.slf4j-api-2.0.7.jar
+44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55  lib/lib/main/org.slf4j.slf4j-api-2.0.18.jar
 2652199af40c9aa2f1782400d2dfbbf4e5226208c4e05ddd4059c3d6d9cd1505  lib/lib/main/org.snakeyaml.snakeyaml-engine-2.6.jar
 72602281c06d97e92c63ce84bd93d007642fa0bff852f63df12fd123b990b1f2  lib/lib/main/org.twitter4j.twitter4j-core-4.1.2.jar
 9884f791f815d0fed8c51771af71164afd48f96e621f26009f9ebe791c053f1b  lib/lib/main/org.wildfly.common.wildfly-common-1.5.4.Final-format-001.jar
@@ -352,3 +352,4 @@ c2aeb4e920bd13c1484eebe461d77fbf8cac2d209b18fa160e196402a55fbbdf  lib/lib/main/o
 fe44043345e542fdabf55ba3b3cade5999fb341e14865f594df076fbb35a4237  lib/lib/main/org.wildfly.security.wildfly-elytron-x500-cert-2.9.2.SP1.jar
 53850db412e1b147cd3c5996516168f809ba03e0df06ae02fe7dc82a978a0314  lib/lib/main/org.wildfly.security.wildfly-elytron-x500-cert-util-2.9.2.SP1.jar
 880c9d896e4b74a06c549c15ca496450165d6909fa15d7e662bee8f6a66d7afa  lib/lib/main/org.yaml.snakeyaml-2.0.jar
+a45d65ed3b1c116732d0b0e7bb76094e664523ca18940dc0d5177c7b8a38dd74  providers/keycloak-lesson-authenticator-1.0.0.jar

@@ -49,13 +49,26 @@ gradle.projectsEvaluated {
                 !rule.owner || !rule.evidence || !rule.approvedOn) {
                 throw new GradleException('Direct build-only scope requires exact artifact, build, references and owner evidence')
             }
+        } else if (rule.kind == 'build-only-detekt') {
+            def services = [':ai-tutor-service', ':api-gateway', ':email-service', ':keyboard-service',
+                ':media-service', ':payment-service', ':registration-service', ':vocabulary-service',
+                ':worksheet-import-service'] as Set
+            if (rule.build != 'playsay-backend' || rule.configuration != 'detekt' ||
+                !(rule.projects instanceof List) || rule.projects.empty ||
+                rule.projects.any { !(it in services) } || rule.projects.toSet().size() != rule.projects.size() ||
+                !(rule.packageUrl ==~ /pkg:maven\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[A-Za-z0-9_.+-]+/) ||
+                !(rule.sha256 ==~ /[a-f0-9]{64}/) || !rule.file ||
+                !(rule.cves instanceof List) || rule.cves.empty || rule.cves.any { !(it ==~ /CVE-\d{4}-\d+/) } ||
+                !rule.owner || !rule.evidence || !rule.approvedOn) {
+                throw new GradleException('Detekt scope requires exact artifact, services and owner evidence')
+            }
         } else if (rule.kind || !rule.owner || !rule.evidence || !rule.approvedOn || !rule.build || !rule.project || !rule.configuration ||
             !rule.parentCoordinate || !rule.parentFile || !(rule.parentSha256 ==~ /[a-f0-9]{64}/) ||
             !(rule.sha256 ==~ /[a-f0-9]{64}/) || !rule.packageUrl || !(rule.cves instanceof List) || rule.cves.empty) {
             throw new GradleException('Runtime scope requires exact artifact hashes, configuration and owner evidence')
         }
     }
-    def buildOnlyHashes = runtimeScope.rules.findAll { it.kind == 'build-only-direct' }.collect { it.sha256 } as Set
+    def buildOnlyHashes = runtimeScope.rules.findAll { it.kind in ['build-only-direct', 'build-only-detekt'] }.collect { it.sha256 } as Set
     if (buildOnlyHashes) {
         def packagedBoundary = new File(policyDir.parentFile, 'keycloak-lesson-authenticator/server-runtime/build-only-risk-sha256.txt')
         if (!packagedBoundary.isFile()) throw new GradleException('Missing Keycloak packaged runtime-boundary hashes')

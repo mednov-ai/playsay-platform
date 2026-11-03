@@ -4,7 +4,7 @@ def root = new File(args[0])
 def rules = new JsonSlurper().parse(new File(root, 'backend/gradle/dependency-security-runtime-scope.json')).rules
 def classify = new GroovyShell().evaluate(new File(root, 'backend/gradle/dependency-security-runtime-scope.gradle'))
 int checks = 0
-rules.findAll { it.kind != 'build-only-direct' }.each { r ->
+rules.findAll { !it.kind }.each { r ->
     def dep = [fileName: r.parentFile + ' (shaded: fixture)', sha256: r.sha256,
                packages: [[id: r.packageUrl]], projectReferences: ['keycloak-lesson-authenticator:serverAugmentation']]
     def configs = [serverAugmentation: [[coordinate: r.parentCoordinate, file: r.parentFile, sha256: r.parentSha256]], serverRuntime: []]
@@ -69,7 +69,35 @@ rules.findAll { it.kind == 'build-only-direct' }.each { r ->
     assert !classify(r.build, r.project, dep, r.cves[0], configs, rules, keycloakMissingServer)
     checks += 18
 }
-def expectedBuildOnly = rules.findAll { it.kind == 'build-only-direct' }.collect { it.sha256 }.toSet()
+rules.findAll { it.kind == 'build-only-detekt' }.each { r ->
+    def purl = r.packageUrl =~ /^pkg:maven\/([^\/]+)\/([^@]+)@(.+)$/
+    assert purl.matches()
+    def coordinate = "${purl[0][1]}:${purl[0][2]}:${purl[0][3]}"
+    def artifact = [coordinate: coordinate, file: r.file, sha256: r.sha256, directory: false]
+    def configs = [detekt: [artifact]]
+    r.projects.each { project ->
+        def dep = [fileName: r.file, sha256: r.sha256, packages: [[id: r.packageUrl]],
+                   projectReferences: [project.substring(1) + ':detekt']]
+        def coverage = [build: 'playsay-backend', selection: project.substring(1),
+            discoveredProjects: [project], modules: [[project: project,
+                configurations: [[name: 'runtimeClasspath', artifacts: []]]]]]
+        assert classify(r.build, project, dep, r.cves[0], configs, rules, coverage)
+        assert !classify(r.build, ':other-service', dep, r.cves[0], configs, rules, coverage)
+        assert !classify(r.build, project, dep + [sha256: '0' * 64], r.cves[0], configs, rules, coverage)
+        assert !classify(r.build, project, dep + [projectReferences: [project.substring(1) + ':runtimeClasspath']], r.cves[0], configs, rules, coverage)
+        assert !classify(r.build, project, dep, 'CVE-2099-99999', configs, rules, coverage)
+        assert !classify(r.build, project, dep, r.cves[0], [:], rules, coverage)
+        assert !classify(r.build, project, dep, r.cves[0], configs, rules, null)
+        def shipped = coverage + [modules: [[project: project,
+            configurations: [[name: 'runtimeClasspath', artifacts: [artifact]]]]]]
+        assert !classify(r.build, project, dep, r.cves[0], configs, rules, shipped)
+        def missingProject = coverage + [selection: 'other-service',
+            modules: [[project: ':other-service', configurations: [[name: 'runtimeClasspath', artifacts: []]]]]]
+        assert !classify(r.build, project, dep, r.cves[0], configs, rules, missingProject)
+        checks += 9
+    }
+}
+def expectedBuildOnly = rules.findAll { it.kind in ['build-only-direct', 'build-only-detekt'] }.collect { it.sha256 }.toSet()
 def imageBoundary = new File(root, 'backend/keycloak-lesson-authenticator/server-runtime/build-only-risk-sha256.txt')
     .readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }.toSet()
 assert !expectedBuildOnly.empty && imageBoundary == expectedBuildOnly

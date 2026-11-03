@@ -25,6 +25,8 @@ spec:
       command: ["cat"]
       tty: true
       env:
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.jvmargs=-Xmx1536m"
         - name: JAVA_TOOL_OPTIONS
           value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
@@ -34,10 +36,10 @@ spec:
       resources:
         requests:
           cpu: 450m
-          memory: 1Gi
+          memory: 1536Mi
         limits:
           cpu: "1"
-          memory: 2Gi
+          memory: 3Gi
     - name: node-frontend
       image: node:26.13.0
       command: ["cat"]

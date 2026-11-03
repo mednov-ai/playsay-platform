@@ -3,13 +3,20 @@ return { String build, String project, Map dependency, String cve, Map configura
     rules.find { rule ->
         def refs = dependency.projectReferences ?: []
         def packages = (dependency.packages ?: []).collect { it.id }
-        if (rule.kind == 'build-only-direct') {
-            if (rule.build != build || rule.project != project || build != 'playsay-backend-build-logic' || project != ':' ||
+        if (rule.kind in ['build-only-direct', 'build-only-detekt']) {
+            def directBuildLogic = rule.kind == 'build-only-direct' && build == 'playsay-backend-build-logic' &&
+                rule.build == build && rule.project == project && project == ':'
+            def detektOnly = rule.kind == 'build-only-detekt' && build == 'playsay-backend' &&
+                rule.build == build && rule.projects?.contains(project) && rule.configuration == 'detekt'
+            def expectedRefs = directBuildLogic ? rule.projectReferences : [project.substring(1) + ':detekt']
+            def prefix = directBuildLogic ? build + ':' : project.substring(1) + ':'
+            if ((!directBuildLogic && !detektOnly) ||
                 !rule.cves.contains(cve) || packages != [rule.packageUrl] || dependency.sha256 != rule.sha256 ||
-                dependency.fileName != rule.file || refs.sort() != rule.projectReferences.sort() ||
+                dependency.fileName != rule.file || refs.toList().sort() != expectedRefs.toList().sort() ||
                 !(backendCoverage?.modules instanceof List) || backendCoverage.modules.empty ||
                 !(backendCoverage.build in ['playsay-backend', 'keycloak-lesson-authenticator'])) return false
             def moduleNames = backendCoverage.modules.collect { it.project } as Set
+            if (detektOnly && !moduleNames.contains(project)) return false
             if (backendCoverage.selection == 'all') {
                 if (!(backendCoverage.discoveredProjects instanceof List) ||
                     moduleNames != (backendCoverage.discoveredProjects as Set)) return false
@@ -23,7 +30,6 @@ return { String build, String project, Map dependency, String cve, Map configura
             if (!parts.matches()) return false
             def coordinate = "${parts[0][1]}:${parts[0][2]}:${parts[0][3]}"
             def covered = refs.every { ref ->
-                def prefix = build + ':'
                 ref.startsWith(prefix) && configurations[ref.substring(prefix.length())]?.any {
                     it.coordinate == coordinate && it.file == rule.file && it.sha256 == rule.sha256 && !it.directory
                 }

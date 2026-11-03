@@ -501,6 +501,181 @@
       "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
       "owner": "Project owner",
       "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.4.10",
+      "sha256": "3953d283e7710c990672e403a87df393d9726a9bf3e172194ebb5c33e062fcb0",
+      "file": "kotlin-build-tools-api-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler@2.4.10",
+      "sha256": "db12b1af0db0e10eeedfc15d5dac0316604e5c556321f60e3bcd73075a66f0a3",
+      "file": "kotlin-compiler-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.4.10",
+      "sha256": "25a1aef7454d46548ecaaf51021b0e52e38141a62ed75af124da109b7324c4e5",
+      "file": "kotlin-reflect-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.4.10",
+      "sha256": "f4a5b30c2fdfbe386b097101b7989dbeea3743c06396136664784e08e15c6899",
+      "file": "kotlin-script-runtime-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@2.4.10",
+      "sha256": "e7a8fe7cacf3b9c838f6b3fcb26dfdd41f844551a3ba67fd3f959a0d9d5c0bef",
+      "file": "kotlin-stdlib-jdk7-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@2.4.10",
+      "sha256": "08346b7f4cfba40c1139161c9f30b68199f425cecf3b63de67838063f34a05c7",
+      "file": "kotlin-stdlib-jdk8-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-detekt",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":email-service",
+        ":keyboard-service",
+        ":media-service",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configuration": "detekt",
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.4.10",
+      "sha256": "4ec0293bc3751423b203f1d8493251c57c42e73eb6377a6b8560d0974ff0a6df",
+      "file": "kotlin-stdlib-2.4.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
     }
   ]
 }

@@ -19,7 +19,7 @@ data class WorksheetImportProperties(
     data class Packet(
         val maxPages: Int = 100,
         val maxBytes: Long = 128L * 1024 * 1024,
-        val maxImageBytes: Long = 12L * 1024 * 1024,
+        val maxImageBytes: Long = 20L * 1024 * 1024,
     )
 
     data class Pdf(

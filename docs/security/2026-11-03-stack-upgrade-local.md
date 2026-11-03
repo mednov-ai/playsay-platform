@@ -40,6 +40,33 @@ The separate full collaboration-service npm audit reported zero findings;
 Its lockfile SHA-256 is
 `0fd1b5604f8845158cb1f9597fb3e9650b70e22bcf3759a38644eefcda49fe05`.
 
+## Frontend runtime images
+
+The previous nginx 1.27 Alpine base was end-of-support and its preliminary
+container scan reported High/Critical findings. Both frontend Dockerfiles now
+use pinned nginx 1.30.6 on supported Alpine and install available Alpine
+security updates. Isolated local builds of both final frontend images scanned
+with zero High/Critical/Unknown matches. Their startup, health checks, SPA
+fallbacks, API routes, WebSocket forwarding headers and web module-worker
+MIME/404 behavior passed against a local mock upstream. The complete raw
+reports and precise digests are retained in infra's
+`migrations/ax41/evidence/security/20261103-stack-upgrade/`.
+These are local builds; the package upgrade can resolve differently later, so
+fresh full scans and review of the exact CI-built image digests remain
+mandatory before delivery.
+
+The Node 26 Alpine base scan also found six High matches under npm's bundled
+dependencies. Both the collaboration and game-adapter runtime stages remove
+the unused npm installation; their local full-image scans returned zero
+High/Critical/Unknown matches. The collaboration service started as non-root
+and passed its health check. The game adapter now uses the pinned Alpine base
+instead of its vulnerable Debian base. Its non-root API, token checks and
+image optimization passed at 1 CPU/1 GiB; a synthetic offline game passed the
+real Chromium validator, and all 37 adapter tests passed on this image family,
+including the previously skipped Chromium tests. Current Alpine packages are
+resolved during the build; exact CI-built images and their dependency reports
+still need fresh complete scans before publication.
+
 ## JVM analysis
 
 The current Detekt alpha.1 compiler cannot read Kotlin 2.4 metadata. On the

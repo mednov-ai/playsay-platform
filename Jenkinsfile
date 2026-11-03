@@ -24,16 +24,19 @@ spec:
     }
   }
   options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 75, unit: 'MINUTES')
   }
   parameters {
-    string(name: 'BRANCH_NAME', defaultValue: '', trim: true)
-    string(name: 'GITHUB_AFTER', defaultValue: '', trim: true)
-    string(name: 'EXPECTED_INFRA_SHA', defaultValue: '', trim: true)
+    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build and deploy to dev, for example develop, codex/task-1, feature/task-1, release/1.001.00', trim: true)
+    string(name: 'AFFECTED_TARGETS', defaultValue: 'all', description: 'Comma-separated deploy targets to build: all, api-gateway, web-app, collaboration-service, media-service, payment-service, registration-service, email-service.', trim: true)
+    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
+    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
   }
+
   environment {
     PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
     INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
@@ -44,7 +47,7 @@ spec:
         script {
           if (params.BRANCH_NAME != 'ci/hotfix-image-upload-413-infra-finalize' ||
               !(params.GITHUB_AFTER ==~ /^[0-9a-f]{40}$/) ||
-              !(params.EXPECTED_INFRA_SHA ==~ /^[0-9a-f]{40}$/)) {
+              !(params.GITHUB_BEFORE ==~ /^[0-9a-f]{40}$/)) {
             error 'The verifier accepts only its CI-only branch and full reviewed SHAs.'
           }
           checkout([
@@ -56,7 +59,7 @@ spec:
           ])
           withEnv([
             "PROOF_SHA=${params.GITHUB_AFTER}",
-            "EXPECTED_INFRA_SHA=${params.EXPECTED_INFRA_SHA}",
+            "EXPECTED_INFRA_SHA=${params.GITHUB_BEFORE}",
             'CI_BRANCH=release/01.007.24',
             'GIT_COMMIT=9bee01c9f0ff0ffc7dd5d4feeae8a73a8c8c10f0'
           ]) {

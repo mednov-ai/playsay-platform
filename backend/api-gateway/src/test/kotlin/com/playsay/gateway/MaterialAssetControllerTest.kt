@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -37,8 +38,17 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.util.unit.DataSize
 
 class MaterialAssetControllerTest : MaterialControllerTestFixture() {
+    @Autowired private lateinit var multipartProperties: MultipartProperties
+
+    @Test
+    fun `multipart parser retains room for the bounded worksheet envelope`() {
+        assertEquals(DataSize.ofMegabytes(129), multipartProperties.maxRequestSize)
+        assertEquals(DataSize.ofMegabytes(64), multipartProperties.maxFileSize)
+    }
+
     @Test
     fun `teacher appends reusable uploaded image page to material and serves stored content`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
@@ -142,6 +152,27 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
     }
 
     @Test
+    fun `live lesson stores an image at the twenty MiB boundary`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val lesson = scheduleController.create(
+            teacher,
+            ScheduledLessonRequest(scheduledStart = activeLessonStart(), scheduledEnd = activeLessonEnd()),
+        ).body!!
+        val bytes = ByteArray(20 * 1024 * 1024) { (it % 251).toByte() }
+
+        val uploaded = materialImagePageController.appendLiveLessonImagePage(
+            teacher,
+            lesson.id,
+            imageFile(name = "boundary.jpg", contentType = "image/jpeg", bytes = bytes),
+        ).body!!
+        val asset = materialAssetController.listAssets(teacher, uploaded.material.id).single()
+        val stored = assertNotNull(materialAssetController.assetContent(teacher, uploaded.material.id, asset.id).body)
+
+        assertEquals(uploaded.material.id, uploaded.lesson.materialId)
+        assertTrue(bytes.contentEquals(stored))
+    }
+
+    @Test
     fun `live uploaded image page creates lesson only material when lesson has no material`() {
         val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
         val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
@@ -214,7 +245,7 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
             materialImagePageController.appendLiveLessonImagePage(
                 teacher,
                 sharedLesson.id,
-                imageFile(name = "large.jpg", contentType = "image/jpeg", bytes = ByteArray(12 * 1024 * 1024 + 1) { 1 }),
+                imageFile(name = "large.jpg", contentType = "image/jpeg", bytes = ByteArray(20 * 1024 * 1024 + 1) { 1 }),
             )
         }
         assertEquals(HttpStatus.BAD_REQUEST, oversizedError.statusCode)

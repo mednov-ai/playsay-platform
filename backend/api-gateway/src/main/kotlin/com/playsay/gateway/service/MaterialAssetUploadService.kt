@@ -289,7 +289,7 @@ internal fun String.materialImageExtension(): String =
         else -> "bin"
     }
 
-private const val materialImageMaxMegabytes = 12
+private const val materialImageMaxMegabytes = 20
 private const val materialImageMaxBytes = materialImageMaxMegabytes * 1024 * 1024
 private const val materialHtmlGameMaxMegabytes = 20
 private const val materialHtmlGameMaxBytes = materialHtmlGameMaxMegabytes * 1024 * 1024

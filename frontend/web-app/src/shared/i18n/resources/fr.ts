@@ -1502,7 +1502,7 @@ export const fr = {
     },
     errors: {
       imageType: "JPEG, PNG et WebP sont pris en charge.",
-      imageSize: "L'image doit faire moins de 12 Mo.",
+      imageSize: "L'image ne doit pas dépasser 20 Mio.",
       imagePrepare: "Le navigateur n'a pas pu préparer l'image.",
       imageCompressedSize: "L'image reste trop grande après compression. Essayez de recadrer la photo plus près de l'exercice.",
       fileRead: "Impossible de lire le fichier.",

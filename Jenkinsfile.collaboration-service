@@ -48,7 +48,7 @@ spec:
           memory: 256Mi
         limits:
           cpu: "1"
-          memory: 1024Mi
+          memory: 3Gi
     - name: image-security
       image: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
       command: ["cat"]
@@ -189,13 +189,43 @@ spec:
               cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-              KANIKO_CONTEXT="$WORKSPACE/collaboration-service" \
-                KANIKO_DOCKERFILE="$WORKSPACE/collaboration-service/Dockerfile" \
-                IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" \
+              KANIKO_CONTEXT="$WORKSPACE/ci-fixtures/livekit" \
+                KANIKO_DOCKERFILE="$WORKSPACE/ci-fixtures/livekit/Dockerfile" \
+                IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/playsay-livekit-security-fixture" \
                 /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
             '''
           }
         }
+      }
+    }
+
+    stage('Inspect LiveKit binary') {
+      when { expression { env.SECURITY_SCAN_ONLY == 'true' } }
+      steps {
+        container('image-security') {
+          sh '''
+            set -eu
+            build="$WORKSPACE/.image-build/playsay-livekit-security-fixture/$BUILD_LABEL"
+            report="$WORKSPACE/image-security/playsay-livekit-security-fixture/$BUILD_LABEL"
+            mkdir -p "$report"
+            wget -q -T 90 -O "$build/crane.tgz" https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz
+            printf '%s  %s\n' 0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0 "$build/crane.tgz" | sha256sum -c -
+            tar -xzf "$build/crane.tgz" -C "$build" crane
+            "$build/crane" export - "$build/rootfs.tar" < "$build/image.tar"
+            tar -xOf "$build/rootfs.tar" usr/share/doc/livekit-build/packages.txt > "$report/livekit-packages.txt"
+            tar -xOf "$build/rootfs.tar" usr/share/doc/livekit-build/build-info.txt > "$report/livekit-build-info.txt"
+            tar -xOf "$build/rootfs.tar" usr/share/doc/livekit-build/binary.sha256 > "$report/livekit-binary.sha256"
+            tar -xOf "$build/rootfs.tar" livekit-server > "$build/livekit-server"
+            expected="$(awk '{print $1}' "$report/livekit-binary.sha256")"
+            actual="$(sha256sum "$build/livekit-server" | awk '{print $1}')"
+            [ "$expected" = "$actual" ]
+            if grep -Eq '^golang.org/x/crypto/openpgp($|/)' "$report/livekit-packages.txt"; then exit 1; fi
+            strings "$build/livekit-server" > "$build/livekit-strings.txt"
+            if grep -q 'golang.org/x/crypto/openpgp' "$build/livekit-strings.txt"; then exit 1; fi
+            printf '%s\n' 'binary hash matched; openpgp packages and strings absent' > "$report/livekit-runtime-boundary.txt"
+          '''
+        }
+        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
       }
     }
 
@@ -205,7 +235,7 @@ EOF
       }
       steps {
         container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/playsay-livekit-security-fixture" ./scripts/ci/scan-image.sh'
         }
         archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
       }
@@ -217,7 +247,7 @@ EOF
       }
       steps {
         container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/playsay-livekit-security-fixture" ./scripts/ci/prepare-and-publish-image.sh'
         }
       }
     }

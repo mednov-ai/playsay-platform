@@ -17,7 +17,7 @@ test('Keycloak acceptance fails closed outside the exact approved scope and find
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const bin = join(dir, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'git'), "#!/bin/sh\nprintf '%s\\n' \"${KEYCLOAK_TEST_TREE:-b5310ef435edb065599d7655003de0355efc0b45}\"\n", { mode: 0o755 });
+  writeFileSync(join(bin, 'git'), "#!/bin/sh\n[ \"$1\" = -c ] && [ \"$2\" = \"safe.directory=$PWD\" ] && [ \"$3\" = rev-parse ] && [ \"$4\" = HEAD:backend/keycloak-lesson-authenticator ] || exit 1\nprintf '%s\\n' \"${KEYCLOAK_TEST_TREE:-b5310ef435edb065599d7655003de0355efc0b45}\"\n", { mode: 0o755 });
   writeFileSync(join(bin, 'trivy'), `#!/bin/sh
 set -eu
 [ "${'$'}{FAIL_CONVERSION:-false}" = false ] || exit 1

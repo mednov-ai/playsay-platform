@@ -12,7 +12,7 @@ case "${CI_BRANCH:-}" in
   release/01.007.25)
     [ "${DEPLOY_TO_DEV:-}" = false ]
     [ "${DEPLOY_TO_PROD:-}" = true ]
-    [ "$(git rev-parse HEAD:backend/keycloak-lesson-authenticator)" = b5310ef435edb065599d7655003de0355efc0b45 ]
+    [ "$(git -c safe.directory="$PWD" rev-parse HEAD:backend/keycloak-lesson-authenticator)" = b5310ef435edb065599d7655003de0355efc0b45 ]
     ;;
   *) exit 1 ;;
 esac

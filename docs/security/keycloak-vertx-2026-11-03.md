@@ -14,8 +14,12 @@ image and a later rebuild date. The server's Maven packaging and Gradle
 security inventory both resolve Guava 33.7.2-jre, whose upstream release
 addresses CVE-2026-102554; packaging fails if a second Guava JAR appears.
 Local provider tests and the Netty, Vert.x and runtime inventory verifiers
-passed. These changes are **not** a clearance of the OS/JDK findings: the
-new exact CI image and its full dependency and image scans still need to pass.
+passed. Jenkins Keycloak #29 also passed the dependency gate and provider
+tests, but the exact-image scan blocked on CVE-2026-91403 in OpenJDK and
+CVE-2026-119373/CVE-2026-119586 in `sqlite-libs`. The prior CA-bundle,
+OpenJDK font and Guava matches no longer appeared. Full raw reports are
+retained in the companion infra evidence; publication and rollout did not
+run. The remaining findings need candidate-specific disposition.
 
 The complete DEV dependency scan in Jenkins full job 5 refreshed NVD and failed
 at source `d5e547e8972faf2b042cf128b0f818708ee3ce1c`. Its backend gate

@@ -3,7 +3,7 @@ FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc
 
 FROM rockylinux/rockylinux:9@sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f AS builder
 USER 0
-RUN dnf --enablerepo=crb -y install rpm-build redhat-rpm-config gcc make ncurses-devel readline-devel glibc-devel autoconf tcl-devel unzip cpio binutils python3
+RUN dnf --enablerepo=crb -y install rpm-build redhat-rpm-config gcc cpp make ncurses-devel readline-devel glibc-devel autoconf tcl-devel unzip cpio binutils python3
 COPY --from=upstream /usr/lib64/libsqlite3.so.0.8.6 /tmp/original-sqlite.so
 COPY probe_sqlite.py /tmp/probe_sqlite.py
 COPY prepare_sqlite_spec.py /tmp/prepare_sqlite_spec.py
@@ -20,13 +20,13 @@ RUN set -eu; \
 
 # Run the source RPM's default test suite, preserving every distribution
 # patch. No file produced by this exploratory build is published.
-RUN set -eu; rpm -q gcc; gcc -print-search-dirs; \
-    compiler="$(rpm -ql gcc | grep '/cc1$')"; test -n "$compiler"; \
+RUN set -eu; rpm -q gcc cpp; /usr/bin/gcc -print-search-dirs; \
+    compiler="$(rpm -ql cpp | grep '/cc1$')"; test -n "$compiler"; \
     ls -l "$compiler"; ldd "$compiler" || true
 RUN printf 'int main(void) { return 0; }\n' > /tmp/compiler-smoke.c \
-    && gcc /tmp/compiler-smoke.c -o /tmp/compiler-smoke \
+    && /usr/bin/gcc /tmp/compiler-smoke.c -o /tmp/compiler-smoke \
     && /tmp/compiler-smoke
-RUN rpmbuild -bb /root/rpmbuild/SPECS/sqlite.spec || { \
+RUN CC=/usr/bin/gcc rpmbuild -bb /root/rpmbuild/SPECS/sqlite.spec || { \
       find /root/rpmbuild/BUILD -name config.log -exec grep -E -A 4 '(gcc.*conftest|error:|collect2|/ld:|cannot find)' {} \; || true; \
       exit 1; \
     }

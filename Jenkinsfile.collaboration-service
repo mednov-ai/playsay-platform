@@ -151,7 +151,7 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
           env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
-          env.IMAGE_ONLY = (env.CI_BRANCH == 'codex/hotfix-stack-upgrade-20261103').toString()
+          env.IMAGE_ONLY = (env.CI_BRANCH == 'codex/hotfix-stack-upgrade-20261103' || env.CI_BRANCH == 'codex/stack-upgrade-prod-candidate-20261104').toString()
           env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
           env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
           env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')

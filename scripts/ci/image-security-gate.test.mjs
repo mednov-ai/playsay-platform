@@ -224,7 +224,7 @@ test('stack hotfix module builds publish images without changing DEV or running 
   assert.equal(pipelines.length, 13);
   for (const name of pipelines) {
     const content = readFileSync(join(root, name), 'utf8');
-    assert.match(content, /env\.IMAGE_ONLY = \(env\.CI_BRANCH == 'codex\/hotfix-stack-upgrade-20261103'\)\.toString\(\)/, name);
+    assert.match(content, /env\.IMAGE_ONLY = \(env\.CI_BRANCH == 'codex\/hotfix-stack-upgrade-20261103' \|\| env\.CI_BRANCH == 'codex\/stack-upgrade-prod-candidate-20261104'\)\.toString\(\)/, name);
     const afterPublish = content.split("stage('Publish image')")[1];
     assert.ok(afterPublish, name);
     assert.match(afterPublish.split("stage('Tag source commit')")[0], /assert-current-branch-head\.sh/, name);

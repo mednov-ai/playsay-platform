@@ -113,7 +113,7 @@ test('all JVM publication paths run the credential-bound gate before tests, migr
     assert.match(source, /activeDeadlineSeconds: 5400/);
     assert.match(source, /archiveArtifacts artifacts: 'backend\/build\/reports\/dependency-security\/\*\*\/\*', allowEmptyArchive: false/);
     assert.match(source.slice(0, gate), /timeout\(time: 75, unit: 'MINUTES'\)/);
-    const publication = source.search(/stage\('Build and push image/);
+    const publication = source.search(/stage\('Build (?:and scan images|image archive)/);
     assert.ok(publication > gate, file);
     assert.match(source.slice(gate, publication), /check-jvm-dependencies\.sh/);
     assert.match(source.slice(gate, publication), /credentialsId: 'nvd-api-key'/);

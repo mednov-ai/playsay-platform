@@ -49,7 +49,8 @@ test("module pipelines route numeric release branches to prod only", () => {
       /^\s*INFRA_BRANCH\s*=\s*'develop'\s*$/m,
       `${pipelineName} must not let Declarative Pipeline reset the computed release branch between stages`,
     );
-    assert.match(pipeline, /stage\('Build and push image'\)[\s\S]*?env\.DEPLOY_IMAGE == 'true'/, pipelineName);
+    assert.match(pipeline, /stage\('Build image archive'\)[\s\S]*?env\.SCAN_IMAGE == 'true'/, pipelineName);
+    assert.match(pipeline, /stage\('Scan image'\)[\s\S]*?env\.SCAN_IMAGE == 'true'/, pipelineName);
     assert.match(pipeline, /stage\('Update environment image reference'\)[\s\S]*?env\.DEPLOY_IMAGE == 'true'/, pipelineName);
 
     const devRouting = pipeline.match(/env\.DEPLOY_TO_DEV = \(([\s\S]*?)\n          \)\.toString\(\)/)?.[1] ?? "";
@@ -200,9 +201,9 @@ esac
   }
 });
 
-test("Kaniko publishes a mutable dev tag only for dev builds", () => {
-  const helper = readFileSync(resolve(platformRoot, "scripts/ci/run-kaniko-image-build.sh"), "utf8");
-  assert.match(helper, /--digest-file "\$DIGEST_FILE"/);
-  assert.match(helper, /if \[ "\$DEPLOY_TO_DEV" = "true" \]/);
-  assert.match(helper, /--destination "\$\{IMAGE_REPOSITORY\}:dev"/);
+test("image publication occurs only after the security gate", () => {
+  const publisher = readFileSync(resolve(platformRoot, "scripts/ci/publish-scanned-image.sh"), "utf8");
+  assert.match(publisher, /scanned\.sha256/);
+  assert.match(publisher, /if \[ "\$DEPLOY_TO_DEV" = true \]/);
+  assert.match(publisher, /"\$CRANE_BIN" tag "\$\{IMAGE_REPOSITORY\}@\$\{remote_digest\}" dev/);
 });

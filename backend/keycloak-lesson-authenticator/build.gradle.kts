@@ -50,10 +50,6 @@ configurations.configureEach {
             "io.airlift" to "aircompressor" -> useVersion("2.0.3")
             "org.codehaus.plexus" to "plexus-utils" -> useVersion("4.0.3")
         }
-        if (requested.group == "io.vertx") {
-            useVersion("4.5.35")
-            because("Keep the Keycloak Vert.x runtime family on its security maintenance release")
-        }
     }
 }
 

@@ -1,273 +1,65 @@
 pipeline {
   agent {
     kubernetes {
-      yaml """
+      yaml '''
 apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
-  activeDeadlineSeconds: 5400
+  activeDeadlineSeconds: 3600
   securityContext:
     fsGroup: 1000
-    fsGroupChangePolicy: OnRootMismatch
   containers:
     - name: jnlp
       image: jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk25
       resources:
         requests: { cpu: 50m, memory: 128Mi }
         limits: { cpu: 300m, memory: 384Mi }
-    - name: gradle
-      image: gradle:9.5.1-jdk25
-      command: ["cat"]
-      tty: true
-      env:
-        - name: GRADLE_OPTS
-          value: "-Dorg.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=256m"
-        - name: JAVA_TOOL_OPTIONS
-          value: "-XX:ActiveProcessorCount=1"
-      volumeMounts:
-        - name: jenkins-agent-cache
-          mountPath: /home/gradle/.gradle
-          subPath: gradle-keycloak-lesson-authenticator
-      resources:
-        requests: { cpu: 450m, memory: 1Gi }
-        limits: { cpu: "1", memory: 2Gi }
-    - name: kaniko
-      image: gcr.io/kaniko-project/executor:debug
-      command: ["/busybox/cat"]
-      tty: true
-      volumeMounts:
-        - name: kaniko-docker-config
-          mountPath: /kaniko/.docker
-      resources:
-        requests: { cpu: 250m, memory: 512Mi }
-        limits: { cpu: "1", memory: 2Gi }
     - name: image-security
       image: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
       command: ["cat"]
       tty: true
-      volumeMounts:
-        - name: kaniko-docker-config
-          mountPath: /kaniko/.docker
       resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-        limits:
-          cpu: "1"
-          memory: 1536Mi
-    - name: tools
-      image: alpine:3.20
-      command: ["cat"]
-      tty: true
-      resources:
-        requests: { cpu: 25m, memory: 32Mi }
-        limits: { cpu: 200m, memory: 128Mi }
-  volumes:
-    - name: kaniko-docker-config
-      emptyDir: {}
-    - name: jenkins-agent-cache
-      persistentVolumeClaim:
-        claimName: jenkins-agent-cache
-"""
+        requests: { cpu: 100m, memory: 256Mi }
+        limits: { cpu: "1", memory: 1536Mi }
+'''
     }
   }
-
   options {
-    buildDiscarder(logRotator(numToKeepStr: '20'))
-    disableConcurrentBuilds()
     skipDefaultCheckout(true)
-    timestamps()
-    timeout(time: 75, unit: 'MINUTES')
+    timeout(time: 55, unit: 'MINUTES')
   }
-
-  parameters {
-    string(name: 'BRANCH_NAME', defaultValue: 'develop', description: 'Git branch to build; dev branches deploy to dev and numeric release branches prepare production.', trim: true)
-    string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
-    string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
-    string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
-    booleanParam(name: 'IMAGE_ONLY', defaultValue: false, description: 'Build, scan and publish the DEV candidate image without changing GitOps or deploying.')
-  }
-
-  environment {
-    PLAYSAY_DEDICATED_CI = 'true'
-    KUBECONFIG = credentials('dev-kubeconfig')
-    GITHUB_OWNER = 'mednov-ai'
-    KEYCLOAK_IMAGE_NAME = 'playsay-keycloak'
-    PLATFORM_REPO = 'https://github.com/mednov-ai/playsay-platform.git'
-    INFRA_REPO = 'https://github.com/mednov-ai/playsay-infra.git'
-  }
-
   stages {
-    stage('Checkout') {
+    stage('Audit immutable images') {
       steps {
-        script {
-          def requestedBranch = params.BRANCH_NAME?.trim() ?: 'develop'
-          def requestedCommit = params.GITHUB_AFTER?.trim()
-          checkout([
-            $class: 'GitSCM',
-            branches: [[name: "*/${requestedBranch}"]],
-            doGenerateSubmoduleConfigurations: false,
-            extensions: [],
-            submoduleCfg: [],
-            userRemoteConfigs: [[url: env.PLATFORM_REPO]]
-          ])
-          if (requestedCommit) {
-            sh "git fetch --no-tags origin +refs/heads/${requestedBranch}:refs/remotes/origin/${requestedBranch}"
-            sh "git checkout --detach ${requestedCommit}"
-          }
-          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-          env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
-          env.CI_BRANCH = requestedBranch.replaceFirst(/^origin\//, '').replaceFirst(/^\*\//, '')
-
-          def buildPrefix = env.CI_BRANCH == 'develop' ? 'keycloak-dev' : "keycloak-${env.CI_BRANCH}"
-          buildPrefix = buildPrefix.replaceAll(/[^A-Za-z0-9_.-]/, '-')
-          buildPrefix = buildPrefix.replaceAll(/^[^A-Za-z0-9]+/, '').replaceAll(/[^A-Za-z0-9]+$/, '')
-          int maxPrefixLength = 63 - env.BUILD_NUMBER.length() - 1
-          if (buildPrefix.length() > maxPrefixLength) {
-            buildPrefix = buildPrefix.take(maxPrefixLength).replaceAll(/[^A-Za-z0-9]+$/, '')
-          }
-          env.BUILD_LABEL_PREFIX = buildPrefix ?: 'keycloak'
-          env.BUILD_LABEL = "${env.BUILD_LABEL_PREFIX}-${env.BUILD_NUMBER}"
-          env.DEPLOY_TO_PROD = (env.CI_BRANCH ==~ /^release\/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$/).toString()
-          if (env.CI_BRANCH.startsWith('release/') && env.DEPLOY_TO_PROD != 'true') {
-            error 'Production release branches must match release/NN.NNN.NN.'
-          }
-          env.DEPLOY_TO_DEV = (
-            env.CI_BRANCH == 'develop' ||
-            env.CI_BRANCH.startsWith('codex/') ||
-            env.CI_BRANCH.startsWith('feature/') ||
-            env.CI_BRANCH.startsWith('hotfix/')
-          ).toString()
-          env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
-          if (env.JOB_NAME == 'playsay-keycloak-image' && !params.IMAGE_ONLY) {
-            error 'The Keycloak image-only job cannot deploy.'
-          }
-          if (params.IMAGE_ONLY && (env.DEPLOY_TO_DEV != 'true' || env.CI_BRANCH != 'codex/hotfix-stack-upgrade-20261103')) {
-            error 'Image-only publication is restricted to the authorized DEV stack hotfix branch.'
-          }
-          env.IMAGE_ONLY = params.IMAGE_ONLY.toString()
-          env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
-          env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
-          env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
-          env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
-
-          currentBuild.displayName = env.BUILD_LABEL
-          currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
-        }
-      }
-    }
-
-    stage('Dependency security') {
-      steps {
-        container('gradle') {
-          withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-            timeout(time: 45, unit: 'MINUTES') {
-              sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-runtime-scope.test.groovy "$PWD"'
-              sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-inventory-fresh.test.groovy "$PWD"'
-              sh './scripts/ci/check-jvm-dependencies.sh keycloak-lesson-authenticator'
-              archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: false
-            }
-          }
-        }
-      }
-    }
-
-    stage('Provider tests') {
-      steps {
-        container('gradle') {
-          dir('backend') {
-            sh 'gradle :keycloak-lesson-authenticator:clean :keycloak-lesson-authenticator:test :keycloak-lesson-authenticator:jar -Pkotlin.compiler.execution.strategy=in-process --no-daemon --stacktrace --max-workers=1'
-          }
-        }
-      }
-    }
-
-    stage('Build image archive') {
-      when { expression { env.SCAN_IMAGE == 'true' } }
-      steps {
-        container('kaniko') {
+        container('image-security') {
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
             sh '''
               set -eu
-              mkdir -p /kaniko/.docker
-              AUTH="$(printf "%s:%s" "$GHCR_USER" "$GHCR_TOKEN" | base64 | tr -d '\n')"
-              cat > /kaniko/.docker/config.json <<EOF
-{"auths":{"ghcr.io":{"auth":"$AUTH"}}}
-EOF
-              KANIKO_CONTEXT="$WORKSPACE/backend/keycloak-lesson-authenticator" \
-                KANIKO_DOCKERFILE="$WORKSPACE/backend/keycloak-lesson-authenticator/Dockerfile" \
-                IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" \
-                /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
+              set +x
+              mkdir -p image-security/production-baseline .image-audit-cache
+              export TRIVY_USERNAME="$GHCR_USER" TRIVY_PASSWORD="$GHCR_TOKEN"
+              trivy --version > image-security/production-baseline/scanner-version.txt
+              trivy image --config '' --ignorefile '' --cache-dir .image-audit-cache --no-progress --image-src remote --scanners vuln --pkg-types os,library --list-all-pkgs --format json --output image-security/production-baseline/keycloak-prod.json 'ghcr.io/mednov-ai/playsay-keycloak@sha256:4906970a91906e3b9747f739e94f1495363c410c7bbc59e6090062e6b7c5cc05'
+              trivy image --config '' --ignorefile '' --cache-dir .image-audit-cache --skip-db-update --no-progress --image-src remote --scanners vuln --pkg-types os,library --list-all-pkgs --format json --output image-security/production-baseline/keycloak-candidate.json 'ghcr.io/mednov-ai/playsay-keycloak@sha256:f79ab63440522b836f91ecf9ce420709a442d298246c4a5502666753fd9292cf'
+              trivy image --config '' --ignorefile '' --cache-dir .image-audit-cache --skip-db-update --no-progress --image-src remote --scanners vuln --pkg-types os,library --list-all-pkgs --format json --output image-security/production-baseline/postgres-prod.json 'ghcr.io/cloudnative-pg/postgresql@sha256:6ae4a22c14bdc66e5feaafd38d12c3956fabf9ce9582189e6aa4ee767d981d1b'
+              trivy image --config '' --ignorefile '' --cache-dir .image-audit-cache --skip-db-update --no-progress --image-src remote --scanners vuln --pkg-types os,library --list-all-pkgs --format json --output image-security/production-baseline/postgres-candidate.json 'ghcr.io/cloudnative-pg/postgresql@sha256:03a1c6a62b27e8ad31cae5c085131b5ac706b09403d6fcb6c58d16c8daa257cd'
+              unset TRIVY_USERNAME TRIVY_PASSWORD
+              trivy image --config '' --ignorefile '' --cache-dir .image-audit-cache --skip-db-update --no-progress --image-src remote --scanners vuln --pkg-types os,library --list-all-pkgs --format json --output image-security/production-baseline/keycloak-postgres-prod.json 'docker.io/bitnamilegacy/postgresql@sha256:9d75ed4556cedefaff8f3aa2ccd39093dcf3f7968d013a82f175bff25c2761e4'
+              cp .image-audit-cache/db/metadata.json image-security/production-baseline/database-metadata.json
+              for item in keycloak-prod keycloak-candidate postgres-prod postgres-candidate keycloak-postgres-prod; do
+                test -s "image-security/production-baseline/$item.json"
+              done
+              echo 'Immutable baseline/candidate scans complete; no image publication or deployment.'
             '''
           }
         }
       }
     }
-
-    stage('Scan image') {
-      when {
-        expression { env.SCAN_IMAGE == 'true' }
-      }
-      steps {
-        container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
-        }
-        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
-      }
-    }
-
-    stage('Publish image') {
-      when {
-        expression { env.DEPLOY_IMAGE == 'true' }
-      }
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache git && ./scripts/ci/assert-current-branch-head.sh'
-        }
-        container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
-        }
-      }
-    }
-
-    stage('Tag source commit') {
-      when { expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' } }
-      steps {
-        container('tools') {
-          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git && ./scripts/ci/tag-source-commit.sh'
-          }
-        }
-      }
-    }
-
-    stage('Update environment image reference') {
-      when { expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' } }
-      steps {
-        container('tools') {
-          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git yq && ./scripts/ci/assert-current-branch-head.sh && CHART_NAME=keycloak IMAGE_REPOSITORY_OVERRIDE=ghcr.io/mednov-ai/playsay-keycloak ./scripts/ci/update-routed-image-reference.sh'
-          }
-        }
-      }
-    }
-
-    stage('Wait for rollout') {
-      when { expression { env.DEPLOY_TO_DEV == 'true' && env.IMAGE_ONLY != 'true' } }
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache jq kubectl && ./scripts/ci/wait-for-keycloak-rollout.sh'
-        }
-      }
-    }
   }
-
   post {
     always {
-      archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: true
-      archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: true
-      echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
+      archiveArtifacts artifacts: 'image-security/production-baseline/**', allowEmptyArchive: true
     }
   }
 }

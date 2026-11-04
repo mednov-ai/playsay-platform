@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController
 import com.playsay.gateway.dto.*
 import com.playsay.gateway.service.*
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 
 @RestController
 @Tag(name = "Auth")
@@ -43,7 +44,7 @@ class MeController {
             .sorted()
 
         return MeResponse(
-            subject = jwt.subject,
+            subject = jwt.requireSubject(),
             username = jwt.getClaimAsString("preferred_username"),
             email = jwt.getClaimAsString("email"),
             name = jwt.getClaimAsString("name"),

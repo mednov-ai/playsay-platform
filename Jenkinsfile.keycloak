@@ -17,12 +17,12 @@ spec:
         requests: { cpu: 50m, memory: 128Mi }
         limits: { cpu: 300m, memory: 384Mi }
     - name: gradle
-      image: gradle:8-jdk21
+      image: gradle:9.5.1-jdk25
       command: ["cat"]
       tty: true
       env:
         - name: GRADLE_OPTS
-          value: "-Dorg.gradle.jvmargs=-Xmx768m -XX:MaxMetaspaceSize=256m"
+          value: '-Dorg.gradle.jvmargs="-Xmx768m -XX:MaxMetaspaceSize=512m"'
         - name: JAVA_TOOL_OPTIONS
           value: "-XX:ActiveProcessorCount=1"
       volumeMounts:
@@ -42,6 +42,20 @@ spec:
       resources:
         requests: { cpu: 250m, memory: 512Mi }
         limits: { cpu: "1", memory: 2Gi }
+    - name: image-security
+      image: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1536Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -72,6 +86,7 @@ spec:
     string(name: 'GITHUB_BEFORE', defaultValue: '', description: 'GitHub push before SHA for dispatcher traceability.', trim: true)
     string(name: 'GITHUB_AFTER', defaultValue: '', description: 'GitHub push after SHA to build exactly, when dispatched from webhook.', trim: true)
     string(name: 'ARGOCD_REFRESH_MODE', defaultValue: 'webhook', description: 'ArgoCD refresh mode: webhook or annotate.', trim: true)
+    booleanParam(name: 'IMAGE_ONLY', defaultValue: false, description: 'Build, scan and publish the DEV candidate image without changing GitOps or deploying.')
   }
 
   environment {
@@ -125,6 +140,15 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
           env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
+          if (env.JOB_NAME == 'playsay-keycloak-image' && !params.IMAGE_ONLY) {
+            error 'The Keycloak image-only job cannot deploy.'
+          }
+          if (params.IMAGE_ONLY && (env.DEPLOY_TO_DEV != 'true' || env.CI_BRANCH != 'codex/hotfix-stack-upgrade-20261103')) {
+            error 'Image-only publication is restricted to the authorized DEV stack hotfix branch.'
+          }
+          env.IMAGE_ONLY = params.IMAGE_ONLY.toString()
+          env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
+          env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
           env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
           env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
 
@@ -140,6 +164,7 @@ spec:
           withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
             timeout(time: 45, unit: 'MINUTES') {
               sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-runtime-scope.test.groovy "$PWD"'
+              sh 'java -cp "${GRADLE_HOME}/lib/*" groovy.ui.GroovyMain scripts/ci/dependency-inventory-fresh.test.groovy "$PWD"'
               sh './scripts/ci/check-jvm-dependencies.sh keycloak-lesson-authenticator'
               archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: false
             }
@@ -158,8 +183,8 @@ spec:
       }
     }
 
-    stage('Build and push image') {
-      when { expression { env.DEPLOY_IMAGE == 'true' } }
+    stage('Build image archive') {
+      when { expression { env.SCAN_IMAGE == 'true' } }
       steps {
         container('kaniko') {
           withCredentials([usernamePassword(credentialsId: 'github-ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
@@ -180,8 +205,34 @@ EOF
       }
     }
 
+    stage('Scan image') {
+      when {
+        expression { env.SCAN_IMAGE == 'true' }
+      }
+      steps {
+        container('image-security') {
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+        }
+        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+      }
+    }
+
+    stage('Publish image') {
+      when {
+        expression { env.DEPLOY_IMAGE == 'true' }
+      }
+      steps {
+        container('tools') {
+          sh 'apk add --no-cache git && ./scripts/ci/assert-current-branch-head.sh'
+        }
+        container('image-security') {
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
+        }
+      }
+    }
+
     stage('Tag source commit') {
-      when { expression { env.DEPLOY_IMAGE == 'true' } }
+      when { expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' } }
       steps {
         container('tools') {
           withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
@@ -192,7 +243,7 @@ EOF
     }
 
     stage('Update environment image reference') {
-      when { expression { env.DEPLOY_IMAGE == 'true' } }
+      when { expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' } }
       steps {
         container('tools') {
           withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
@@ -203,7 +254,7 @@ EOF
     }
 
     stage('Wait for rollout') {
-      when { expression { env.DEPLOY_TO_DEV == 'true' } }
+      when { expression { env.DEPLOY_TO_DEV == 'true' && env.IMAGE_ONLY != 'true' } }
       steps {
         container('tools') {
           sh 'apk add --no-cache jq kubectl && ./scripts/ci/wait-for-keycloak-rollout.sh'
@@ -215,6 +266,7 @@ EOF
   post {
     always {
       archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: true
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

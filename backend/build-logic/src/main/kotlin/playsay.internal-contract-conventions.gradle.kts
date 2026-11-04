@@ -30,6 +30,9 @@ tasks.named<GenerateTask>("openApiGenerate") {
     group = "contract generation"
     description = "Generates framework-neutral $contractDomain internal contract models."
     generatorName.set("kotlin")
+    // Keep multiple generated contracts from accumulating classes in the Gradle daemon.
+    workerIsolation.set("process")
+    maxWorkerHeapSize.set("384m")
     library.set("jvm-retrofit2")
     inputSpec.set(contractSpec.asFile.absolutePath)
     outputDir.set(generatedRoot.get().asFile.absolutePath)

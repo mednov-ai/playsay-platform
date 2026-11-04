@@ -77,9 +77,11 @@ try {
 
   const passwords = readDemoPasswords();
   const teacher = await createSession(browser, "teacher", passwords.teacher);
+  sessions.push(teacher);
   const studentA = await createSession(browser, "studentA", passwords.studentA);
+  sessions.push(studentA);
   const studentB = await createSession(browser, "studentB", passwords.studentB);
-  sessions.push(teacher, studentA, studentB);
+  sessions.push(studentB);
 
   const [rawStudentAProfile, studentBProfile] = await Promise.all([
     apiRequest(studentA.tokens.accessToken, "GET", "/users/me/profile", 200),
@@ -134,6 +136,15 @@ try {
     assertStudentDocumentChromeHidden(studentB.page),
   ]);
   addCheck("student-workspace-hides-document-tabs-and-side-editor");
+
+  // Selecting the first student can hide the teacher's task after the initial
+  // reveal. Reopen it after all participants have joined.
+  if (await teacher.page.locator("[data-testid='lesson-material-surface']").count() === 0) {
+    const reveal = teacher.page.locator("button").filter({ hasText: /Показать задание|Show task|Aufgabe anzeigen|Afficher la tâche/i }).first();
+    await reveal.waitFor({ timeout: timeoutMs });
+    await reveal.click();
+    await teacher.page.locator("[data-testid='lesson-material-surface']").waitFor({ timeout: timeoutMs });
+  }
 
   if (annotationOnly) {
     await waitForSharedPresenceReady(teacher.page, studentA.page, studentB.page);
@@ -195,13 +206,34 @@ try {
     if (teacherToken) {
       await cleanup(teacherToken);
     }
-  } catch {
-    // Keep the smoke failure focused on the original error.
+  } catch (cleanupError) {
+    console.error(`Cleanup failed; task-owned fixture IDs remain in summary: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
   }
   console.error(`Sprint 5 UI smoke failed: ${error instanceof Error ? error.message : String(error)}`);
   console.error(JSON.stringify(summary, null, 2));
   process.exitCode = 1;
 } finally {
+  const logoutResults = await Promise.allSettled(sessions.map(async (session) => {
+    let refreshToken = session.tokens.refreshToken;
+    if (new URL(session.page.url()).origin === new URL(webBaseUrl).origin) {
+      const current = await session.page.evaluate((key) => window.sessionStorage.getItem(key), tokenStorageKey).catch(() => null);
+      if (current) {
+        try { refreshToken = JSON.parse(current).refreshToken ?? refreshToken; } catch { /* use the original test session */ }
+      }
+    }
+    const response = await fetch(`${authIssuer}/protocol/openid-connect/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: authClientId, refresh_token: refreshToken }),
+    });
+    if (!response.ok) throw new Error(`task-owned ${session.role} session logout failed: HTTP ${response.status}`);
+  }));
+  for (const result of logoutResults) {
+    if (result.status === "rejected") {
+      console.error(result.reason instanceof Error ? result.reason.message : "task-owned session logout failed");
+      process.exitCode = 1;
+    }
+  }
   await Promise.allSettled(sessions.map((session) => session.context.close()));
   await browser?.close();
 }
@@ -657,6 +689,8 @@ async function createSmokeLesson(token, materialId, participantSubjects) {
     type: "GROUP",
     workMode: "SHARED",
   });
+  created.lessonId = lesson.id;
+  summary.lessonId = lesson.id;
   return apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/start`, 200);
 }
 
@@ -690,19 +724,18 @@ async function completeClassroomPreJoin(page) {
   if (fakeMedia) {
     const recordButton = page.locator(".playsay-prejoin-audio-actions button[data-recording]").first();
     await recordButton.waitFor({ state: "visible", timeout: timeoutMs });
-    await recordButton.dispatchEvent("pointerdown", {
-      button: 0,
-      isPrimary: true,
-      pointerId: 1,
-      pointerType: "mouse",
-    });
-    await page.waitForTimeout(600);
-    await recordButton.dispatchEvent("pointerup", {
-      button: 0,
-      isPrimary: true,
-      pointerId: 1,
-      pointerType: "mouse",
-    });
+    await page.waitForFunction(() => {
+      const button = document.querySelector(".playsay-prejoin-audio-actions button[data-recording]");
+      return button instanceof HTMLButtonElement && !button.disabled;
+    }, null, { timeout: timeoutMs });
+    const bounds = await recordButton.boundingBox();
+    if (!bounds) throw new Error("Audio-check button has no visible bounds");
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    try {
+      await page.waitForFunction(() => document.querySelector(".playsay-prejoin-audio-actions button[data-recording]")?.getAttribute("data-recording") === "true", null, { timeout: timeoutMs });
+      await page.waitForTimeout(1200);
+    } finally { await page.mouse.up(); }
     const heardRecordingButton = page.locator(".playsay-prejoin-audio-confirm button").first();
     await heardRecordingButton.waitFor({ state: "visible", timeout: timeoutMs });
     await heardRecordingButton.click();
@@ -883,6 +916,11 @@ async function drawTextAndMindMap(page) {
   const textEditor = page.locator(".playsay-annotation-text-text textarea");
   await textEditor.waitFor({ timeout: timeoutMs });
   await textEditor.fill("Friendly text");
+  await page.waitForFunction(() => {
+    const editor = document.querySelector(".playsay-annotation-text-text textarea");
+    const frame = editor?.closest(".playsay-annotation-html-element, foreignObject");
+    return parseFloat(frame?.style.width || frame?.getAttribute("width")) > 72;
+  }, null, { timeout: timeoutMs });
   const initialTextSize = await textEditor.evaluate((editor) => {
     const frame = editor.closest(".playsay-annotation-html-element, foreignObject");
     return frame ? {
@@ -1325,15 +1363,14 @@ async function waitForApi(check) {
 
 async function cleanup(token) {
   if (created.lessonId) {
-    await apiRequest(token, "DELETE", `/schedule/lessons/${created.lessonId}`, 204).catch(() => null);
+    await apiRequest(token, "DELETE", `/schedule/lessons/${created.lessonId}`, 204);
+    await apiRequest(token, "GET", `/schedule/lessons/${created.lessonId}`, 404);
     created.lessonId = null;
   }
   if (created.materialId && created.materialRequest) {
-    await apiRequest(token, "PUT", `/materials/${created.materialId}`, 200, {
-      ...created.materialRequest,
-      status: "ARCHIVED",
-      title: `${created.materialRequest.title} archived`,
-    }).catch(() => null);
+    await apiRequest(token, "DELETE", `/materials/${created.materialId}`, 204);
+    const archived = await apiRequest(token, "GET", `/materials/${created.materialId}`, 200);
+    if (archived.status !== "ARCHIVED") throw new Error("Task-owned material was not archived.");
     created.materialId = null;
   }
 }
@@ -1353,7 +1390,7 @@ async function apiRequest(token, method, pathName, expectedStatus, body) {
   if (response.status !== expectedStatus) {
     throw new Error(`${method} ${pathName} expected HTTP ${expectedStatus}, got ${response.status}${text ? `: ${text.slice(0, 300)}` : ""}`);
   }
-  if (!text || expectedStatus === 204) {
+  if (!text || expectedStatus === 204 || expectedStatus === 404) {
     return null;
   }
   return JSON.parse(text);

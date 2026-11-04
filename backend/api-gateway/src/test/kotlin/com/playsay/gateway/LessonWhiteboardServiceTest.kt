@@ -12,6 +12,7 @@ import com.playsay.gateway.repo.CollaborationDocumentRepo
 import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.service.LessonWhiteboardService
+import com.playsay.gateway.utils.requireSubject
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
@@ -59,9 +60,9 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         val learner = service.current(students[0], lesson.id, null).board!!
         assertFalse(learner.canDraw)
         val granted = service.update(teacher, lesson.id, board.id, UpdateLessonWhiteboardRequest(learner.controlRevision, learnerInkEnabled = true, background = "#fff8e8"))
-        assertTrue(service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.subject, 0)).canDraw)
+        assertTrue(service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.requireSubject(), 0)).canDraw)
         service.update(teacher, lesson.id, board.id, UpdateLessonWhiteboardRequest(granted.controlRevision, learnerInkEnabled = false))
-        assertFalse(service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.subject, 0)).canDraw)
+        assertFalse(service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.requireSubject(), 0)).canDraw)
         assertFailsWith<ProjectResponseException> { service.update(students[0], lesson.id, board.id, UpdateLessonWhiteboardRequest(0, clear = true)) }
     }
 
@@ -75,22 +76,22 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         assertEquals("#202433", cleared.background); assertTrue(cleared.learnerInkEnabled)
         assertNotEquals(board.document.id, cleared.document.id)
         assertFalse(documents.existsById(board.document.id))
-        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(teacher.token.subject, 0)) }
+        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(teacher.token.requireSubject(), 0)) }
         assertFailsWith<ProjectResponseException> { service.update(teacher, lesson.id, board.id, UpdateLessonWhiteboardRequest(board.controlRevision, clear = true)) }
     }
 
     @Test fun `parallel boards and history remain isolated`() {
         val (lesson, teacher, students) = fixture("PARALLEL")
-        val a = service.ensure(teacher, lesson.id, students[0].token.subject)
-        val b = service.ensure(teacher, lesson.id, students[1].token.subject)
+        val a = service.ensure(teacher, lesson.id, students[0].token.requireSubject())
+        val b = service.ensure(teacher, lesson.id, students[1].token.requireSubject())
         assertNotEquals(a.id, b.id)
         assertEquals(a.id, service.current(students[0], lesson.id, null).board?.id)
         assertFailsWith<ProjectResponseException> { service.get(students[0], lesson.id, b.id) }
         lesson.status = "COMPLETED"; lesson.actualEnd = Instant.now(); lessons.saveAndFlush(lesson)
         assertTrue(service.get(students[0], lesson.id, a.id).readOnly)
         assertFalse(service.get(teacher, lesson.id, a.id).canDraw)
-        assertFailsWith<ProjectResponseException> { service.ensure(teacher, lesson.id, students[0].token.subject) }
-        assertFailsWith<ProjectResponseException> { service.policy(token, a.document.id, WhiteboardPolicyRequest(students[0].token.subject, 0)) }
+        assertFailsWith<ProjectResponseException> { service.ensure(teacher, lesson.id, students[0].token.requireSubject()) }
+        assertFailsWith<ProjectResponseException> { service.policy(token, a.document.id, WhiteboardPolicyRequest(students[0].token.requireSubject(), 0)) }
     }
 
     @Test fun `concurrent ensure serializes context and material replacement keeps identity`() {
@@ -171,12 +172,12 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         val (lesson, teacher, students) = fixture()
         val board = service.ensure(teacher, lesson.id, null)
         assertTrue(service.get(auth(user("ADMIN")), lesson.id, board.id).canManage)
-        org.springframework.jdbc.core.JdbcTemplate(dataSource).update("INSERT INTO lesson_admission (id, lesson_id, subject, status, revision, created_at, updated_at, row_version) VALUES (?, ?, ?, 'KICKED', 1, ?, ?, 0)", UUID.randomUUID(), lesson.id, students[0].token.subject, Instant.now(), Instant.now())
+        org.springframework.jdbc.core.JdbcTemplate(dataSource).update("INSERT INTO lesson_admission (id, lesson_id, subject, status, revision, created_at, updated_at, row_version) VALUES (?, ?, ?, 'KICKED', 1, ?, ?, 0)", UUID.randomUUID(), lesson.id, students[0].token.requireSubject(), Instant.now(), Instant.now())
         assertFailsWith<ProjectResponseException> { service.current(students[0], lesson.id, null) }
-        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.subject, 0)) }
-        val actor = users.findByKeycloakSubject(teacher.token.subject)!!; actor.roles = "STUDENT"; users.saveAndFlush(actor)
+        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(students[0].token.requireSubject(), 0)) }
+        val actor = users.findByKeycloakSubject(teacher.token.requireSubject())!!; actor.roles = "STUDENT"; users.saveAndFlush(actor)
         assertFailsWith<ProjectResponseException> { service.update(teacher, lesson.id, board.id, UpdateLessonWhiteboardRequest(board.controlRevision, learnerInkEnabled = true)) }
-        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(teacher.token.subject, 0)) }
+        assertFailsWith<ProjectResponseException> { service.policy(token, board.document.id, WhiteboardPolicyRequest(teacher.token.requireSubject(), 0)) }
     }
 
     @Test fun `HTTP context commands and indexed query defaults bind as the published contract`() {
@@ -201,7 +202,7 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         val jwt = com.nimbusds.jwt.SignedJWT.parse(issued.token)
         assertTrue(jwt.verify(com.nimbusds.jose.crypto.MACVerifier("whiteboard-local-test-signing-secret-at-least-32")))
         val claims = jwt.jwtClaimsSet
-        assertEquals("playsay-api-gateway", claims.issuer); assertEquals(students[0].token.subject, claims.subject)
+        assertEquals("playsay-api-gateway", claims.issuer); assertEquals(students[0].token.requireSubject(), claims.subject)
         assertEquals(board.id.toString(), claims.getStringClaim("whiteboardId")); assertEquals(0L, claims.getLongClaim("contentEpoch"))
         assertNull(claims.getClaim("materialId")); assertEquals(false, claims.getBooleanClaim("canPublishMaterialViewport"))
         assertEquals("GROUP", claims.getStringClaim("scope")); assertEquals(board.document.yjsDocumentId, issued.yjsDocumentId)

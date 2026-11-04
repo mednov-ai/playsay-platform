@@ -11,6 +11,7 @@ license to merge code solely because it looks similar.
 | --- | --- | --- |
 | `JacksonConfig.kt` in ai-tutor-service, api-gateway, and vocabulary-service | Spring configuration | The serialization policy is currently identical in three modules. It may move only to a narrow, test-covered Jackson configuration component; controller and domain configuration remain local. |
 | `RawRequestBody.kt` in api-gateway and payment-service | Integration delivery infrastructure | Preserve exact UTF-8 request bytes for provider webhooks. A shared helper is allowed, but webhook endpoints, authentication, response mapping, and provider semantics remain local. |
+| `JwtSubject.kt` in five resource servers | Spring/security boundary | Reject a missing or blank subject locally as unauthorized. Error mapping remains service-owned; each service's WebSocket and HTTP authentication boundaries remain explicit. |
 | `OpenAiReasoningEffort.kt` in api-gateway and vocabulary-service | Framework-neutral deterministic utility | Consolidated in the focused `openai-support` module with behavioral tests. This is provider-option validation, not shared domain behavior. |
 
 The machine-checked path-to-classification mapping remains in

@@ -3,6 +3,7 @@ package com.playsay.gateway.service
 import com.playsay.gateway.client.RegistrationGateway
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
@@ -16,12 +17,12 @@ class LessonRememberedSessionService(
         val sessionId = authentication.token.getClaimAsString("sid")
             ?.takeIf(String::isNotBlank)
             ?: throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.LESSON_SESSION_INVALID)
-        registrationGateway.revokeLessonSession(authentication.token.subject, sessionId)
+        registrationGateway.revokeLessonSession(authentication.token.requireSubject(), sessionId)
         auditService.record(null, LessonAccessAuditEvent.SESSION_REVOKED, LessonAccessAuditOutcome.ACCEPTED, LessonAccessActorKind.STUDENT)
     }
 
     fun revokeAll(authentication: JwtAuthenticationToken) {
-        registrationGateway.revokeAllLessonSessions(authentication.token.subject)
+        registrationGateway.revokeAllLessonSessions(authentication.token.requireSubject())
         auditService.record(null, LessonAccessAuditEvent.SESSION_REVOKED, LessonAccessAuditOutcome.ACCEPTED, LessonAccessActorKind.STUDENT)
     }
 }

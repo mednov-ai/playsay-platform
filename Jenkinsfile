@@ -21,7 +21,7 @@ spec:
           cpu: 300m
           memory: 384Mi
     - name: gradle
-      image: gradle:8-jdk21
+      image: gradle:9.5.1-jdk25
       command: ["cat"]
       tty: true
       env:
@@ -41,7 +41,7 @@ spec:
           cpu: "1"
           memory: 3Gi
     - name: node-frontend
-      image: node:22
+      image: node:26.13.0
       command: ["cat"]
       tty: true
       volumeMounts:
@@ -56,7 +56,7 @@ spec:
           cpu: "1"
           memory: 1Gi
     - name: node-collaboration
-      image: node:22
+      image: node:26.13.0
       command: ["cat"]
       tty: true
       volumeMounts:
@@ -168,6 +168,20 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
+    - name: image-security
+      image: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1536Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -332,6 +346,8 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
 
+          env.DEPLOY_TO_PROD = 'false'
+
           currentBuild.displayName = env.BUILD_LABEL
           currentBuild.description = "${env.CI_BRANCH} @ ${env.GIT_COMMIT_SHORT}"
           echo "Build label: ${env.BUILD_LABEL}"
@@ -464,39 +480,12 @@ spec:
       }
     }
 
-    stage('DB migrate') {
-      when {
-        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true') }
-      }
-      steps {
-        container('tools') {
-          echo "Applying affected database migrations for ${env.BUILD_LABEL}"
-          sh '''
-            set -eu
-            apk add --no-cache jq kubectl
-            if [ "$RUN_API_GATEWAY" = "true" ]; then
-              ./scripts/ci/run-dev-liquibase-job.sh api-gateway backend/api-gateway/src/main/resources/db/changelog playsay-app-db
-            fi
-            if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
-              ./scripts/ci/run-dev-liquibase-job.sh payment-service backend/payment-service/src/main/resources/db/changelog playsay-app-db
-            fi
-            if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
-              ./scripts/ci/run-dev-liquibase-job.sh registration-service backend/registration-service/src/main/resources/db/changelog playsay-app-db
-            fi
-            if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
-              ./scripts/ci/run-dev-liquibase-job.sh email-service backend/email-service/src/main/resources/db/changelog playsay-app-db
-            fi
-          '''
-        }
-      }
-    }
-
-    stage('Build and push images') {
+    stage('Build and scan images') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
       }
-      parallel {
-        stage('Build and push backend image') {
+      stages {
+        stage('Build and scan backend image') {
           when {
             expression { env.RUN_API_GATEWAY == 'true' }
           }
@@ -517,19 +506,24 @@ spec:
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/backend" \
-                    --dockerfile "$WORKSPACE/backend/api-gateway/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/backend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/backend/api-gateway/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${API_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push frontend image') {
+        stage('Build and scan frontend image') {
           when {
             expression { env.RUN_WEB_APP == 'true' }
           }
@@ -543,19 +537,24 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/frontend" \
-                    --dockerfile "$WORKSPACE/frontend/web-app/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/frontend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/frontend/web-app/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${WEB_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push collaboration service image') {
+        stage('Build and scan collaboration service image') {
           when {
             expression { env.RUN_COLLABORATION_SERVICE == 'true' }
           }
@@ -569,19 +568,24 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/collaboration-service" \
-                    --dockerfile "$WORKSPACE/collaboration-service/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/collaboration-service" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/collaboration-service/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push media service image') {
+        stage('Build and scan media service image') {
           when {
             expression { env.RUN_MEDIA_SERVICE == 'true' }
           }
@@ -602,19 +606,24 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/backend" \
-                    --dockerfile "$WORKSPACE/backend/media-service/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/backend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/backend/media-service/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${MEDIA_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push payment service image') {
+        stage('Build and scan payment service image') {
           when {
             expression { env.RUN_PAYMENT_SERVICE == 'true' }
           }
@@ -641,19 +650,24 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/backend" \
-                    --dockerfile "$WORKSPACE/backend/payment-service/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/backend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/backend/payment-service/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${PAYMENT_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push registration service image') {
+        stage('Build and scan registration service image') {
           when {
             expression { env.RUN_REGISTRATION_SERVICE == 'true' }
           }
@@ -680,19 +694,24 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/backend" \
-                    --dockerfile "$WORKSPACE/backend/registration-service/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/backend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/backend/registration-service/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${REGISTRATION_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
 
-        stage('Build and push email service image') {
+        stage('Build and scan email service image') {
           when {
             expression { env.RUN_EMAIL_SERVICE == 'true' }
           }
@@ -719,14 +738,19 @@ EOF
                   cat > /kaniko/.docker/config.json <<EOF
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
-                  /kaniko/executor \
-                    --context "$WORKSPACE/backend" \
-                    --dockerfile "$WORKSPACE/backend/email-service/Dockerfile" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:${GIT_COMMIT}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:${BUILD_LABEL}" \
-                    --destination "ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}:dev"
+                  KANIKO_CONTEXT="$WORKSPACE/backend" \
+                    KANIKO_DOCKERFILE="$WORKSPACE/backend/email-service/Dockerfile" \
+                    IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}" \
+                    /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
                 '''
               }
+            }
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+            }
+            archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+            container('image-security') {
+              sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${EMAIL_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
             }
           }
         }
@@ -766,6 +790,34 @@ EOF
       }
     }
 
+    stage('DB migrate') {
+      when {
+        expression { env.DEPLOY_TO_DEV == 'true' && (env.RUN_API_GATEWAY == 'true' || env.RUN_PAYMENT_SERVICE == 'true' || env.RUN_REGISTRATION_SERVICE == 'true' || env.RUN_EMAIL_SERVICE == 'true') }
+      }
+      steps {
+        container('tools') {
+          echo "Applying affected database migrations for ${env.BUILD_LABEL}"
+          sh '''
+            set -eu
+            apk add --no-cache git jq kubectl
+            ./scripts/ci/assert-current-branch-head.sh
+            if [ "$RUN_API_GATEWAY" = "true" ]; then
+              ./scripts/ci/run-dev-liquibase-job.sh api-gateway backend/api-gateway/src/main/resources/db/changelog playsay-app-db
+            fi
+            if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
+              ./scripts/ci/run-dev-liquibase-job.sh payment-service backend/payment-service/src/main/resources/db/changelog playsay-app-db
+            fi
+            if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
+              ./scripts/ci/run-dev-liquibase-job.sh registration-service backend/registration-service/src/main/resources/db/changelog playsay-app-db
+            fi
+            if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
+              ./scripts/ci/run-dev-liquibase-job.sh email-service backend/email-service/src/main/resources/db/changelog playsay-app-db
+            fi
+          '''
+        }
+      }
+    }
+
     stage('Update dev image tags') {
       when {
         expression { env.DEPLOY_TO_DEV == 'true' && env.RUN_ANY_TARGET == 'true' }
@@ -776,35 +828,56 @@ EOF
             sh '''
               set -eu
               apk add --no-cache git yq
+              ./scripts/ci/assert-current-branch-head.sh
               AUTH_REPO="$(echo "$INFRA_REPO" | sed "s#https://#https://${GITHUB_USER}:${GITHUB_TOKEN}@#")"
+              load_scanned_digest() {
+                digest_file="$WORKSPACE/image-security/$1/$BUILD_LABEL/published-digest.txt"
+                if [ ! -s "$digest_file" ]; then
+                  echo "Missing scanned image digest for $1" >&2
+                  exit 1
+                fi
+                IMAGE_DIGEST="$(tr -d '[:space:]' < "$digest_file")"
+                if ! printf '%s\n' "$IMAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+                  echo "Invalid scanned image digest for $1" >&2
+                  exit 1
+                fi
+                export IMAGE_DIGEST
+              }
               update_values() {
                 changed_files=""
                 if [ "$RUN_API_GATEWAY" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
+                  load_scanned_digest "$API_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/api-gateway/values-dev.yaml
                   changed_files="$changed_files helm-charts/api-gateway/values-dev.yaml"
                 fi
                 if [ "$RUN_WEB_APP" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
+                  load_scanned_digest "$WEB_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/web-app/values-dev.yaml
                   changed_files="$changed_files helm-charts/web-app/values-dev.yaml"
                 fi
                 if [ "$RUN_COLLABORATION_SERVICE" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
+                  load_scanned_digest "$COLLABORATION_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/collaboration-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/collaboration-service/values-dev.yaml"
                 fi
                 if [ "$RUN_MEDIA_SERVICE" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/media-service/values-dev.yaml
+                  load_scanned_digest "$MEDIA_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/media-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/media-service/values-dev.yaml"
                 fi
                 if [ "$RUN_PAYMENT_SERVICE" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/payment-service/values-dev.yaml
+                  load_scanned_digest "$PAYMENT_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/payment-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/payment-service/values-dev.yaml"
                 fi
                 if [ "$RUN_REGISTRATION_SERVICE" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/registration-service/values-dev.yaml
+                  load_scanned_digest "$REGISTRATION_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/registration-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/registration-service/values-dev.yaml"
                 fi
                 if [ "$RUN_EMAIL_SERVICE" = "true" ]; then
-                  yq -i ".image.tag = strenv(BUILD_LABEL) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/email-service/values-dev.yaml
+                  load_scanned_digest "$EMAIL_IMAGE_NAME"
+                  yq -i ".image.tag = strenv(BUILD_LABEL) | .image.digest = strenv(IMAGE_DIGEST) | .build.name = strenv(BUILD_LABEL) | .build.number = strenv(BUILD_NUMBER) | .build.branch = strenv(CI_BRANCH) | .build.branchLabel = strenv(BUILD_LABEL_PREFIX) | .build.commit = strenv(GIT_COMMIT) | .build.commitShort = strenv(GIT_COMMIT_SHORT)" helm-charts/email-service/values-dev.yaml
                   changed_files="$changed_files helm-charts/email-service/values-dev.yaml"
                 fi
                 git add $changed_files
@@ -1052,6 +1125,7 @@ JSON
   post {
     always {
       archiveArtifacts artifacts: 'backend/build/reports/dependency-security/**/*', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: true
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

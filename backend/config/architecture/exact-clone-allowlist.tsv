@@ -5,5 +5,10 @@ spring-jackson-configuration	backend/vocabulary-service/src/main/kotlin/com/play
 spring-jackson-configuration	backend/worksheet-import-service/src/main/kotlin/com/playsay/worksheetimport/config/JacksonConfig.kt
 raw-webhook-request-body	backend/api-gateway/src/main/kotlin/com/playsay/gateway/utils/RawRequestBody.kt
 raw-webhook-request-body	backend/payment-service/src/main/kotlin/com/playsay/payment/utils/RawRequestBody.kt
+jwt-subject-validation	backend/ai-tutor-service/src/main/kotlin/com/playsay/aitutor/config/security/JwtSubject.kt
+jwt-subject-validation	backend/api-gateway/src/main/kotlin/com/playsay/gateway/utils/JwtSubject.kt
+jwt-subject-validation	backend/keyboard-service/src/main/kotlin/com/playsay/keyboard/utils/JwtSubject.kt
+jwt-subject-validation	backend/vocabulary-service/src/main/kotlin/com/playsay/vocabulary/config/security/JwtSubject.kt
+jwt-subject-validation	backend/worksheet-import-service/src/main/kotlin/com/playsay/worksheetimport/config/security/JwtSubject.kt
 vocabulary-homework-rework-contract	backend/api-gateway/src/main/kotlin/com/playsay/gateway/dto/VocabularyHomeworkRework.kt
 vocabulary-homework-rework-contract	backend/vocabulary-service/src/main/kotlin/com/playsay/vocabulary/dto/VocabularyHomeworkRework.kt

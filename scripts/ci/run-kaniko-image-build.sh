@@ -24,27 +24,32 @@ case "$IMAGE_REPOSITORY" in
   *) echo "Unexpected image repository: $IMAGE_REPOSITORY" >&2; exit 1 ;;
 esac
 
-if [ "$DEPLOY_TO_DEV" = "true" ] && [ "$DEPLOY_TO_PROD" = "true" ]; then
-  echo "A build cannot target dev and prod at the same time." >&2
-  exit 1
-fi
-if [ "$DEPLOY_TO_DEV" != "true" ] && [ "$DEPLOY_TO_PROD" != "true" ]; then
-  echo "The image build has no deployment target." >&2
-  exit 1
-fi
+SECURITY_SCAN_ONLY="${SECURITY_SCAN_ONLY:-false}"
+case "$DEPLOY_TO_DEV:$DEPLOY_TO_PROD:$SECURITY_SCAN_ONLY" in
+  true:false:false|false:true:false|false:false:true) ;;
+  *) echo "Select exactly one deployment target or the scan-only mode." >&2; exit 1 ;;
+esac
 
 DIGEST_FILE="$WORKSPACE/image-digest.txt"
 rm -f "$DIGEST_FILE"
 
-set -- \
+case "$BUILD_LABEL" in
+  ''|*[!A-Za-z0-9_.-]*) echo "Invalid image build label." >&2; exit 1 ;;
+esac
+IMAGE_NAME="${IMAGE_REPOSITORY##*/}"
+BUILD_DIR="$WORKSPACE/.image-build/$IMAGE_NAME/$BUILD_LABEL"
+mkdir -p "$BUILD_DIR"
+rm -f "$BUILD_DIR/image.tar" "$BUILD_DIR/scanned.sha256"
+
+"${KANIKO_EXECUTOR:-/kaniko/executor}" \
   --context "$KANIKO_CONTEXT" \
   --dockerfile "$KANIKO_DOCKERFILE" \
   --destination "${IMAGE_REPOSITORY}:${GIT_COMMIT}" \
-  --destination "${IMAGE_REPOSITORY}:${BUILD_LABEL}" \
-  --digest-file "$DIGEST_FILE"
+  --no-push \
+  --no-push-cache \
+  --tar-path "$BUILD_DIR/image.tar"
 
-if [ "$DEPLOY_TO_DEV" = "true" ]; then
-  set -- "$@" --destination "${IMAGE_REPOSITORY}:dev"
+if [ ! -s "$BUILD_DIR/image.tar" ]; then
+  echo "Kaniko did not produce a non-empty image archive." >&2
+  exit 1
 fi
-
-exec "${KANIKO_EXECUTOR:-/kaniko/executor}" "$@"

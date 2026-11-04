@@ -15,6 +15,12 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+      <!-- Keep the rebuilt server and the Gradle security inventory aligned. -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>33.7.2-jre</version>
+      </dependency>
       <!-- Override only the Vert.x family in the upstream runtime. Importing the
            entire Vert.x BOM would also change unrelated Jackson and logging deps. -->
       <dependency><groupId>io.vertx</groupId><artifactId>vertx-auth-common</artifactId><version>${vertx.version}</version></dependency>

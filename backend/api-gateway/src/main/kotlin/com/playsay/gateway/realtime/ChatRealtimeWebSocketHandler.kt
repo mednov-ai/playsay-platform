@@ -2,6 +2,7 @@ package com.playsay.gateway.realtime
 
 import com.playsay.gateway.service.ChatDeliveryService
 import com.playsay.gateway.service.ChatAccessPolicy
+import com.playsay.gateway.utils.requireSubject
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -15,11 +16,11 @@ class ChatRealtimeWebSocketHandler(
 ) : TextWebSocketHandler() {
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val authentication = session.attributes[authenticationAttribute] as? JwtAuthenticationToken
-        if (authentication == null || !ChatAccessPolicy.allows(authentication)) {
+        if (authentication == null || authentication.token.subject.isNullOrBlank() || !ChatAccessPolicy.allows(authentication)) {
             session.close(CloseStatus.NOT_ACCEPTABLE)
             return
         }
-        val subject = authentication.token.subject
+        val subject = authentication.token.requireSubject()
         hub.register(session, subject)
         deliveryService.deliverPending(subject)
     }

@@ -14,7 +14,9 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    // Preserve Vite 6's module target when upgrading to Vite 8.
+    target: ["es2020", "edge88", "firefox78", "chrome87", "safari14"],
+    rolldownOptions: {
       input: {
         app: resolve(projectRoot, "index.html"),
         chatServiceWorker: resolve(projectRoot, "src/service-worker/chatServiceWorker.ts"),

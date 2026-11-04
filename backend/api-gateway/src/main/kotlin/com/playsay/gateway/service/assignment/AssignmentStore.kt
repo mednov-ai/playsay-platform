@@ -17,6 +17,7 @@ import com.playsay.gateway.dto.VocabularyHomeworkReviewRequest
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.service.UserProfileStore
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
@@ -42,7 +43,7 @@ class AssignmentStore(
             request = request,
         )
         assignmentEventPublisher.publish(
-            authentication.token.subject,
+            authentication.token.requireSubject(),
             result.assignmentId,
             result.recipients,
             result.change,
@@ -58,7 +59,7 @@ class AssignmentStore(
         authentication.requireAssignmentManager()
         val teacherUserId = userProfileStore.currentUserId(authentication)
         val result = assignmentCreationService.createVocabularyHomework(teacherUserId, request)
-        vocabularyAssignmentIntegrationService.enqueuePreparation(result, authentication.token.subject, request)
+        vocabularyAssignmentIntegrationService.enqueuePreparation(result, authentication.token.requireSubject(), request)
         return teacherDetail(authentication, result.assignmentId)
     }
 
@@ -99,7 +100,7 @@ class AssignmentStore(
             request,
         )
         assignmentEventPublisher.publish(
-            authentication.token.subject,
+            authentication.token.requireSubject(),
             result.assignmentId,
             result.recipients,
             result.change,
@@ -199,7 +200,7 @@ class AssignmentStore(
     ): TeacherAssignmentDetailResponse {
         authentication.requireAssignmentManager()
         assignmentQueryService.requireTeacherRecipient(authentication, assignmentId, studentSubject)
-        vocabularyAssignmentIntegrationService.review(assignmentId, studentSubject, authentication.token.subject, request)
+        vocabularyAssignmentIntegrationService.review(assignmentId, studentSubject, authentication.token.requireSubject(), request)
         return teacherDetail(authentication, assignmentId)
     }
 

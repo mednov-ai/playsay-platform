@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { useState } from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonMaterial } from "../../../shared/api/playsay";
 import { emptyAnnotationContent, type AnnotationContent } from "../model/annotation";
@@ -30,6 +30,7 @@ describe("ControlledAnnotationCanvas", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 

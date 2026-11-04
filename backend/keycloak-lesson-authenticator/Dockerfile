@@ -19,13 +19,15 @@ COPY server-runtime/pom.xml server-runtime/settings.xml server-runtime/VerifyNet
 COPY server-runtime/src ./src
 COPY --from=provider-build /workspace/build/libs/keycloak-lesson-authenticator-1.0.0.jar /tmp/keycloak-provider.jar
 RUN /opt/apache-maven-3.9.16/bin/mvn -B -ntp -s settings.xml package \
+    && test -f target/lib/lib/main/com.google.guava.guava-33.7.2-jre.jar \
+    && test "$(find target/lib/lib/main -name 'com.google.guava.guava-*.jar' | wc -l)" -eq 1 \
     && java VerifyNetty.java target/lib/lib/main > target/netty-security-inventory.tsv \
     && java VerifyVertx.java target/lib/lib/main > target/vertx-security-inventory.tsv \
     && java VerifyRuntime.java target/lib build-only-risk-sha256.txt /tmp/keycloak-provider.jar > target/server-runtime-sha256.txt
 
 # Rebuild the complete mutable-jar dependency model with patched Netty and Vert.x.
 # Keycloak implementations and runtime OS/JDK remain on the pinned official image.
-FROM quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244 AS keycloak-build
+FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332 AS keycloak-build
 RUN rm -rf /opt/keycloak/lib
 COPY --chown=1000:0 --from=server-runtime-build /workspace/server-runtime/target/lib/ /opt/keycloak/lib/
 COPY --chown=1000:0 --from=server-runtime-build /workspace/server-runtime/target/netty-security-inventory.tsv /opt/keycloak/netty-security-inventory.tsv
@@ -38,7 +40,7 @@ RUN touch -m --date=@1743465600 /opt/keycloak/providers/keycloak-lesson-authenti
     && JAVA_OPTS_KC_HEAP="-Xms128m -Xmx512m" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true --cache=local --http-relative-path=/keycloak/ \
     && cd /opt/keycloak && sha256sum -c server-runtime-sha256.txt
 
-FROM quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
 RUN rm -rf /opt/keycloak/lib
 COPY --chown=1000:0 --from=keycloak-build /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 server-runtime/entrypoint.sh /opt/keycloak/bin/playsay-entrypoint.sh

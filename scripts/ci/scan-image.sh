@@ -63,11 +63,16 @@ if [ -s "$CACHE_DIR/java-db/metadata.json" ]; then
   cp "$CACHE_DIR/java-db/metadata.json" "$REPORT_DIR/java-database-metadata.json"
 fi
 
-if ! trivy convert --config '' --ignorefile '' --severity UNKNOWN,HIGH,CRITICAL \
-  --format json --exit-code 1 --output "$REPORT_DIR/blocking.json" "$REPORT_DIR/full.json"; then
-  echo "Blocking findings or report conversion failure; image was not published." >&2
-  exit 1
-fi
+set +e
+trivy convert --config '' --ignorefile '' --severity UNKNOWN,HIGH,CRITICAL \
+  --format json --exit-code 42 --output "$REPORT_DIR/blocking.json" "$REPORT_DIR/full.json"
+conversion_result=$?
+set -e
+case "$conversion_result" in
+  0) ;;
+  42) echo "Blocking findings; image was not published." >&2; exit 42 ;;
+  *) echo "Report conversion failed; image was not published." >&2; exit 1 ;;
+esac
 if [ ! -s "$REPORT_DIR/blocking.json" ]; then
   echo "Missing security gate report." >&2
   exit 1

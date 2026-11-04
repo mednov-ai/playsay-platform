@@ -82,7 +82,8 @@ JSON
   if [ "${'$'}{TRIVY_MODE:-}" = tamper ]; then printf 'changed' >> "$input"; fi
 elif [ "$mode" = convert ]; then
   printf '{}' > "$output"
-  if [ "${'$'}{TRIVY_MODE:-}" = blocked ]; then exit 1; fi
+  if [ "${'$'}{TRIVY_MODE:-}" = blocked ]; then exit 42; fi
+  if [ "${'$'}{TRIVY_MODE:-}" = conversion-error ]; then exit 2; fi
 fi
 `);
   f.writeExecutable('wget', 'printf "wget\\n" >> "$LOG_FILE"; exit 8');
@@ -121,13 +122,14 @@ done
   assert.notEqual(failed.status, 0);
 });
 
-for (const mode of ['blocked', 'error', 'tamper']) {
+for (const mode of ['blocked', 'error', 'conversion-error', 'tamper']) {
   test(`security gate stops before publication on ${mode}`, (t) => {
     const f = fixture(t);
     f.prepareArchive();
     installScanner(f);
     const result = f.run('scan-image.sh', { TRIVY_MODE: mode });
     assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    if (mode === 'blocked') assert.equal(result.status, 42);
     assert.doesNotMatch(f.calls(), /wget|push|tag/);
     assert.ok(!existsSync(join(f.workspace, 'image-digest.txt')));
     assert.ok(!existsSync(join(f.build, 'scanned.sha256')));

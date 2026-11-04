@@ -235,7 +235,7 @@ EOF
       }
       steps {
         container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/playsay-livekit-security-fixture" ./scripts/ci/scan-image.sh'
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/playsay-livekit-security-fixture" ./ci-fixtures/livekit/scan-livekit-image.sh'
         }
         archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
       }

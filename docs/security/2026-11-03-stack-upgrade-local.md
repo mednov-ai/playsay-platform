@@ -139,3 +139,22 @@ findings, with five previously classified outside-runtime findings retained.
 The later full scan against merged, uncommitted source also passed under the
 recorded scoped policy. A native container build, authentication and deployed
 DEV acceptance are not established by the local Maven package.
+
+### Vite browser target and worker assets, 2026-11-04
+
+The original source used Vite 6.4.3 and its [default module target](https://v6.vite.dev/config/build-options#build-target). Vite 7 and
+[8](https://vite.dev/guide/migration#default-browser-target-change) raise the default browser versions; the web app, keyboard app and game-sync
+library now explicitly retain Vite 6's `es2020`, Edge 88, Firefox 78, Chrome
+87 and Safari 14 compilation targets. This preserves the compiler target,
+not a guarantee that all browser APIs or devices at those versions work.
+The configs use Vite 8's Rolldown options and the React plugin 6.2.1.
+
+All three production builds passed locally. The game-sync tests passed 12/12
+and the web push/service-worker tests passed 9/9. Against local preview
+servers, current Chromium and WebKit rendered the web registration screen at
+desktop and mobile sizes and the keyboard screen at desktop size. The web
+service worker registered and activated; its JavaScript, the PDF module
+worker and a PDF WASM asset were served successfully. External requests were
+blocked and API responses were synthetic. These checks do not prove old
+browser or physical-device support, the nginx deployment, authentication or
+the upgraded DEV lesson. Exact rebuilt CI images still need fresh scans.

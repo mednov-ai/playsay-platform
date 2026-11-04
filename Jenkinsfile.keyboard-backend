@@ -155,6 +155,7 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
           env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
+          env.IMAGE_ONLY = (env.CI_BRANCH == 'codex/hotfix-stack-upgrade-20261103').toString()
           env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
           env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
           env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
@@ -243,6 +244,9 @@ EOF
         expression { env.DEPLOY_IMAGE == 'true' }
       }
       steps {
+        container('tools') {
+          sh 'apk add --no-cache git && ./scripts/ci/assert-current-branch-head.sh'
+        }
         container('image-security') {
           sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYBOARD_SERVICE_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
         }
@@ -251,7 +255,7 @@ EOF
 
     stage('Tag source commit') {
       when {
-        expression { env.DEPLOY_IMAGE == 'true' }
+        expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' }
       }
       steps {
         container('tools') {
@@ -264,7 +268,7 @@ EOF
 
     stage('DB migrate') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.IMAGE_ONLY != 'true' }
       }
       steps {
         container('tools') {
@@ -280,7 +284,7 @@ EOF
 
     stage('Update environment image reference') {
       when {
-        expression { env.DEPLOY_IMAGE == 'true' }
+        expression { env.DEPLOY_IMAGE == 'true' && env.IMAGE_ONLY != 'true' }
       }
       steps {
         container('tools') {
@@ -293,7 +297,7 @@ EOF
 
     stage('Wait for rollout') {
       when {
-        expression { env.DEPLOY_TO_DEV == 'true' }
+        expression { env.DEPLOY_TO_DEV == 'true' && env.IMAGE_ONLY != 'true' }
       }
       steps {
         container('tools') {

@@ -10,6 +10,8 @@ import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
 
+// JPA keeps mapped columns explicit in the entity constructor.
+@Suppress("LongParameterList")
 @Entity
 @Table(name = "lesson_material")
 class LessonMaterialEntity(

@@ -32,6 +32,8 @@ object MaterialHtmlGameEnrichmentStatuses {
 }
 
 @Component
+// Constructor coordinates existing domain boundaries.
+@Suppress("LongParameterList")
 class MaterialHtmlGameEnrichmentService(
     private val enrichmentRepo: MaterialHtmlGameEnrichmentRepo,
     private val lessonMaterialRepo: LessonMaterialRepo,

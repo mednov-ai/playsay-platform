@@ -16,6 +16,11 @@ plugins {
 extra["kotlin.version"] = "2.4.20"
 extra["freemarker.version"] = "2.3.35"
 
+dependencies {
+    // Boot 4 uses Jackson 3 for HTTP; Jackson 2 codecs do not provide Kotlin defaults here.
+    add("implementation", "tools.jackson.module:jackson-module-kotlin")
+}
+
 detekt {
     toolVersion = "2.0.0-alpha.6"
     source.setFrom(files("src/main/kotlin"))

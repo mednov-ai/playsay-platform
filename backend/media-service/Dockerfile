@@ -14,7 +14,12 @@ RUN echo "6bbb3d314cde4febe36e5fa1d55462e29c974f63444e707871834f6d8cc210ae  /too
     && mkdir -p /tools/yt-dlp-plugins \
     && unzip /tools/bgutil-provider.zip -d /tools/yt-dlp-plugins
 
-FROM eclipse-temurin:25.0.5_8-jre
+FROM eclipse-temurin:25.0.5_8-jre@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0
+# Compatible Ubuntu security patch; fail closed if the fixed package is absent.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade --no-install-recommends -y libpcre2-8-0 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ge 10.46-1ubuntu0.1 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=youtube-tools /tools/yt-dlp /usr/local/bin/yt-dlp
 COPY --from=youtube-tools /tools/deno/deno /usr/local/bin/deno

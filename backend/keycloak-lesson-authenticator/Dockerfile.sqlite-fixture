@@ -1,16 +1,18 @@
 # Exploratory image only: rebuild Red Hat's exact source RPM with FTS5 disabled.
 FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332 AS upstream
 
-FROM registry.access.redhat.com/ubi9/ubi:9.8@sha256:8f989cc9270da6abec0144c22846ed1e6e92e462dc7768ce0981c4ac1d574733 AS builder
+FROM rockylinux/rockylinux:9@sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f AS builder
 USER 0
-RUN dnf -y install rpm-build gcc make ncurses-devel readline-devel glibc-devel autoconf tcl-devel unzip cpio binutils python3
+RUN dnf --enablerepo=crb -y install rpm-build gcc make ncurses-devel readline-devel glibc-devel autoconf tcl-devel unzip cpio binutils python3
 COPY --from=upstream /usr/lib64/libsqlite3.so.0.8.6 /tmp/original-sqlite.so
 COPY probe_sqlite.py /tmp/probe_sqlite.py
 RUN set -eu; \
     curl -fsSL --max-time 120 -o /tmp/sqlite.src.rpm \
       https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/s/sqlite-3.34.1-11.el9_8.src.rpm; \
     echo '4efcc956008f0468362b41bdba79111c41027b682bcdea3ecca3744cf50ebfd7  /tmp/sqlite.src.rpm' | sha256sum -c -; \
-    rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release; \
+    curl -fsSL --max-time 30 -o /tmp/redhat-key https://www.redhat.com/security/data/fd431d51.txt; \
+    echo 'd4b2543626bee31d9438d4a31731aae712c072893c7aed8854f16c42fafc742b  /tmp/redhat-key' | sha256sum -c -; \
+    rpm --import /tmp/redhat-key; \
     rpm -Kv /tmp/sqlite.src.rpm; \
     rpm -ivh /tmp/sqlite.src.rpm; \
     test "$(grep -c -- '--enable-fts5' /root/rpmbuild/SPECS/sqlite.spec)" -eq 1; \

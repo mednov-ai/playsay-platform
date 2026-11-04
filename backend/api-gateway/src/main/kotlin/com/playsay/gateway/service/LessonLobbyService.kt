@@ -13,6 +13,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.realtime.LessonRealtimeHub
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -93,7 +94,7 @@ class LessonLobbyService(
         if (attempt == null || attempt.lessonId != lessonId || attempt.state != "LOBBY_PENDING" || !now.isBefore(attempt.expiresAt)) {
             throw invalidDecision()
         }
-        admissionService.approveLobby(lessonId, studentSubject, authentication.token.subject, expectedRevision)
+        admissionService.approveLobby(lessonId, studentSubject, authentication.token.requireSubject(), expectedRevision)
         attempt.targetSubject = studentSubject
         attempt.confirmationMethod = "LOBBY"
         attempt.state = "LOBBY_APPROVED"
@@ -136,7 +137,7 @@ class LessonLobbyService(
             lessonId,
             subject,
             LessonAdmissionEvent.KICK,
-            authentication.token.subject,
+            authentication.token.requireSubject(),
             expectedRevision,
         )
         realtimeHub.revokeLessonSubject(lessonId, subject)
@@ -167,7 +168,7 @@ class LessonLobbyService(
             lessonId,
             subject,
             LessonAdmissionEvent.READMIT,
-            authentication.token.subject,
+            authentication.token.requireSubject(),
             expectedRevision,
         )
         auditService.record(lessonId, LessonAccessAuditEvent.STUDENT_READMITTED, LessonAccessAuditOutcome.ACCEPTED, authentication.auditActorKind())
@@ -212,7 +213,7 @@ class LessonLobbyService(
     ): LessonAccessAttemptResponse {
         val now = Instant.now(clock)
         val attempt = requireAttempt(lessonId, attemptId, attemptSecret, now)
-        val subject = authentication.token.subject
+        val subject = authentication.token.requireSubject()
         val lesson = lessonRepo.findScheduleRowById(lessonId) ?: throw invalidDecision()
         val assigned = (lesson.teacherSubject == subject && authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER }) ||
             (participantRepo.existsByLessonIdAndSubject(lessonId, subject) &&

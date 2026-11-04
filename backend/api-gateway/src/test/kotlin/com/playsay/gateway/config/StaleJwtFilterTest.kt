@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -17,6 +18,29 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 
 class StaleJwtFilterTest {
+    @Test
+    fun `rejects a missing or blank token subject before querying users`() {
+        for (subject in listOf(null, "", "  ")) {
+            val repo = mock(AppUserRepo::class.java)
+            val builder = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .claim("test", "value")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+            if (subject != null) builder.subject(subject)
+            SecurityContextHolder.getContext().authentication = JwtAuthenticationToken(builder.build(), emptyList(), "test")
+            val response = MockHttpServletResponse()
+            var continued = false
+
+            StaleJwtFilter(repo).doFilter(MockHttpServletRequest(), response) { _, _ -> continued = true }
+
+            assertEquals(401, response.status)
+            assertFalse(continued)
+            assertEquals(null, SecurityContextHolder.getContext().authentication)
+            verifyNoInteractions(repo)
+        }
+    }
+
     @Test
     fun `deletion intent rejects even a fresh token`() {
         val repo = mock(AppUserRepo::class.java)

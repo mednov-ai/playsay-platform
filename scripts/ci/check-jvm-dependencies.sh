@@ -69,6 +69,22 @@ run_gradle() {
     --no-daemon --no-configuration-cache --no-parallel --max-workers=1 \
     -Pkotlin.compiler.execution.strategy=in-process "$@"
 }
+# Collect the exact selected backend runtime graph before checking build tools.
+# A direct build-tool finding is outside server runtime only when this fresh
+# inventory proves its exact coordinate and hash are absent from that graph.
+export DEPENDENCY_SECURITY_BUILD_ROOT="$repo/backend"
+export DEPENDENCY_SECURITY_REPORT_DIR="$reports/backend"
+export DEPENDENCY_SECURITY_MODULE="${1:-all}"
+case "$DEPENDENCY_SECURITY_MODULE" in
+  inventory) export DEPENDENCY_SECURITY_MODULE=all ;;
+  keycloak-standalone)
+    export DEPENDENCY_SECURITY_BUILD_ROOT="$repo/backend/keycloak-lesson-authenticator"
+    export DEPENDENCY_SECURITY_MODULE=all ;;
+esac
+run_gradle dependencySecurityInventory
+export DEPENDENCY_SECURITY_BACKEND_COVERAGE="$reports/backend/coverage.json"
+[ -s "$DEPENDENCY_SECURITY_BACKEND_COVERAGE" ] || { echo 'Missing fresh backend runtime inventory' >&2; exit 2; }
+
 export DEPENDENCY_SECURITY_BUILD_ROOT="$repo/backend/build-logic"
 export DEPENDENCY_SECURITY_REPORT_DIR="$reports/build-logic"
 export DEPENDENCY_SECURITY_MODULE=all
@@ -91,7 +107,6 @@ case "$DEPENDENCY_SECURITY_MODULE" in
     export DEPENDENCY_SECURITY_MODULE=all ;;
 esac
 if [ "${1:-all}" = inventory ]; then
-  run_gradle dependencySecurityInventory
   echo 'state=inventory-only' >> "$reports/status.txt"
 else
   backend_status=0

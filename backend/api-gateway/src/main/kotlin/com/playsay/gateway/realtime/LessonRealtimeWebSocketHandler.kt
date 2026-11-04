@@ -5,6 +5,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import com.playsay.gateway.service.ScheduledLessonStore
 import com.playsay.gateway.service.LessonAdmissionGuard
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.util.UUID
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
@@ -151,11 +152,12 @@ class LessonRealtimeWebSocketHandler(
     }
 
     private fun WebSocketSession.authentication(): JwtAuthenticationToken? =
-        attributes[authenticationAttribute] as? JwtAuthenticationToken
+        (attributes[authenticationAttribute] as? JwtAuthenticationToken)
+            ?.takeIf { !it.token.subject.isNullOrBlank() }
 
     private fun JwtAuthenticationToken.lessonRealtimePrincipal(): LessonRealtimePrincipal =
         LessonRealtimePrincipal(
-            subject = token.subject,
+            subject = token.requireSubject(),
             roles = authorities.mapNotNull { authority ->
                 authority.authority?.removePrefix(MetaData.Authorities.PREFIX)?.takeIf { it in applicationRoles }
             }.toSet(),

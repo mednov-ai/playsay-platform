@@ -56,3 +56,17 @@ The owner authorized combined DEV/PROD delivery, but the Keycloak 26.8.1 candida
 ## Outside server runtime — owner policy 2026-10-14
 
 Components proven absent from server runtime do not block release under the owner instruction recorded in AGENTS.md. Full coverage, fresh advisory updates and raw findings remain mandatory. Exact scope and inventory evidence are recorded separately as `gate.json.outsideRuntime`; this is not risk renewal, false-positive suppression or remediation. Unknown scope, runtime presence or missing evidence fails closed. The current exact Docker transport/Keycloak rule, packaged runtime checks and optimized startup boundary are documented in [the candidate evidence](security/keycloak-upgrade-2026-10-14.md#outside-server-runtime). Existing Kotlin acceptance and other gates remain unchanged.
+
+For exact direct build-logic artifacts, the runner first resolves the selected
+backend modules and their production classpaths in the same private run. A
+classification requires the recorded artifact hash, PURL, advisory and all
+reported build-logic configuration references to match; each selected runtime
+classpath, including Keycloak's `serverRuntime`, must be complete and contain
+neither the coordinate nor the bytes. Missing or ambiguous inventory blocks
+classification. Every application Boot JAR checks its actual nested JARs
+against those exact build-only hashes, and the custom Keycloak image checks
+the packaged server and provider. The image's hash list must match the scope
+policy; the scanner enforces this before publication and the runtime-scope
+tests verify the boundary logic. The current
+[stack-upgrade evidence](security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary)
+retains the candidate-specific inventories and explains the limits.

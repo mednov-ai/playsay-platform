@@ -22,7 +22,12 @@ set -eu
 printf '%s|%s|%s|%s\\n' "$DEPENDENCY_SECURITY_BUILD_ROOT" "$DEPENDENCY_SECURITY_MODULE" "$DEPENDENCY_SECURITY_DATA_DIR" "$*" >> "$CALL_LOG"
 case "$*" in
   *dependencyCheckUpdate*) [ "$FAIL_MODE" != update ] || exit 9 ;;
-  *dependencySecurityInventory*) [ "$FAIL_MODE" != inventory ] || exit 8 ;;
+  *dependencySecurityInventory*)
+    [ "$FAIL_MODE" != inventory ] || exit 8
+    if [ "$FAIL_MODE" != missing-coverage ]; then
+      mkdir -p "$DEPENDENCY_SECURITY_REPORT_DIR"
+      printf '{"modules":[]}' > "$DEPENDENCY_SECURITY_REPORT_DIR/coverage.json"
+    fi ;;
   *dependencySecurity*)
     [ -f "$DEPENDENCY_SECURITY_DATA_DIR/honey-update-success" ] || exit 7
     if [ "$FAIL_MODE" = accepted ]; then
@@ -62,6 +67,14 @@ test('security gate refreshes data once and shares only the invocation-private d
     assert.doesNotMatch(calls + result.stdout + result.stderr + status, /fixture-secret/);
     assert.match(status, /state=passed/);
     assert.match(status, /source_revision=0123456789abcdef0123456789abcdef01234567/);
+    assert.ok(calls.indexOf('/backend|api-gateway|') < calls.indexOf('/backend/build-logic|all|'));
+});
+
+test('missing backend runtime inventory stops the gate before advisory refresh', () => {
+  const { result, calls, status } = exercise('api-gateway', 'missing-coverage');
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(calls, /dependencyCheckUpdate|dependencySecurity --continue/);
+  assert.match(status, /state=failed-or-incomplete/);
 });
 
 test('advisory refresh failure prevents every analysis and cannot report a clean gate', () => {

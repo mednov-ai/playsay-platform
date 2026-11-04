@@ -5,6 +5,7 @@ import com.playsay.gateway.repo.AssignmentRecipientRepo
 import com.playsay.gateway.repo.LessonMaterialRow
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.time.Clock
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -49,7 +50,7 @@ class MaterialReadAccessPolicy(
             archivedStatus = MetaData.AssignmentStatuses.ARCHIVED,
         ) > 0 || lessonRepo.countActiveMaterialParticipant(
             materialId = material.id,
-            subject = authentication.token.subject,
+            subject = authentication.token.requireSubject(),
             accessStartsBy = lessonAccessStartsBy(clock.instant()),
             accessEndsAfter = lessonAccessEndsAfter(clock.instant()),
             excludedStatuses = expiredMaterialAccessStatuses,

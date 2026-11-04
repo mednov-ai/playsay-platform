@@ -8,7 +8,7 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   plugins: [react()],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         app: resolve(projectRoot, "index.html"),
         chatServiceWorker: resolve(projectRoot, "src/service-worker/chatServiceWorker.ts"),

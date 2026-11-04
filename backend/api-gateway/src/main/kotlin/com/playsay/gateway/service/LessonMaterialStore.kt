@@ -25,6 +25,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -374,7 +375,7 @@ class LessonMaterialStore(
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !isLessonParticipant(lessonId, authentication.token.subject)) {
+        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !isLessonParticipant(lessonId, authentication.token.requireSubject())) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }
 
@@ -391,7 +392,7 @@ class LessonMaterialStore(
         if (lessonMaterialCatalogService.canManageMaterials(authentication)) {
             lessonRepo.findScheduledMaterialLookup(lessonId)
         } else {
-            lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.subject)
+            lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.requireSubject())
         }
 
     private fun lockScheduledLesson(lessonId: UUID) {

@@ -1,4 +1,5 @@
 package com.playsay.gateway.service
+
 import com.playsay.gateway.client.RegistrationGateway
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,6 +24,7 @@ import com.playsay.gateway.utils.MetaData
 import com.playsay.gateway.utils.hasApplicationRole
 import com.playsay.gateway.utils.toApplicationRoles
 import com.playsay.gateway.utils.toStoredRoles
+import com.playsay.gateway.utils.requireSubject
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -290,7 +292,7 @@ class UserManagementService(
     }
 
     private fun requireActiveActor(authentication: JwtAuthenticationToken) {
-        if (appUserRepo.hasDeletionIntent(authentication.token.subject)) {
+        if (appUserRepo.hasDeletionIntent(authentication.token.requireSubject())) {
             fail(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.USER_DELETED)
         }
     }

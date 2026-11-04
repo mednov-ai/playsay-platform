@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.playsay.vocabulary.service.VocabularyAccessService
 import com.playsay.vocabulary.service.VocabularyPracticeService
+import com.playsay.vocabulary.config.security.requireSubject
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -28,7 +29,7 @@ class VocabularyRealtimeWebSocketHandler(
             session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Authentication is required."))
             return
         }
-        hub.register(session, authentication.token.subject)
+        hub.register(session, authentication.token.requireSubject())
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
@@ -51,7 +52,7 @@ class VocabularyRealtimeWebSocketHandler(
                         return
                     }
                     val owner = access.requireOwnerAccess(
-                        authentication.token.subject,
+                        authentication.token.requireSubject(),
                         inbound.ownerSubject.trim(),
                         inbound.lessonId,
                     )
@@ -63,7 +64,7 @@ class VocabularyRealtimeWebSocketHandler(
                         hub.sendError(session, "A vocabulary practice is required.")
                         return
                     }
-                    val practice = practices.requirePracticeSubscription(authentication.token.subject, practiceId)
+                    val practice = practices.requirePracticeSubscription(authentication.token.requireSubject(), practiceId)
                     hub.subscribePractice(session, practiceId, practice.lessonId)
                 }
                 else -> hub.sendError(session, "A vocabulary subscription is required.")
@@ -82,7 +83,8 @@ class VocabularyRealtimeWebSocketHandler(
     }
 
     private fun WebSocketSession.authentication(): JwtAuthenticationToken? =
-        attributes[authenticationAttribute] as? JwtAuthenticationToken
+        (attributes[authenticationAttribute] as? JwtAuthenticationToken)
+            ?.takeIf { !it.token.subject.isNullOrBlank() }
 }
 
 const val PLAY_SAY_WEBSOCKET_PROTOCOL = "playsay"

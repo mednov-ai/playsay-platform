@@ -76,7 +76,9 @@ class VocabularyWebSocketAuthInterceptor(
             protocol.isNotEmpty() && protocol != PLAY_SAY_WEBSOCKET_PROTOCOL
         } ?: return false
         return try {
-            val authentication = jwtAuthenticationConverter.convert(jwtDecoder.decode(token))
+            val jwt = jwtDecoder.decode(token)
+            if (jwt.subject.isNullOrBlank()) return false
+            val authentication = jwtAuthenticationConverter.convert(jwt)
                 as? JwtAuthenticationToken
                 ?: return false
             attributes[authenticationAttribute] = authentication

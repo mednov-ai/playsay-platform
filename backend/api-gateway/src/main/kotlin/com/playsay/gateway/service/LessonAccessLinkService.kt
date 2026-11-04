@@ -10,6 +10,7 @@ import com.playsay.gateway.utils.MetaData
 import com.playsay.gateway.repo.LessonAccessLinkRepo
 import com.playsay.gateway.repo.LessonEntryAttemptRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
+import com.playsay.gateway.utils.requireSubject
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Instant
@@ -50,7 +51,7 @@ class LessonAccessLinkService(
                 it.rotatedAt = now
                 linkRepo.save(it)
             }
-            createLink(lessonId, authentication.token.subject, now)
+            createLink(lessonId, authentication.token.requireSubject(), now)
         } else {
             ensureAliasHash(requireNotNull(existing))
         }
@@ -69,7 +70,7 @@ class LessonAccessLinkService(
             it.rotatedAt = now
             linkRepo.save(it)
         }
-        return createLink(lessonId, authentication.token.subject, now).also {
+        return createLink(lessonId, authentication.token.requireSubject(), now).also {
             auditService.record(lessonId, LessonAccessAuditEvent.LINK_ROTATED, LessonAccessAuditOutcome.ACCEPTED, authentication.actorKind())
         }.toResponse()
     }

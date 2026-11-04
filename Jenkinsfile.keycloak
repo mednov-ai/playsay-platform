@@ -17,7 +17,7 @@ spec:
         requests: { cpu: 50m, memory: 128Mi }
         limits: { cpu: 300m, memory: 384Mi }
     - name: gradle
-      image: gradle:8-jdk21
+      image: gradle:9.5.1-jdk25
       command: ["cat"]
       tty: true
       env:

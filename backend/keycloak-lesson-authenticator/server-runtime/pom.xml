@@ -53,6 +53,14 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- Align the complete Vert.x family with the matching patched runtime. -->
+      <dependency>
+        <groupId>io.vertx</groupId>
+        <artifactId>vertx-dependencies</artifactId>
+        <version>${vertx.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>org.keycloak</groupId>
         <artifactId>keycloak-parent</artifactId>

@@ -1,4 +1,4 @@
-FROM gradle:8.14.3-jdk21-alpine AS provider-build
+FROM gradle:9.5.1-jdk25-alpine AS provider-build
 WORKDIR /workspace
 COPY build.gradle.kts /workspace/build.gradle.kts
 COPY settings.gradle.kts /workspace/settings.gradle.kts
@@ -15,15 +15,15 @@ RUN wget -q https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3
     && chmod +x /opt/apache-maven-3.9.16/bin/mvn
 WORKDIR /workspace/server-runtime
 ENV MAVEN_OPTS="-Xmx768m -XX:MaxMetaspaceSize=256m"
-COPY server-runtime/pom.xml server-runtime/settings.xml server-runtime/VerifyNetty.java server-runtime/VerifyRuntime.java server-runtime/VerifyVertx.java ./
+COPY server-runtime/pom.xml server-runtime/settings.xml server-runtime/VerifyNetty.java server-runtime/VerifyVertx.java server-runtime/VerifyRuntime.java server-runtime/build-only-risk-sha256.txt ./
 COPY server-runtime/src ./src
 COPY --from=provider-build /workspace/build/libs/keycloak-lesson-authenticator-1.0.0.jar /tmp/keycloak-provider.jar
 RUN /opt/apache-maven-3.9.16/bin/mvn -B -ntp -s settings.xml package \
     && java VerifyNetty.java target/lib/lib/main > target/netty-security-inventory.tsv \
     && java VerifyVertx.java target/lib/lib/main > target/vertx-security-inventory.tsv \
-    && java VerifyRuntime.java target/lib /tmp/keycloak-provider.jar > target/server-runtime-sha256.txt
+    && java VerifyRuntime.java target/lib build-only-risk-sha256.txt /tmp/keycloak-provider.jar > target/server-runtime-sha256.txt
 
-# Rebuild the complete mutable-jar dependency model with patched Netty and Vert.x.
+# Rebuild the complete mutable-jar dependency model with Netty 4.1.139.
 # Keycloak implementations and runtime OS/JDK remain on the pinned official image.
 FROM quay.io/keycloak/keycloak@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244 AS keycloak-build
 RUN rm -rf /opt/keycloak/lib

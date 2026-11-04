@@ -1,4 +1,4 @@
-FROM node:22.22.0-bookworm-slim AS build
+FROM node:26.13.0-bookworm-slim AS build
 WORKDIR /workspace/frontend
 COPY package.json package-lock.json ./
 COPY web-app/package.json web-app/package.json
@@ -13,7 +13,7 @@ COPY game-adapter-service game-adapter-service
 RUN npm --workspace game-sync-sdk run build \
     && npm --workspace game-adapter-service run build
 
-FROM node:22.22.0-bookworm-slim
+FROM node:26.13.0-bookworm-slim
 WORKDIR /app
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates chromium fonts-liberation \

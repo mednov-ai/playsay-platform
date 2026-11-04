@@ -13,6 +13,7 @@ import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.StudentProfileRepo
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.Instant
@@ -47,7 +48,7 @@ class LiveKitTokenService(
 
         val now = Instant.now()
         val expiresAt = now.plusSeconds(tokenTtlSeconds.coerceIn(60, 86_400))
-        val identity = authentication.token.subject
+        val identity = authentication.token.requireSubject()
         val displayName = authentication.token.getClaimAsString("name")
             ?: authentication.token.getClaimAsString("preferred_username")
             ?: identity
@@ -146,7 +147,7 @@ class LiveKitRoomStore(
         } else {
             lessonRepo.findJoinableForStudent(
                 lessonId = lessonId,
-                subject = authentication.token.subject,
+                subject = authentication.token.requireSubject(),
                 accessStartsBy = lessonAccessStartsBy(now),
                 accessEndsAfter = lessonAccessEndsAfter(now),
                 requiredStatus = MetaData.LessonStatuses.IN_PROGRESS,

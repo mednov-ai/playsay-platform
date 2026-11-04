@@ -39,11 +39,28 @@ gradle.projectsEvaluated {
     def runtimeScope = new JsonSlurper().parse(runtimeScopeFile)
     if (runtimeScope.schemaVersion != 1 || !(runtimeScope.rules instanceof List)) throw new GradleException('Invalid runtime-scope policy')
     runtimeScope.rules.each { rule ->
-        if (!rule.owner || !rule.evidence || !rule.approvedOn || !rule.build || !rule.project || !rule.configuration ||
+        if (rule.kind == 'build-only-direct') {
+            if (rule.build != 'playsay-backend-build-logic' || rule.project != ':' ||
+                !(rule.packageUrl ==~ /pkg:maven\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[A-Za-z0-9_.+-]+/) ||
+                !(rule.sha256 ==~ /[a-f0-9]{64}/) || !rule.file ||
+                !(rule.projectReferences instanceof List) || rule.projectReferences.empty ||
+                rule.projectReferences.any { !(it ==~ /playsay-backend-build-logic:[A-Za-z0-9_.-]+/) } ||
+                !(rule.cves instanceof List) || rule.cves.empty || rule.cves.any { !(it ==~ /CVE-\d{4}-\d+/) } ||
+                !rule.owner || !rule.evidence || !rule.approvedOn) {
+                throw new GradleException('Direct build-only scope requires exact artifact, build, references and owner evidence')
+            }
+        } else if (rule.kind || !rule.owner || !rule.evidence || !rule.approvedOn || !rule.build || !rule.project || !rule.configuration ||
             !rule.parentCoordinate || !rule.parentFile || !(rule.parentSha256 ==~ /[a-f0-9]{64}/) ||
             !(rule.sha256 ==~ /[a-f0-9]{64}/) || !rule.packageUrl || !(rule.cves instanceof List) || rule.cves.empty) {
             throw new GradleException('Runtime scope requires exact artifact hashes, configuration and owner evidence')
         }
+    }
+    def buildOnlyHashes = runtimeScope.rules.findAll { it.kind == 'build-only-direct' }.collect { it.sha256 } as Set
+    if (buildOnlyHashes) {
+        def packagedBoundary = new File(policyDir.parentFile, 'keycloak-lesson-authenticator/server-runtime/build-only-risk-sha256.txt')
+        if (!packagedBoundary.isFile()) throw new GradleException('Missing Keycloak packaged runtime-boundary hashes')
+        def packagedHashes = packagedBoundary.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') } as Set
+        if (packagedHashes != buildOnlyHashes) throw new GradleException('Keycloak runtime-boundary hashes do not match scope policy')
     }
     def classifyOutsideRuntime = new GroovyShell().evaluate(new File(policyDir, 'dependency-security-runtime-scope.gradle'))
     def suppressions = new File(policyDir, 'dependency-check-suppressions.xml')
@@ -176,6 +193,9 @@ gradle.projectsEvaluated {
             def blocking = []
             def outsideRuntime = []
             def coverage = new JsonSlurper().parse(new File(reportRoot, 'coverage.json'))
+            def backendCoverageFile = System.getenv('DEPENDENCY_SECURITY_BACKEND_COVERAGE')
+            def backendCoverage = backendCoverageFile && new File(backendCoverageFile).isFile()
+                ? new JsonSlurper().parse(new File(backendCoverageFile)) : null
             def today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
             selected.each { p ->
                 def moduleReports = new File(reportRoot, p.path == ':' ? 'root' : p.path.substring(1).replace(':', '/'))
@@ -203,7 +223,7 @@ gradle.projectsEvaluated {
                             def finding = [project: p.path, dependency: dependency.fileName, packages: packages, cve: vulnerability.name, score: score]
                             if (approval) accepted.add(finding + [approval: approval.id, expires: approval.expires])
                             else {
-                                def outside = classifyOutsideRuntime(root.name, p.path, dependency, vulnerability.name, configurations, runtimeScope.rules)
+                                def outside = classifyOutsideRuntime(root.name, p.path, dependency, vulnerability.name, configurations, runtimeScope.rules, backendCoverage)
                                 if (outside) outsideRuntime.add(finding + [classification: 'outside-server-runtime', evidence: outside.evidence,
                                     configuration: outside.configuration, parentSha256: outside.parentSha256])
                                 else blocking.add(finding)

@@ -6,9 +6,9 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     outDir: "dist",
-    rollupOptions: {
-      input: resolve(__dirname, "src/content-script.ts"),
-      output: { entryFileNames: "content-script.js", format: "iife", inlineDynamicImports: true },
+    rolldownOptions: {
+      input: resolve(import.meta.dirname, "src/content-script.ts"),
+      output: { entryFileNames: "content-script.js", format: "iife", codeSplitting: false },
     },
   },
 });

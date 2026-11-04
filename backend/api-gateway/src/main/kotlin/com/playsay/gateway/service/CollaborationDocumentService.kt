@@ -19,6 +19,7 @@ import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
 import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.Instant
@@ -49,7 +50,7 @@ class CollaborationTokenService(
         val expiresAt = now.plusSeconds(tokenTtlSeconds.coerceIn(60, 3_600))
         val claims = JWTClaimsSet.Builder()
             .issuer("playsay-api-gateway")
-            .subject(authentication.token.subject)
+            .subject(authentication.token.requireSubject())
             .claim("documentId", document.id.toString())
             .claim("lessonId", document.lessonId.toString())
             .claim("materialId", document.materialId.toString())
@@ -220,12 +221,12 @@ class CollaborationDocumentService(
             return lookup
         }
 
-        val lookup = lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.subject)
+        val lookup = lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.requireSubject())
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         if (lookup.materialId != materialId) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         }
-        if (!lookup.isVisibleToParticipant(clock.instant()) || !isLessonParticipant(lessonId, authentication.token.subject)) {
+        if (!lookup.isVisibleToParticipant(clock.instant()) || !isLessonParticipant(lessonId, authentication.token.requireSubject())) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
         return lookup

@@ -5,8 +5,8 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     outDir: "dist",
-    rollupOptions: {
-      input: resolve(__dirname, "src/service-worker.ts"),
+    rolldownOptions: {
+      input: resolve(import.meta.dirname, "src/service-worker.ts"),
       output: { entryFileNames: "service-worker.js", format: "es" },
     },
   },

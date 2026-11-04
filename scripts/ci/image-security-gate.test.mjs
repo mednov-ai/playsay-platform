@@ -213,6 +213,32 @@ test('each module pipeline scans before publishing, tagging, or updating GitOps'
   }
 });
 
+test('stack hotfix module builds publish images without changing DEV or running migrations', () => {
+  const allowedStages = new Set([
+    'Tag source commit', 'DB migrate', 'Update environment image reference',
+    'Wait for rollout', 'Wait for smoke dependencies', 'UI smoke', 'Browser smoke',
+  ]);
+  const pipelines = readdirSync(root).filter(name => name.startsWith('Jenkinsfile.') &&
+    name !== 'Jenkinsfile.keycloak' &&
+    readFileSync(join(root, name), 'utf8').includes('run-kaniko-image-build.sh'));
+  assert.equal(pipelines.length, 13);
+  for (const name of pipelines) {
+    const content = readFileSync(join(root, name), 'utf8');
+    assert.match(content, /env\.IMAGE_ONLY = \(env\.CI_BRANCH == 'codex\/hotfix-stack-upgrade-20261103'\)\.toString\(\)/, name);
+    const afterPublish = content.split("stage('Publish image')")[1];
+    assert.ok(afterPublish, name);
+    assert.match(afterPublish.split("stage('Tag source commit')")[0], /assert-current-branch-head\.sh/, name);
+    const following = afterPublish.split(/\n  post \{/)[0];
+    const stages = [...following.matchAll(/stage\('([^']+)'\)/g)];
+    for (let i = 0; i < stages.length; i++) {
+      const stage = stages[i];
+      assert.ok(allowedStages.has(stage[1]), `${name}: unexpected stage ${stage[1]}`);
+      const body = following.slice(stage.index, stages[i + 1]?.index);
+      assert.match(body.split('steps {')[0], /env\.IMAGE_ONLY != 'true'/, `${name}: ${stage[1]}`);
+    }
+  }
+});
+
 test('legacy aggregate builds scan each image before migrations and pin each scanned digest', () => {
   const content = readFileSync(join(root, 'Jenkinsfile'), 'utf8');
   const build = content.indexOf("stage('Build and scan images')");

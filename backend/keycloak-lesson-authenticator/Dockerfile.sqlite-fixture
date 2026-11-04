@@ -20,6 +20,9 @@ RUN set -eu; \
 
 # Run the source RPM's default test suite, preserving every distribution
 # patch. No file produced by this exploratory build is published.
+RUN set -eu; rpm -q gcc; gcc -print-search-dirs; \
+    compiler="$(rpm -ql gcc | grep '/cc1$')"; test -n "$compiler"; \
+    ls -l "$compiler"; ldd "$compiler" || true
 RUN printf 'int main(void) { return 0; }\n' > /tmp/compiler-smoke.c \
     && gcc /tmp/compiler-smoke.c -o /tmp/compiler-smoke \
     && /tmp/compiler-smoke

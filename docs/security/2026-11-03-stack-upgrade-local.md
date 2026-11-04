@@ -156,5 +156,9 @@ desktop and mobile sizes and the keyboard screen at desktop size. The web
 service worker registered and activated; its JavaScript, the PDF module
 worker and a PDF WASM asset were served successfully. External requests were
 blocked and API responses were synthetic. These checks do not prove old
-browser or physical-device support, the nginx deployment, authentication or
-the upgraded DEV lesson. Exact rebuilt CI images still need fresh scans.
+browser or physical-device support, authentication or the upgraded DEV lesson.
+The same browser and asset checks passed with the built files mounted into
+local nginx 1.30.6 using the candidate nginx configurations. Both health
+checks, API redirects and SPA fallbacks passed; a missing `.mjs` returned 404.
+This mounted fixture is not the exact final container or a DEV deployment.
+Exact rebuilt CI images still need fresh scans.

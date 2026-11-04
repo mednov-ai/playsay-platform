@@ -23,3 +23,12 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("com.h2database:h2")
 }
+
+// Bound the complete CI suite so retained Spring contexts cannot exhaust its pod.
+tasks.withType<Test>().configureEach {
+    if (providers.gradleProperty("lowMemoryTests").isPresent) {
+        maxParallelForks = 1
+        forkEvery = 8
+        maxHeapSize = "384m"
+    }
+}

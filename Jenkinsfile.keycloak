@@ -197,6 +197,34 @@ EOF
       }
     }
 
+    stage('Inspect Keycloak image') {
+      when { expression { env.SECURITY_SCAN_ONLY == 'true' } }
+      steps {
+        container('image-security') {
+          sh '''
+            set -eu
+            build="$WORKSPACE/.image-build/${KEYCLOAK_IMAGE_NAME}/$BUILD_LABEL"
+            report="$WORKSPACE/image-security/${KEYCLOAK_IMAGE_NAME}/$BUILD_LABEL"
+            mkdir -p "$report"
+            sha256sum "$build/image.tar" | awk '{print $1}' > "$report/inspected-image-archive.sha256"
+            wget -q -T 90 -O "$build/crane.tgz" https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz
+            printf '%s  %s\\n' 0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0 "$build/crane.tgz" | sha256sum -c -
+            tar -xzf "$build/crane.tgz" -C "$build" crane
+            "$build/crane" export - "$build/rootfs.tar" < "$build/image.tar"
+            tar -tf "$build/rootfs.tar" > "$build/image-paths.txt"
+            grep -i 'sqlite' "$build/image-paths.txt" > "$report/sqlite-paths.txt" || true
+            grep -E '(^|/)(sqlite3|sqlite3_analyzer|sqldiff)$' "$build/image-paths.txt" > "$report/sqlite-shell-paths.txt" || true
+            grep -E '^opt/keycloak/conf/truststores/.+' "$build/image-paths.txt" > "$report/keycloak-truststore-paths.txt" || true
+            tar -tvf "$build/rootfs.tar" | grep -E '(java-21-openjdk.*/lib/security/cacerts|etc/pki/java/cacerts|etc/pki/ca-trust/extracted/java/cacerts)$' > "$report/java-truststore-links.txt"
+            tar -xOf "$build/rootfs.tar" etc/pki/ca-trust/extracted/java/cacerts > "$report/java-system-cacerts"
+            sha256sum "$report/java-system-cacerts" | awk '{print $1}' > "$report/java-system-cacerts.sha256"
+            [ "$(sha256sum "$build/image.tar" | awk '{print $1}')" = "$(cat "$report/inspected-image-archive.sha256")" ]
+          '''
+        }
+        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+      }
+    }
+
     stage('Scan image') {
       when {
         expression { env.SCAN_IMAGE == 'true' }

@@ -45,6 +45,7 @@ configurations.configureEach {
             useVersion("4.5.35")
         }
         when (requested.group to requested.name) {
+            "com.google.guava" to "guava" -> useVersion("33.7.2-jre")
             "com.mysql" to "mysql-connector-j" -> useVersion("26.7.0")
             "io.airlift" to "aircompressor" -> useVersion("2.0.3")
             "org.codehaus.plexus" to "plexus-utils" -> useVersion("4.0.3")

@@ -49,6 +49,20 @@ spec:
         limits:
           cpu: "1"
           memory: 1024Mi
+    - name: image-security
+      image: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+      command: ["cat"]
+      tty: true
+      volumeMounts:
+        - name: kaniko-docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1536Mi
     - name: tools
       image: alpine:3.20
       command: ["cat"]
@@ -137,6 +151,8 @@ spec:
             env.CI_BRANCH.startsWith('hotfix/')
           ).toString()
           env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
+          env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
+          env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
           env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
           env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
 
@@ -159,9 +175,9 @@ spec:
       }
     }
 
-    stage('Build and push image') {
+    stage('Build image archive') {
       when {
-        expression { env.DEPLOY_IMAGE == 'true' }
+        expression { env.SCAN_IMAGE == 'true' }
       }
       steps {
         container('kaniko') {
@@ -179,6 +195,29 @@ EOF
                 /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
             '''
           }
+        }
+      }
+    }
+
+    stage('Scan image') {
+      when {
+        expression { env.SCAN_IMAGE == 'true' }
+      }
+      steps {
+        container('image-security') {
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/scan-image.sh'
+        }
+        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
+      }
+    }
+
+    stage('Publish image') {
+      when {
+        expression { env.DEPLOY_IMAGE == 'true' }
+      }
+      steps {
+        container('image-security') {
+          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${COLLABORATION_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
         }
       }
     }
@@ -223,6 +262,7 @@ EOF
 
   post {
     always {
+      archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: true
       echo "Build ${env.BUILD_LABEL ?: env.BUILD_NUMBER} finished with ${currentBuild.currentResult}"
     }
   }

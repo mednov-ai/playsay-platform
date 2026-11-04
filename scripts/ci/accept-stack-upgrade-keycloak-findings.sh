@@ -1,12 +1,21 @@
 #!/usr/bin/env sh
 set -eu
 
-# This one-time DEV hotfix acceptance covers only findings observed in both
-# the prior DEV image and the reviewed candidate. Everything else fails closed.
+# Owner-approved exact finding matrix. DEV scope is unchanged; the one-time
+# production scope is only release/01.007.25 with the reviewed Keycloak tree.
 [ "${IMAGE_REPOSITORY:-}" = 'ghcr.io/mednov-ai/playsay-keycloak' ]
-[ "${CI_BRANCH:-}" = 'codex/hotfix-stack-upgrade-20261103' ]
-[ "${DEPLOY_TO_DEV:-}" = true ]
-[ "${DEPLOY_TO_PROD:-}" = false ]
+case "${CI_BRANCH:-}" in
+  codex/hotfix-stack-upgrade-20261103)
+    [ "${DEPLOY_TO_DEV:-}" = true ]
+    [ "${DEPLOY_TO_PROD:-}" = false ]
+    ;;
+  release/01.007.25)
+    [ "${DEPLOY_TO_DEV:-}" = false ]
+    [ "${DEPLOY_TO_PROD:-}" = true ]
+    [ "$(git rev-parse HEAD:backend/keycloak-lesson-authenticator)" = b5310ef435edb065599d7655003de0355efc0b45 ]
+    ;;
+  *) exit 1 ;;
+esac
 [ "${SECURITY_SCAN_ONLY:-false}" = false ]
 [ "$#" -eq 2 ]
 [ -s "$1" ]

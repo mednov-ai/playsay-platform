@@ -12,11 +12,12 @@ const approved = [
   'os-pkgs|CVE-2026-119586|sqlite-libs|3.34.1-11.el9_8',
 ];
 
-test('Keycloak acceptance fails closed outside the exact DEV scope and findings', (t) => {
+test('Keycloak acceptance fails closed outside the exact approved scope and findings', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'playsay-keycloak-accept-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const bin = join(dir, 'bin');
   mkdirSync(bin);
+  writeFileSync(join(bin, 'git'), "#!/bin/sh\nprintf '%s\\n' \"${KEYCLOAK_TEST_TREE:-b5310ef435edb065599d7655003de0355efc0b45}\"\n", { mode: 0o755 });
   writeFileSync(join(bin, 'trivy'), `#!/bin/sh
 set -eu
 [ "${'$'}{FAIL_CONVERSION:-false}" = false ] || exit 1
@@ -46,6 +47,13 @@ exit 1
       { env: { ...base, ...env }, encoding: 'utf8' }).status;
   };
   assert.equal(run(approved), 0);
+  const prod = { CI_BRANCH: 'release/01.007.25', DEPLOY_TO_DEV: 'false', DEPLOY_TO_PROD: 'true' };
+  assert.equal(run(approved, prod), 0);
+  assert.notEqual(run(approved, { ...prod, CI_BRANCH: 'release/01.007.26' }), 0);
+  assert.notEqual(run(approved, { ...prod, KEYCLOAK_TEST_TREE: '0000000000000000000000000000000000000000' }), 0);
+  assert.notEqual(run([...approved, 'os-pkgs|CVE-2099-1|sqlite-libs|3.34.1-11.el9_8'], prod), 0);
+  assert.notEqual(run(approved, { ...prod, DEPLOY_TO_DEV: 'true' }), 0);
+  assert.notEqual(run(approved, { ...prod, SECURITY_SCAN_ONLY: 'true' }), 0);
   assert.equal(run([approved[0]]), 0);
   assert.notEqual(run([]), 0);
   assert.notEqual(run([...approved, 'os-pkgs|CVE-2099-1|sqlite-libs|3.34.1-11.el9_8']), 0);

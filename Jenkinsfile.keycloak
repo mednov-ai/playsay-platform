@@ -6,7 +6,7 @@ apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
-  activeDeadlineSeconds: 5400
+  activeDeadlineSeconds: 6000
   securityContext:
     fsGroup: 1000
     fsGroupChangePolicy: OnRootMismatch
@@ -78,7 +78,7 @@ spec:
     disableConcurrentBuilds()
     skipDefaultCheckout(true)
     timestamps()
-    timeout(time: 75, unit: 'MINUTES')
+    timeout(time: 90, unit: 'MINUTES')
   }
 
   parameters {
@@ -140,6 +140,7 @@ spec:
           ).toString()
           env.DEPLOY_IMAGE = (env.DEPLOY_TO_DEV == 'true' || env.DEPLOY_TO_PROD == 'true').toString()
           env.SECURITY_SCAN_ONLY = env.CI_BRANCH.startsWith('security-check/').toString()
+          if (env.SECURITY_SCAN_ONLY != 'true') { error 'SQLite exploration is scan-only.' }
           env.SCAN_IMAGE = (env.DEPLOY_IMAGE == 'true' || env.SECURITY_SCAN_ONLY == 'true').toString()
           env.DEPLOY_ENVIRONMENT = env.DEPLOY_TO_PROD == 'true' ? 'prod' : (env.DEPLOY_TO_DEV == 'true' ? 'dev' : 'none')
           env.INFRA_BRANCH = env.DEPLOY_TO_PROD == 'true' ? env.CI_BRANCH : 'develop'
@@ -188,12 +189,35 @@ spec:
 {"auths":{"ghcr.io":{"auth":"$AUTH"}}}
 EOF
               KANIKO_CONTEXT="$WORKSPACE/backend/keycloak-lesson-authenticator" \
-                KANIKO_DOCKERFILE="$WORKSPACE/backend/keycloak-lesson-authenticator/Dockerfile" \
+                KANIKO_DOCKERFILE="$WORKSPACE/backend/keycloak-lesson-authenticator/Dockerfile.sqlite-fixture" \
                 IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" \
                 /busybox/sh ./scripts/ci/run-kaniko-image-build.sh
             '''
           }
         }
+      }
+    }
+
+    stage('Inspect rebuilt SQLite') {
+      steps {
+        container('image-security') {
+          sh '''
+            set -eu
+            build="$WORKSPACE/.image-build/$KEYCLOAK_IMAGE_NAME/$BUILD_LABEL"
+            report="$WORKSPACE/image-security/$KEYCLOAK_IMAGE_NAME/$BUILD_LABEL"
+            mkdir -p "$report"
+            sha256sum "$build/image.tar" | awk '{print $1}' > "$report/inspected-image-archive.sha256"
+            wget -q -T 90 -O "$build/crane.tgz" https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz
+            printf '%s  %s\\n' 0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0 "$build/crane.tgz" | sha256sum -c -
+            tar -xzf "$build/crane.tgz" -C "$build" crane
+            "$build/crane" export - "$build/rootfs.tar" < "$build/image.tar"
+            for item in sqlite-probe.json missing-original-exports.txt sha256.txt sqlite.spec; do
+              tar -xOf "$build/rootfs.tar" "usr/share/doc/sqlite-fixture/$item" > "$report/$item"
+            done
+            [ "$(sha256sum "$build/image.tar" | awk '{print $1}')" = "$(cat "$report/inspected-image-archive.sha256")" ]
+          '''
+        }
+        archiveArtifacts artifacts: 'image-security/**/*', allowEmptyArchive: false
       }
     }
 
@@ -209,47 +233,7 @@ EOF
       }
     }
 
-    stage('Publish image') {
-      when {
-        expression { env.DEPLOY_IMAGE == 'true' }
-      }
-      steps {
-        container('image-security') {
-          sh 'IMAGE_REPOSITORY="ghcr.io/${GITHUB_OWNER}/${KEYCLOAK_IMAGE_NAME}" ./scripts/ci/prepare-and-publish-image.sh'
-        }
-      }
-    }
 
-    stage('Tag source commit') {
-      when { expression { env.DEPLOY_IMAGE == 'true' } }
-      steps {
-        container('tools') {
-          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git && ./scripts/ci/tag-source-commit.sh'
-          }
-        }
-      }
-    }
-
-    stage('Update environment image reference') {
-      when { expression { env.DEPLOY_IMAGE == 'true' } }
-      steps {
-        container('tools') {
-          withCredentials([usernamePassword(credentialsId: 'github-infra-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
-            sh 'apk add --no-cache git yq && ./scripts/ci/assert-current-branch-head.sh && CHART_NAME=keycloak IMAGE_REPOSITORY_OVERRIDE=ghcr.io/mednov-ai/playsay-keycloak ./scripts/ci/update-routed-image-reference.sh'
-          }
-        }
-      }
-    }
-
-    stage('Wait for rollout') {
-      when { expression { env.DEPLOY_TO_DEV == 'true' } }
-      steps {
-        container('tools') {
-          sh 'apk add --no-cache jq kubectl && ./scripts/ci/wait-for-keycloak-rollout.sh'
-        }
-      }
-    }
   }
 
   post {

@@ -103,10 +103,12 @@ class LiveKitRoomStore(
     private val admissionGuard: LessonAdmissionGuard,
     private val tokenService: LiveKitTokenService,
     private val regionalMediaRoutingService: RegionalMediaRoutingService,
+    private val maintenanceGuard: LessonMaintenanceGuard,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun createToken(authentication: JwtAuthenticationToken, lessonId: UUID, origin: String? = null): LiveKitRoomTokenResponse {
+        maintenanceGuard.requireLessonAdmission()
         if (admissionGuard.isKicked(lessonId, authentication)) {
             throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         }

@@ -21,10 +21,12 @@ class ScheduledLessonLifecycleService(
     private val scheduledLessonStore: ScheduledLessonStore,
     private val authorizationService: ScheduledLessonAuthorizationService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val maintenanceGuard: LessonMaintenanceGuard,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     @Transactional
     fun start(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledLessonResponse {
+        maintenanceGuard.requireLessonAdmission()
         authentication.requireLessonManager()
         val lesson = lessonRepo.lockById(lessonId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)

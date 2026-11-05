@@ -37,6 +37,8 @@ for commit in "$GIT_COMMIT" "$BASE_PLATFORM_COMMIT" "$ACCEPTED_DEV_COMMIT"; do
     exit 1
   fi
 done
+RELEASE_KIND="${RELEASE_KIND:-normal}"
+case "$RELEASE_KIND" in normal|hotfix) ;; *) echo 'Invalid release kind.' >&2; exit 1 ;; esac
 
 TARGET_ORDER="api-gateway ai-tutor-service worksheet-import-service vocabulary-service web-app game-adapter-service collaboration-service media-service payment-service registration-service email-service keycloak keyboard-service keyboard-app"
 VALIDATION_ORDER="ci-contracts smoke-syntax"
@@ -153,7 +155,12 @@ for attempt in 1 2 3 4 5; do
     printf 'releaseBranch: "%s"\n' "$CI_BRANCH"
     printf 'baseRelease: "%s"\n' "$BASE_RELEASE_BRANCH"
     printf 'basePlatformCommit: "%s"\n' "$BASE_PLATFORM_COMMIT"
-    printf 'acceptedDevCommit: "%s"\n' "$ACCEPTED_DEV_COMMIT"
+    printf 'releaseKind: "%s"\n' "$RELEASE_KIND"
+    if [ "$RELEASE_KIND" = hotfix ]; then
+      printf 'integratedDevCommit: "%s"\n' "$ACCEPTED_DEV_COMMIT"
+    else
+      printf 'acceptedDevCommit: "%s"\n' "$ACCEPTED_DEV_COMMIT"
+    fi
     printf 'baseInfraCommit: "%s"\n' "$base_infra_commit"
     printf 'platformCommit: "%s"\n' "$GIT_COMMIT"
     echo "affectedTargets:"

@@ -75,17 +75,29 @@ spec:
           }
           env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
           env.GIT_COMMIT_SHORT = env.GIT_COMMIT.take(12)
+          env.RELEASE_KIND = 'normal'
           if (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/) {
             sh 'git fetch --no-tags origin +refs/heads/develop:refs/remotes/origin/develop'
-            env.ACCEPTED_DEV_COMMIT = params.ACCEPTED_DEV_COMMIT?.trim() ?: sh(
-              script: 'git rev-parse refs/remotes/origin/develop',
-              returnStdout: true
-            ).trim()
+            if (env.CI_BRANCH.tokenize('.').last().toInteger() != 0) {
+              env.RELEASE_KIND = 'hotfix'
+              if (params.ACCEPTED_DEV_COMMIT?.trim()) {
+                error 'A hotfix uses its exact integrated source, not ACCEPTED_DEV_COMMIT.'
+              }
+              env.ACCEPTED_DEV_COMMIT = env.GIT_COMMIT
+            } else {
+              env.ACCEPTED_DEV_COMMIT = sh(
+                script: 'git rev-parse refs/remotes/origin/develop',
+                returnStdout: true
+              ).trim()
+              if (params.ACCEPTED_DEV_COMMIT?.trim() && params.ACCEPTED_DEV_COMMIT.trim() != env.ACCEPTED_DEV_COMMIT) {
+                error 'A normal release must contain current develop.'
+              }
+            }
             if (!(env.ACCEPTED_DEV_COMMIT ==~ /^[0-9a-f]{40}$/)) {
               error 'ACCEPTED_DEV_COMMIT must be a full Git SHA.'
             }
             sh "git cat-file -e '${env.ACCEPTED_DEV_COMMIT}^{commit}'"
-            if (sh(
+            if (env.RELEASE_KIND == 'normal' && sh(
               script: "git merge-base --is-ancestor '${env.ACCEPTED_DEV_COMMIT}' '${env.GIT_COMMIT}'",
               returnStatus: true
             ) != 0) {
@@ -107,8 +119,10 @@ spec:
             fi
             git config --global --add safe.directory "$WORKSPACE"
             EFFECTIVE_AFTER="${GITHUB_AFTER:-$GIT_COMMIT}"
+            EFFECTIVE_BEFORE="${GITHUB_BEFORE:-}"
+            if [ "$RELEASE_KIND" = hotfix ]; then EFFECTIVE_BEFORE=""; fi
             BRANCH_NAME="$CI_BRANCH" \
-            GITHUB_BEFORE="${GITHUB_BEFORE:-}" \
+            GITHUB_BEFORE="$EFFECTIVE_BEFORE" \
             GITHUB_AFTER="$EFFECTIVE_AFTER" \
             FORCE_TARGETS="${FORCE_TARGETS:-}" \
             INFRA_REPO="$INFRA_REPO" \
@@ -140,6 +154,9 @@ spec:
           echo "Detection reason: ${env.AFFECTED_REASON}"
           echo "Detection mode: ${env.DETECTION_MODE}"
           echo "Detection base: ${env.DETECTION_BASE ?: '(none)'}"
+          if (env.CI_BRANCH ==~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/) {
+            sh '''./scripts/ci/validate-release-source.sh . "$RELEASE_KIND" "$CI_BRANCH" "$GIT_COMMIT" "$DETECTION_BASE" "$ACCEPTED_DEV_COMMIT" refs/remotes/origin/develop "$BASE_RELEASE_BRANCH"'''
+          }
         }
 
         script {

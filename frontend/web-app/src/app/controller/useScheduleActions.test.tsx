@@ -74,6 +74,18 @@ describe("useScheduleActions", () => {
     }));
   });
 
+  it.each([true, false, null])("uses fresh actor-specific extension permission %s at room entry", async (canExtend) => {
+    const input = setup();
+    const fresh = { ...input.lesson, canExtend, accessRevision: 2, accessEndsAt: "2026-07-17T11:20:00Z" };
+    apiMocks.fetchScheduledLesson.mockResolvedValue(fresh);
+    const { result } = renderHook(() => useScheduleActions(input.props));
+    await act(() => result.current.confirmScheduledLessonJoin(input.lesson, mediaChoices));
+    expect(apiMocks.fetchScheduledLesson).toHaveBeenCalledWith("lesson-1");
+    expect(input.setRoomSession).toHaveBeenCalledWith(expect.objectContaining({
+      canExtend, accessRevision: 2, accessEndsAt: fresh.accessEndsAt,
+    }));
+  });
+
   it("recovers a lost extension response from committed policy and preserves newer state", async () => {
     const input = setup();
     apiMocks.extendScheduledLessonAccess.mockRejectedValue(new Error("lost response"));

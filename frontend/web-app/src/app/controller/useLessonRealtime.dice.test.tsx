@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 // @vitest-environment-options { "url": "http://localhost/" }
 
-import { useState } from "react";
-import { observeServerTime, resetServerClock } from "../../shared/lib/serverClock";
-import { act, renderHook } from "@testing-library/react";
+import { useEffect, useState } from "react";
+import { observeServerTime, resetServerClock, serverClockSynchronized, serverNowMs, subscribeServerClock } from "../../shared/lib/serverClock";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LessonRoomSession } from "../../features/classroom";
 import type { MeProfile, ScheduledLesson } from "../../shared/api/playsay";
 import { useLessonRealtime } from "./useLessonRealtime";
+import { LessonExtensionOffer } from "../../features/classroom/ui/LessonExtensionOffer";
 
 const apiMocks = vi.hoisted(() => ({
   fetchScheduledLessons: vi.fn(),
@@ -130,6 +131,203 @@ describe("useLessonRealtime dice delivery", () => {
     expect(apiMocks.fetchScheduledLessons).toHaveBeenCalled();
     expect(props.closeClassroom).not.toHaveBeenCalled();
     rendered.unmount();
+  });
+
+  it.each([true, false])("preserves actor-specific extension permission %s across neutral and stale events", async (canExtend) => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:53:00Z");
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend };
+    const policy = { id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend: null } as ScheduledLesson;
+    const { result, unmount } = renderHook(() => {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({ ...props, nowMs: now, roomSession, setRoomSession });
+      return roomSession;
+    });
+    await act(async () => Promise.resolve());
+    act(() => sockets[0].receive({ type: "lesson.updated", lesson: policy }));
+    expect(result.current?.canExtend).toBe(canExtend);
+    act(() => sockets[0].receive({ type: "lesson.updated", lesson: { ...policy, accessRevision: 0, canExtend: !canExtend } }));
+    expect(result.current?.canExtend).toBe(canExtend);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("shows and repeats the offer from the live room and server clock after a neutral realtime snapshot", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:52:59Z");
+    const monotonic = vi.spyOn(performance, "now").mockReturnValue(0);
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: true };
+    const neutral = { id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend: null } as ScheduledLesson;
+    const accepted: number[] = [];
+
+    function ClassroomHarness() {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      const [nowMs, setNowMs] = useState(serverNowMs);
+      useEffect(() => {
+        const update = () => setNowMs(serverNowMs());
+        const unsubscribe = subscribeServerClock(update);
+        const timer = window.setInterval(update, 1000);
+        return () => { unsubscribe(); window.clearInterval(timer); };
+      }, []);
+      useLessonRealtime({ ...props, nowMs, roomSession, setRoomSession });
+      return roomSession && <LessonExtensionOffer session={roomSession} nowMs={nowMs} onExtend={async (_lessonId, revision) => {
+        accepted.push(revision);
+        setRoomSession(current => current && { ...current, accessRevision: revision + 1, accessEndsAt: new Date(Date.parse(current.accessEndsAt!) + 600_000).toISOString() });
+      }} />;
+    }
+
+    const view = render(<ClassroomHarness />);
+    await act(async () => Promise.resolve());
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+    act(() => sockets[0].receive({ type: "lesson.updated", lesson: neutral }));
+    monotonic.mockReturnValue(1000);
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByText("lessonExtension.extend")); });
+    expect(accepted).toEqual([1]);
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+    monotonic.mockReturnValue(601000);
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByText("lessonExtension.extend")); });
+    expect(accepted).toEqual([1, 2]);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("recovers a missing manager permission from the periodic authorized schedule snapshot", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:53:00Z");
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: null };
+    apiMocks.fetchScheduledLessons.mockResolvedValue([{ id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend: true }]);
+
+    function ClassroomHarness() {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({ ...props, nowMs: now, roomSession, setRoomSession });
+      return roomSession && <LessonExtensionOffer session={roomSession} nowMs={now} canManageSchedule onExtend={async () => undefined} />;
+    }
+
+    const view = render(<ClassroomHarness />);
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole("status").textContent).toBe("lessonExtension.policyUnavailable");
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(apiMocks.fetchScheduledLessons).toHaveBeenCalled();
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("applies actor-specific permission changes even when the deadline revision is unchanged", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:53:00Z");
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: true };
+    let canExtend = false;
+    apiMocks.fetchScheduledLessons.mockImplementation(async () => [{ id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend }]);
+    const { result, unmount } = renderHook(() => {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({ ...props, nowMs: now, roomSession, setRoomSession });
+      return roomSession;
+    });
+    await act(async () => Promise.resolve());
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(result.current?.canExtend).toBe(false);
+    canExtend = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(result.current?.canExtend).toBe(true);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("shows an unavailable state offline and restores the offer after a fresh online snapshot", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:53:00Z");
+    const monotonic = vi.spyOn(performance, "now").mockReturnValue(0);
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: true };
+    const policy = { id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend: true } as ScheduledLesson;
+    apiMocks.fetchScheduledLessons.mockImplementation(async () => {
+      observeServerTime({ serverNow: new Date(now + 1000).toISOString() });
+      return [policy];
+    });
+    const onExtend = vi.fn();
+    function ClassroomHarness() {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      const [nowMs, setNowMs] = useState(serverNowMs);
+      useEffect(() => {
+        const update = () => setNowMs(serverNowMs());
+        const unsubscribe = subscribeServerClock(update);
+        const timer = window.setInterval(update, 1000);
+        return () => { unsubscribe(); window.clearInterval(timer); };
+      }, []);
+      useLessonRealtime({ ...props, nowMs, roomSession, setRoomSession });
+      return roomSession && <LessonExtensionOffer session={roomSession} nowMs={nowMs} canManageSchedule onExtend={onExtend} />;
+    }
+    const view = render(<ClassroomHarness />);
+    await act(async () => Promise.resolve());
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+    act(() => window.dispatchEvent(new Event("offline")));
+    expect(serverClockSynchronized()).toBe(false);
+    monotonic.mockReturnValue(1000);
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByRole("status").textContent).toBe("lessonExtension.syncFailed");
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    expect(serverClockSynchronized()).toBe(true);
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+    expect(onExtend).not.toHaveBeenCalled();
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("ignores a delayed schedule response after a newer extension event", async () => {
+    const props = diceHookProps();
+    const now = Date.parse("2026-11-05T07:53:00Z");
+    observeServerTime({ serverNow: new Date(now).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: true };
+    const oldPolicy = { id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: initial.accessEndsAt, accessRevision: 1, canExtend: false } as ScheduledLesson;
+    let resolveSchedule!: (lessons: ScheduledLesson[]) => void;
+    apiMocks.fetchScheduledLessons.mockReturnValue(new Promise<ScheduledLesson[]>(resolve => { resolveSchedule = resolve; }));
+    const { result, unmount } = renderHook(() => {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({ ...props, nowMs: now, roomSession, setRoomSession });
+      return roomSession;
+    });
+    await act(async () => Promise.resolve());
+    act(() => window.dispatchEvent(new Event("pageshow")));
+    act(() => sockets[0].receive({ type: "lesson.updated", lesson: { ...oldPolicy, accessRevision: 2, accessEndsAt: "2026-11-05T08:05:00Z", canExtend: null } }));
+    expect(result.current?.accessRevision).toBe(2);
+    await act(async () => { resolveSchedule([oldPolicy]); await Promise.resolve(); });
+    expect(result.current?.accessEndsAt).toBe("2026-11-05T08:05:00Z");
+    expect(result.current?.canExtend).toBe(true);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("refreshes authoritative time and the deadline when a suspended classroom regains focus", async () => {
+    const props = diceHookProps();
+    const beforeSleep = Date.parse("2026-11-05T07:50:00Z");
+    observeServerTime({ serverNow: new Date(beforeSleep).toISOString() });
+    const initial = { ...props.roomSession, lessonStatus: "IN_PROGRESS", accessEndsAt: "2026-11-05T07:55:00Z", accessRevision: 1, canExtend: true };
+    apiMocks.fetchScheduledLessons.mockImplementation(async () => {
+      observeServerTime({ serverNow: "2026-11-05T07:54:00Z" });
+      return [{ id: "lesson-1", status: "IN_PROGRESS", accessAllowed: true, accessEndsAt: "2026-11-05T08:05:00Z", accessRevision: 2, canExtend: true }];
+    });
+    const { result, unmount } = renderHook(() => {
+      const [roomSession, setRoomSession] = useState<LessonRoomSession | null>(initial);
+      useLessonRealtime({ ...props, nowMs: beforeSleep, roomSession, setRoomSession });
+      return roomSession;
+    });
+    await act(async () => Promise.resolve());
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(serverClockSynchronized()).toBe(true);
+    expect(result.current?.accessEndsAt).toBe("2026-11-05T08:05:00Z");
+    expect(result.current?.canExtend).toBe(true);
+    expect(props.closeClassroom).not.toHaveBeenCalled();
+    unmount();
   });
 
   it("sends one request for repeated taps and clears pending on the matching result", async () => {

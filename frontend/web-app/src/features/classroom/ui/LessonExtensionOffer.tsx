@@ -3,21 +3,27 @@ import type { LessonRoomSession } from "../model/session";
 import { serverClockSynchronized } from "../../../shared/lib/serverClock";
 import { useAppTranslation } from "../../../shared/i18n";
 
-export function LessonExtensionOffer({ session, nowMs, onExtend }: {
-  session: LessonRoomSession; nowMs: number; onExtend: (lessonId: string, revision: number) => Promise<void>;
+export function LessonExtensionOffer({ session, nowMs, onExtend, canManageSchedule = false }: {
+  session: LessonRoomSession; nowMs: number; onExtend: (lessonId: string, revision: number) => Promise<void>; canManageSchedule?: boolean;
 }) {
   const { t, i18n } = useAppTranslation();
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deadline = session.accessEndsAt ? Date.parse(session.accessEndsAt) : Number.NaN;
-  const offerKey = `${session.lessonId}:${session.accessRevision ?? 0}`;
+  const revision = session.accessRevision;
+  const validRevision = typeof revision === "number" && Number.isSafeInteger(revision) && revision >= 0;
+  const offerKey = `${session.lessonId}:${revision ?? "unknown"}`;
   if (!serverClockSynchronized()) return <aside className="lesson-extension-offer" role="status">{t("lessonExtension.syncFailed")}</aside>;
-  if (!session.canExtend || !Number.isFinite(nowMs) ||
+  if (canManageSchedule && (session.canExtend == null || (session.canExtend &&
+      (!Number.isFinite(nowMs) || !Number.isFinite(deadline) || !validRevision)))) {
+    return <aside className="lesson-extension-offer" role="status">{t("lessonExtension.policyUnavailable")}</aside>;
+  }
+  if (!session.canExtend || typeof revision !== "number" || !validRevision || !Number.isFinite(nowMs) ||
       !Number.isFinite(deadline) || nowMs < deadline - 120_000 || nowMs >= deadline || dismissed === offerKey) return null;
   const extend = async () => {
     setPending(true); setError(null);
-    try { await onExtend(session.lessonId, session.accessRevision ?? 0); }
+    try { await onExtend(session.lessonId, revision); }
     catch { setError(offerKey); }
     finally { setPending(false); }
   };

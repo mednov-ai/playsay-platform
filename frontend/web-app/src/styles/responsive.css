@@ -923,3 +923,18 @@ body.playsay-classroom-video-expanded .playsay-classroom-shell[data-video-expand
     height: 100%;
   }
 }
+
+/* The offer occupies part of the viewport; expanded lesson surfaces must fit
+   the remaining flex space so that their bottom controls remain reachable. */
+body.playsay-classroom-video-expanded main > section > .lesson-extension-offer + .playsay-classroom-shell[data-video-expanded="true"],
+body.playsay-classroom-external-activity-focus main > section > .lesson-extension-offer + .playsay-classroom-shell[data-presentation-mode="external-activity-focus"],
+body.playsay-classroom-video-expanded main[data-playsay-tools-layout="true"] > section > .lesson-extension-offer + .playsay-classroom-shell[data-video-expanded="true"],
+body.playsay-classroom-external-activity-focus main[data-playsay-tools-layout="true"] > section > .lesson-extension-offer + .playsay-classroom-shell[data-presentation-mode="external-activity-focus"] {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 0;
+}
+
+body.playsay-classroom-video-expanded main > section > .lesson-extension-offer + .playsay-classroom-shell[data-video-expanded="true"] .playsay-video-rail {
+  height: 100%;
+}

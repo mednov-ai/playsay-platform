@@ -408,7 +408,7 @@ export function AppShell(props: AppShellProps) {
 
         {roomSession ? (
           <Suspense fallback={<PanelFallback />}>
-            <LessonExtensionOffer session={roomSession} nowMs={nowMs} onExtend={extendLessonAccess} />
+            <LessonExtensionOffer session={roomSession} nowMs={nowMs} onExtend={extendLessonAccess} canManageSchedule={canManageSchedule} />
             <LiveLessonExperience
               materials={materials}
               onAssignMaterial={(lessonId, materialId) => assignMaterialToScheduledLesson(lessonId, materialId)}

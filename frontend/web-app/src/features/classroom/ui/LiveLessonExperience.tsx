@@ -371,7 +371,8 @@ export async function requestClassroomFullscreen(shell: HTMLElement | null): Pro
   const toolsLayout = typeof shell.closest === "function"
     ? shell.closest<HTMLElement>("[data-playsay-tools-layout]")
     : null;
-  const fullscreenShell = (toolsLayout ?? shell) as FullscreenCapableElement;
+  const appShell = typeof shell.closest === "function" ? shell.closest<HTMLElement>("main") : null;
+  const fullscreenShell = (toolsLayout ?? appShell ?? shell) as FullscreenCapableElement;
   if (fullscreenShell.requestFullscreen) {
     await fullscreenShell.requestFullscreen({ navigationUI: "hide" });
     return true;

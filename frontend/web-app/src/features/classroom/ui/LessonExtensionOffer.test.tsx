@@ -42,4 +42,30 @@ describe("lesson extension offer", () => {
     view.rerender(<LessonExtensionOffer session={{ ...session, accessRevision: 1, accessEndsAt: "2026-10-04T07:35:00Z" }} nowMs={at("33")} onExtend={onExtend} />);
     expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
   });
+  it("recovers an undismissed offer after the classroom is reloaded", () => {
+    const onExtend = vi.fn();
+    const view = render(<LessonExtensionOffer session={session} nowMs={at("23")} onExtend={onExtend} />);
+    fireEvent.click(screen.getByText("lessonExtension.decline"));
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+    view.unmount();
+    render(<LessonExtensionOffer session={session} nowMs={at("23")} onExtend={onExtend} />);
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+  });
+  it("explains missing policy to a manager and recovers the offer when it arrives", () => {
+    const onExtend = vi.fn();
+    const view = render(<LessonExtensionOffer session={{ ...session, canExtend: null }} canManageSchedule nowMs={at("23")} onExtend={onExtend} />);
+    expect(screen.getByRole("status")).toHaveTextContent("lessonExtension.policyUnavailable");
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+    view.rerender(<LessonExtensionOffer session={{ ...session, accessEndsAt: null }} canManageSchedule nowMs={at("23")} onExtend={onExtend} />);
+    expect(screen.getByRole("status")).toHaveTextContent("lessonExtension.policyUnavailable");
+    view.rerender(<LessonExtensionOffer session={{ ...session, accessRevision: undefined }} canManageSchedule nowMs={at("23")} onExtend={onExtend} />);
+    expect(screen.getByRole("status")).toHaveTextContent("lessonExtension.policyUnavailable");
+    view.rerender(<LessonExtensionOffer session={session} canManageSchedule nowMs={at("23")} onExtend={onExtend} />);
+    expect(screen.getByText("lessonExtension.extend")).toBeTruthy();
+  });
+  it("does not display a policy warning or extension action to a student with unknown permission", () => {
+    render(<LessonExtensionOffer session={{ ...session, canExtend: null }} nowMs={at("23")} onExtend={vi.fn()} />);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText("lessonExtension.extend")).toBeNull();
+  });
 });

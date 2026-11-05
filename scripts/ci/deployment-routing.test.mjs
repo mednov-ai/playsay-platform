@@ -109,7 +109,7 @@ test("release candidate lifecycle preserves a manual production gate", () => {
 
   assert.match(finalize, /manifest_status.*"building"/);
   assert.match(finalize, /acceptedDevCommit/);
-  assert.match(finalize, /git -C "\$PLATFORM_DIR" merge-base --is-ancestor/);
+  assert.match(finalize, /validate-release-source\.sh/);
   assert.match(finalize, /\.build\.commit/);
   assert.match(finalize, /Unaffected chart .* changed image\/build metadata/);
   assert.match(

@@ -48,6 +48,7 @@ if [ "$remote_platform_head" != "$GIT_COMMIT" ]; then
 fi
 
 START_DIR="$(pwd)"
+SCRIPT_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 MANIFEST_PATH="argocd-apps/prod/release-candidate.yaml"
 
 ensure_helm_dependency_repositories() {
@@ -95,21 +96,39 @@ for attempt in 1 2 3; do
   affected_targets="$(yq -r '.affectedTargets[]?' "$MANIFEST_PATH" | paste -sd, -)"
   base_infra_commit="$(yq -r '.baseInfraCommit // ""' "$MANIFEST_PATH")"
   base_release="$(yq -r '.baseRelease // ""' "$MANIFEST_PATH")"
-  accepted_dev_commit="$(yq -r '.acceptedDevCommit // ""' "$MANIFEST_PATH")"
+  base_platform_commit="$(yq -r '.basePlatformCommit // ""' "$MANIFEST_PATH")"
+  release_kind="$(yq -r '.releaseKind // "normal"' "$MANIFEST_PATH")"
+  case "$release_kind" in
+    normal) accepted_dev_commit="$(yq -r '.acceptedDevCommit // ""' "$MANIFEST_PATH")" ;;
+    hotfix) accepted_dev_commit="$(yq -r '.integratedDevCommit // ""' "$MANIFEST_PATH")" ;;
+    *) echo "Candidate manifest has an invalid releaseKind: $release_kind" >&2; exit 1 ;;
+  esac
   if ! printf '%s\n' "$base_infra_commit" | grep -Eq '^[0-9a-f]{40}$'; then
     echo "Candidate manifest has an invalid baseInfraCommit." >&2
     exit 1
   fi
   if ! printf '%s\n' "$accepted_dev_commit" | grep -Eq '^[0-9a-f]{40}$'; then
-    echo "Candidate manifest has an invalid acceptedDevCommit." >&2
+    echo "Candidate manifest has an invalid release integration commit." >&2
     exit 1
   fi
   PLATFORM_DIR="$WORK_DIR/platform"
   git clone --quiet --no-checkout --single-branch --branch "$CI_BRANCH" "$PLATFORM_REPO" "$PLATFORM_DIR"
-  if ! git -C "$PLATFORM_DIR" merge-base --is-ancestor "$accepted_dev_commit" "$GIT_COMMIT"; then
-    echo "Release $CI_BRANCH does not contain accepted dev commit $accepted_dev_commit." >&2
-    exit 1
+  if [ "$release_kind" = hotfix ]; then
+    if ! printf '%s\n' "$base_release" | grep -Eq '^release/[0-9]{2}\.[0-9]{3}\.[0-9]{2}$'; then
+      echo 'Candidate manifest has an invalid hotfix base release.' >&2; exit 1
+    fi
+    git fetch --quiet origin '+refs/heads/develop:refs/remotes/origin/develop'
+    current_release="$(git show 'refs/remotes/origin/develop:argocd-apps/prod/current-release.txt' | tr -d '[:space:]')"
+    if [ "$current_release" != "$base_release" ]; then
+      echo 'Production release moved since hotfix preparation.' >&2; exit 1
+    fi
+    git -C "$PLATFORM_DIR" fetch --quiet origin "+refs/heads/develop:refs/remotes/origin/develop" "+refs/heads/${base_release}:refs/remotes/origin/${base_release}"
+    current_platform_base="$(git -C "$PLATFORM_DIR" rev-parse "refs/remotes/origin/${base_release}^{commit}")"
+    if [ "$current_platform_base" != "$base_platform_commit" ]; then
+      echo 'Production platform source moved since hotfix preparation.' >&2; exit 1
+    fi
   fi
+  "$SCRIPT_DIR/validate-release-source.sh" "$PLATFORM_DIR" "$release_kind" "$CI_BRANCH" "$GIT_COMMIT" "$base_platform_commit" "$accepted_dev_commit" refs/remotes/origin/develop "$base_release"
   if ! git cat-file -e "${base_infra_commit}^{commit}" 2>/dev/null; then
     git fetch --quiet origin "refs/heads/${base_release}:refs/remotes/origin/${base_release}"
   fi

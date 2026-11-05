@@ -43,8 +43,9 @@ function initWorkRepo(path) {
   git(path, ["config", "user.name", "Release Candidate Test"]);
 }
 
+for (const [releaseKind, nextRelease] of [["normal", "release/01.002.00"], ["hotfix", "release/01.001.01"]]) {
 test(
-  "release candidate prepare/finalize preserves baseline metadata and reaches ready",
+  `${releaseKind} candidate prepare/finalize preserves baseline metadata and reaches ready`,
   { skip: !existsSync(yqBin) || !existsSync(helmBin), timeout: 30_000 },
   () => {
     const sandbox = mkdtempSync(resolve(tmpdir(), "playsay-release-candidate-test-"));
@@ -66,26 +67,27 @@ test(
       git(platformWork, ["add", "."]);
       git(platformWork, ["commit", "-qm", "production source"]);
       const basePlatformCommit = git(platformWork, ["rev-parse", "HEAD"]);
-      git(platformWork, ["branch", "release/1.001.06"]);
+      git(platformWork, ["branch", "release/01.001.00"]);
       write(platformWork, "frontend/web-app/src/App.tsx", "candidate\n");
       git(platformWork, ["add", "."]);
       git(platformWork, ["commit", "-qm", "candidate source"]);
       const candidatePlatformCommit = git(platformWork, ["rev-parse", "HEAD"]);
-      git(platformWork, ["branch", "release/1.001.07"]);
+      git(platformWork, ["branch", nextRelease]);
+      git(platformWork, ["branch", "develop"]);
       git(platformWork, ["remote", "add", "origin", `file://${platformBare}`]);
-      git(platformWork, ["push", "-q", "origin", "release/1.001.06", "release/1.001.07"]);
+      git(platformWork, ["push", "-q", "origin", "release/01.001.00", nextRelease, "develop"]);
 
       initWorkRepo(infraWork);
-      write(infraWork, "argocd-apps/prod/current-release.txt", "release/1.001.06\n");
+      write(infraWork, "argocd-apps/prod/current-release.txt", "release/01.001.00\n");
       write(
         infraWork,
         "argocd-apps/prod/root-app.yaml",
-        "spec:\n  source:\n    targetRevision: release/1.001.06\n",
+        "spec:\n  source:\n    targetRevision: release/01.001.00\n",
       );
       write(
         infraWork,
         "argocd-apps/prod/apps/web-app.yaml",
-        "spec:\n  source:\n    targetRevision: release/1.001.06\n",
+        "spec:\n  source:\n    targetRevision: release/01.001.00\n",
       );
       write(
         infraWork,
@@ -103,7 +105,7 @@ test(
           "build:",
           '  name: "old"',
           '  number: "1"',
-          '  branch: "release/1.001.06"',
+          '  branch: "release/01.001.00"',
           `  commit: "${basePlatformCommit}"`,
           "",
         ].join("\n"),
@@ -177,9 +179,9 @@ test(
       git(infraWork, ["add", "."]);
       git(infraWork, ["commit", "-qm", "infra baseline"]);
       git(infraWork, ["branch", "-M", "develop"]);
-      git(infraWork, ["branch", "release/1.001.06"]);
+      git(infraWork, ["branch", "release/01.001.00"]);
       git(infraWork, ["remote", "add", "origin", `file://${infraBare}`]);
-      git(infraWork, ["push", "-q", "origin", "develop", "release/1.001.06"]);
+      git(infraWork, ["push", "-q", "origin", "develop", "release/01.001.00"]);
 
       mkdirSync(runner);
       const rewrittenInfraUrl = "https://test:test@example.invalid/infra.git";
@@ -195,9 +197,10 @@ test(
         GIT_CONFIG_VALUE_1: rewrittenPlatformUrl,
         INFRA_REPO: "https://example.invalid/infra.git",
         PLATFORM_REPO: rewrittenPlatformUrl,
-        CI_BRANCH: "release/1.001.07",
+        CI_BRANCH: nextRelease,
+        RELEASE_KIND: releaseKind,
         GIT_COMMIT: candidatePlatformCommit,
-        BASE_RELEASE_BRANCH: "release/1.001.06",
+        BASE_RELEASE_BRANCH: "release/01.001.00",
         BASE_PLATFORM_COMMIT: basePlatformCommit,
         ACCEPTED_DEV_COMMIT: candidatePlatformCommit,
         AFFECTED_TARGETS: "web-app",
@@ -228,7 +231,7 @@ test(
       assert.equal(retryPrepare.status, 0, `${retryPrepare.stdout}\n${retryPrepare.stderr}`);
       assert.match(retryPrepare.stdout, /RELEASE_AFFECTED_TARGETS=web-app/);
 
-      git(sandbox, ["clone", "-q", "--branch", "release/1.001.07", `file://${infraBare}`, candidateWork]);
+      git(sandbox, ["clone", "-q", "--branch", nextRelease, `file://${infraBare}`, candidateWork]);
       const manifestPath = resolve(candidateWork, "argocd-apps/prod/release-candidate.yaml");
       assert.match(readFileSync(manifestPath, "utf8"), /status: building/);
       assert.equal(
@@ -256,12 +259,29 @@ test(
       const candidateValues = resolve(candidateWork, "helm-charts/web-app/values-prod.yaml");
       run(yqBin, [
         "-i",
-        `.image.tag = "new" | .image.digest = "${newDigest}" | .build.name = "new" | .build.number = "2" | .build.branch = "release/1.001.07" | .build.commit = "${candidatePlatformCommit}"`,
+        `.image.tag = "new" | .image.digest = "${newDigest}" | .build.name = "new" | .build.number = "2" | .build.branch = "${nextRelease}" | .build.commit = "${candidatePlatformCommit}"`,
         candidateValues,
       ]);
       git(candidateWork, ["add", candidateValues]);
       git(candidateWork, ["commit", "-qm", "candidate image"]);
-      git(candidateWork, ["push", "-q", "origin", "HEAD:release/1.001.07"]);
+      git(candidateWork, ["push", "-q", "origin", `HEAD:${nextRelease}`]);
+
+      if (releaseKind === "hotfix") {
+        run(yqBin, ["-i", `.basePlatformCommit = "${candidatePlatformCommit}"`, manifestPath]);
+        git(candidateWork, ["add", manifestPath]);
+        git(candidateWork, ["commit", "-qm", "incorrect production baseline"]);
+        git(candidateWork, ["push", "-q", "origin", `HEAD:${nextRelease}`]);
+        const invalidBase = spawnSync(
+          "sh", [resolve(platformRoot, "scripts/ci/finalize-release-candidate.sh")],
+          { cwd: runner, env: commonEnv, encoding: "utf8" },
+        );
+        assert.notEqual(invalidBase.status, 0);
+        assert.match(invalidBase.stderr, /Production platform source moved/);
+        run(yqBin, ["-i", `.basePlatformCommit = "${basePlatformCommit}"`, manifestPath]);
+        git(candidateWork, ["add", manifestPath]);
+        git(candidateWork, ["commit", "-qm", "restore production baseline"]);
+        git(candidateWork, ["push", "-q", "origin", `HEAD:${nextRelease}`]);
+      }
 
       const finalize = spawnSync(
         "sh",
@@ -271,7 +291,7 @@ test(
       assert.equal(finalize.status, 0, `${finalize.stdout}\n${finalize.stderr}`);
 
       rmSync(candidateWork, { recursive: true, force: true });
-      git(sandbox, ["clone", "-q", "--branch", "release/1.001.07", `file://${infraBare}`, candidateWork]);
+      git(sandbox, ["clone", "-q", "--branch", nextRelease, `file://${infraBare}`, candidateWork]);
       assert.equal(
         run(yqBin, ["-r", ".status", resolve(candidateWork, "argocd-apps/prod/release-candidate.yaml")]),
         "ready",
@@ -285,3 +305,5 @@ test(
     }
   },
 );
+
+}

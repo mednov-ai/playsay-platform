@@ -255,3 +255,9 @@ test('legacy aggregate builds scan each image before migrations and pin each sca
   assert.match(content.slice(migrate, update), /assert-current-branch-head\.sh[\s\S]*run-dev-liquibase-job\.sh/);
   assert.equal((content.slice(update).match(/\.image\.digest = strenv\(IMAGE_DIGEST\)/g) ?? []).length, 7);
 });
+
+test('whiteboard API candidate is image-only and uses the existing publication guard', () => {
+  const content = readFileSync(join(root, 'Jenkinsfile.api-gateway'), 'utf8');
+  assert.match(content, /env\.CI_BRANCH == 'codex\/whiteboard-api-image-only-20261105'\) \{ env\.IMAGE_ONLY = 'true' \}/);
+  assert.match(content.split("stage('Publish image')")[1].split("stage('Tag source commit')")[0], /assert-current-branch-head\.sh/);
+});

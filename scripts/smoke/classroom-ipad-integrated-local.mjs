@@ -89,6 +89,60 @@ async function checkBoard(page) {
       assert.equal(geometry.obstructed, 0, `board ${expanded}, corner ${index}: board control blocked`);
     }
   }
+  // Board data may not yet be loaded. The teacher must remain in a reserved
+  // video row, with a usable minimum size and without covering board controls.
+  await page.evaluate(() => {
+    const stage = document.querySelector('.playsay-whiteboard-stage');
+    window.detachedFixtureStage = stage;
+    window.fixtureStageParent = stage.parentElement;
+    window.fixtureStageNext = stage.nextSibling;
+    stage.remove();
+  });
+  await page.waitForFunction(() => document.querySelector('.playsay-tablet-video-area')?.dataset.boardFallback === 'true');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  let fallback = await page.locator('.classroom-floating-window').boundingBox();
+  assert.ok(fallback && fallback.width >= 159, `missing board stage must retain visible video at minimum size: ${JSON.stringify(fallback)}`);
+  assert.equal(await page.locator('.classroom-floating-window__resize').isVisible(), true);
+  const workbenchBox = await page.locator('.playsay-workbench').boundingBox();
+  assert.ok(workbenchBox && fallback.y + fallback.height <= workbenchBox.y + 1, `fallback video must not cover the workspace: ${JSON.stringify({fallback,workbenchBox})}`);
+  const tabsReachable = await page.locator('#fixture-board').evaluate(el => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return hit === el || el.contains(hit); });
+  assert.equal(tabsReachable, true, 'fallback must not cover board tabs');
+  await page.locator('.classroom-floating-window__resize').click();
+  await page.locator('.classroom-floating-window__menu').waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.fixtureStageParent.insertBefore(window.detachedFixtureStage, window.fixtureStageNext));
+  await page.waitForFunction(() => document.querySelector('.playsay-tablet-video-area')?.dataset.boardFallback === 'false');
+  // Force the real scrollable workspace past the stage to exercise scrolling
+  // while board controls/data remain mounted, then return to the board.
+  await page.evaluate(() => {
+    const workbench = document.querySelector('.playsay-workbench');
+    const filler = document.createElement('div');
+    filler.id = 'fixture-scroll-filler';
+    filler.style.height = '1500px';
+    filler.style.flex = '0 0 1500px';
+    const board = document.querySelector('.playsay-whiteboard');
+    board.style.minHeight = '1800px';
+    board.append(filler);
+    const area = document.querySelector('.playsay-tablet-video-area');
+    window.fixtureFallbackChanges = 0;
+    window.fixtureFallbackObserver = new MutationObserver(records => { window.fixtureFallbackChanges += records.length; });
+    window.fixtureFallbackObserver.observe(area, { attributes: true, attributeFilter: ['data-board-fallback'] });
+    const stage = document.querySelector('.playsay-whiteboard-stage');
+    workbench.scrollTop += stage.getBoundingClientRect().bottom - area.getBoundingClientRect().top - 110;
+  });
+  await page.waitForFunction(() => document.querySelector('.playsay-tablet-video-area')?.dataset.boardFallback === 'true', null, { timeout: 5000 }).catch(async error => {
+    const debug = await page.evaluate(() => { const w = document.querySelector('.playsay-workbench'); const s = document.querySelector('.playsay-whiteboard-stage'); const a = document.querySelector('.playsay-tablet-video-area'); return { scrollTop: w.scrollTop, scrollHeight: w.scrollHeight, clientHeight: w.clientHeight, stage: s.getBoundingClientRect().toJSON(), workbench: w.getBoundingClientRect().toJSON(), fallback: a.dataset.boardFallback }; });
+    throw new Error(`${error.message}: ${JSON.stringify(debug)}`);
+  });
+  fallback = await page.locator('.classroom-floating-window').boundingBox();
+  assert.ok(fallback && fallback.width >= 159, `scrolled board must retain visible video at minimum size: ${JSON.stringify(fallback)}`);
+  await page.evaluate(() => new Promise(resolve => { let frames = 0; const next = () => { if (++frames === 30) resolve(); else requestAnimationFrame(next); }; requestAnimationFrame(next); }));
+  assert.ok(await page.evaluate(() => window.fixtureFallbackChanges) <= 1, 'fallback must not oscillate near the minimum visible stage height');
+  await page.evaluate(() => { document.querySelector('.playsay-workbench').scrollTop = document.querySelector('.playsay-workbench').scrollHeight; });
+  await page.waitForFunction(() => document.querySelector('.playsay-tablet-video-area')?.dataset.boardFallback === 'true');
+  assert.ok((await page.locator('.classroom-floating-window').boundingBox()).width >= 159, 'video remains at least minimum width with stage completely off-screen');
+  await page.evaluate(() => { const workbench = document.querySelector('.playsay-workbench'); window.fixtureFallbackObserver.disconnect(); document.querySelector('#fixture-scroll-filler').remove(); document.querySelector('.playsay-whiteboard').style.minHeight = ''; workbench.scrollTop = 0; });
+  await page.waitForFunction(() => document.querySelector('.playsay-tablet-video-area')?.dataset.boardFallback === 'false');
   await page.locator("#fixture-material").click();
 }
 

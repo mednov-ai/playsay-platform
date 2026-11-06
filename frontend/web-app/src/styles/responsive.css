@@ -986,6 +986,23 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   pointer-events: none;
 }
 
+/* Keep the teacher visible without covering board controls when the drawing
+   surface has not loaded or is outside the scrollable visible area. */
+.playsay-classroom-shell[data-tablet-floating="true"]:has(.playsay-tablet-video-area[data-board-fallback="true"]) {
+  grid-template-rows: auto 8rem minmax(0, 1fr) auto;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has(.playsay-tablet-video-area[data-board-fallback="true"]) .playsay-tablet-video-area {
+  position: relative;
+  inset: auto;
+  grid-row: 2;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has(.playsay-tablet-video-area[data-board-fallback="true"]) .playsay-classroom-primary {
+  grid-row: 3;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has(.playsay-tablet-video-area[data-board-fallback="true"]) .playsay-classroom-conference .playsay-classroom-controls {
+  grid-row: 4;
+}
+
 .playsay-tablet-video-content,
 .playsay-tablet-teacher-video {
   position: relative;

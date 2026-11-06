@@ -125,10 +125,11 @@ export function LiveLessonExperience({
   useEffect(() => setGameMinimized(false), [libraryGame.launch?.id]);
   const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch && !whiteboardPresented;
   const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
-  const rawViewportMode = useClassroomViewportMode(!canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus);
+  const libraryGameActive = Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented);
+  const rawViewportMode = useClassroomViewportMode(!canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
-  const tabletFloating = viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus;
+  const tabletFloating = viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
     : tabletFloating

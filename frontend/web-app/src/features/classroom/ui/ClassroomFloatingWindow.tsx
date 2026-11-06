@@ -4,6 +4,8 @@ import { useAppTranslation } from "../../../shared/i18n";
 import {
   FLOATING_ASPECT,
   FLOATING_DEFAULT_WIDTH,
+  FLOATING_INSET,
+  FLOATING_MIN_WIDTH,
   clampFloatingPosition,
   cornerPosition,
   floatingWidth,
@@ -32,7 +34,6 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
   const gestureRef = useRef<Gesture | null>(null);
   const suppressResizeClickRef = useRef(false);
   const [bounds, setBounds] = useState<FloatingBounds | null>(null);
-  const [boardSurfaceVisible, setBoardSurfaceVisible] = useState(true);
   const [corner, setCorner] = useState<FloatingCorner>("bottom-right");
   const [preferredWidth, setPreferredWidth] = useState(FLOATING_DEFAULT_WIDTH);
   const [dragPosition, setDragPosition] = useState<FloatingPosition | null>(null);
@@ -43,20 +44,30 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     if (!parent) return;
     const shell = parent.closest(".playsay-classroom-shell");
     let observedBoard: Element | null = null;
+    let normalInsets: { left: number; top: number; right: number; bottom: number } | null = null;
+    let remeasure: number | null = null;
     const measure = () => {
       const rect = parent.getBoundingClientRect();
+      const shellRect = shell?.getBoundingClientRect();
+      const fallback = parent.dataset.boardFallback === "true";
+      if (!fallback && shellRect) normalInsets = { left: rect.left - shellRect.left, top: rect.top - shellRect.top, right: shellRect.right - rect.right, bottom: shellRect.bottom - rect.bottom };
       const visual = window.visualViewport;
       const viewLeft = visual?.offsetLeft ?? 0;
       const viewTop = visual?.offsetTop ?? 0;
       const viewRight = viewLeft + (visual?.width ?? window.innerWidth);
       const viewBottom = viewTop + (visual?.height ?? window.innerHeight);
-      let left = Math.max(rect.left, viewLeft);
-      let top = Math.max(rect.top, viewTop);
-      let right = Math.min(rect.right, viewRight);
-      let bottom = Math.min(rect.bottom, viewBottom);
+      const normal = fallback && shellRect && normalInsets ? { left: shellRect.left + normalInsets.left, top: shellRect.top + normalInsets.top, right: shellRect.right - normalInsets.right, bottom: shellRect.bottom - normalInsets.bottom } : rect;
+      let left = Math.max(normal.left, viewLeft);
+      let top = Math.max(normal.top, viewTop);
+      let right = Math.min(normal.right, viewRight);
+      let bottom = Math.min(normal.bottom, viewBottom);
       const boardWorkbench = shell?.querySelector('.playsay-workbench[data-whiteboard-active="true"]');
       const tabs = shell?.querySelector(".playsay-whiteboard-tabs");
-      if (tabs && tabs.getClientRects().length) top = Math.max(top, tabs.getBoundingClientRect().bottom);
+      // Evaluate whether the board fits in the normal layout, even while the
+      // temporary video row shifts the workbench down; otherwise the row could
+      // cause its own entrance/exit condition to oscillate on scroll.
+      const rowOffset = fallback ? rect.height : 0;
+      if (tabs && tabs.getClientRects().length) top = Math.max(top, tabs.getBoundingClientRect().bottom - rowOffset);
       const stage = boardWorkbench?.querySelector(".playsay-whiteboard-stage") ?? null;
       if (stage !== observedBoard) {
         if (observedBoard) observer?.unobserve(observedBoard);
@@ -72,16 +83,29 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
           bottom = top;
         } else {
           left = Math.max(left, stageRect.left, workbenchRect.left);
-          top = Math.max(top, stageRect.top, workbenchRect.top);
+          top = Math.max(top, stageRect.top - rowOffset, workbenchRect.top - rowOffset);
           right = Math.min(right, stageRect.right, workbenchRect.right);
-          bottom = Math.min(bottom, stageRect.bottom, workbenchRect.bottom);
+          bottom = Math.min(bottom, stageRect.bottom - rowOffset, workbenchRect.bottom);
         }
       }
-      setBoardSurfaceVisible(!boardWorkbench || (right - left >= 80 && bottom - top >= 80));
+      const needsFallback = Boolean(boardWorkbench && (right - left < FLOATING_MIN_WIDTH + FLOATING_INSET * 2 || bottom - top < FLOATING_MIN_WIDTH / FLOATING_ASPECT + FLOATING_INSET * 2));
+      if (needsFallback !== fallback) {
+        parent.dataset.boardFallback = String(needsFallback);
+        if (remeasure !== null) cancelAnimationFrame(remeasure);
+        remeasure = requestAnimationFrame(() => { remeasure = null; measure(); });
+        return;
+      }
+      if (fallback) {
+        left = Math.max(rect.left, viewLeft);
+        top = Math.max(rect.top, viewTop);
+        right = Math.min(rect.right, viewRight);
+        bottom = Math.min(rect.bottom, viewBottom);
+      }
       setBounds({ left: left - rect.left, top: top - rect.top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) });
     };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     observer?.observe(parent);
+    if (shell) observer?.observe(shell);
     const mutations = shell && typeof MutationObserver !== "undefined" ? new MutationObserver(measure) : null;
     mutations?.observe(shell!, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-whiteboard-active", "data-expanded"] });
     measure();
@@ -92,6 +116,8 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     return () => {
       observer?.disconnect();
       mutations?.disconnect();
+      if (remeasure !== null) cancelAnimationFrame(remeasure);
+      delete parent.dataset.boardFallback;
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
       window.visualViewport?.removeEventListener("resize", measure);
@@ -154,7 +180,7 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     setDragPosition(null);
   }
 
-  const style: CSSProperties = { left: position.left, top: position.top, width, aspectRatio: `${FLOATING_ASPECT}`, visibility: boardSurfaceVisible ? undefined : "hidden" };
+  const style: CSSProperties = { left: position.left, top: position.top, width, aspectRatio: `${FLOATING_ASPECT}` };
   // Open toward the center of the usable area, keeping the grip available when there is room.
   const menuStyle: CSSProperties = bounds ? {
     left: Math.max(bounds.left + 12 - position.left, Math.min((width - 132) / 2, bounds.left + bounds.width - 12 - position.left - 132)),

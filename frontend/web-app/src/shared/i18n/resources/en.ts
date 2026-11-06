@@ -1600,6 +1600,12 @@ export const en = {
     },
   },
   classroom: {
+    floatingVideo: {
+      options: "Video window options", topLeft: "Move video to top left", topRight: "Move video to top right",
+      bottomLeft: "Move video to bottom left", bottomRight: "Move video to bottom right",
+      smaller: "Make video smaller", larger: "Make video larger", resize: "Resize video window",
+      otherParticipants: "Participants", teacherUnavailable: "Teacher unavailable",
+    },
     live: "Live",
     participantFallback: "Participant",
     screenSharePreviewTitle: "Your screen is being shared",

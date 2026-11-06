@@ -4,6 +4,7 @@ import {
   classroomCameraSlots,
   classroomExternalActivityVideo,
   classroomScreenShareTrack,
+  classroomTabletSlots,
 } from "./ClassroomVideoStage";
 
 describe("classroomCameraSlots", () => {
@@ -77,6 +78,23 @@ describe("classroomCameraSlots", () => {
     expect(externalVideo.featuredSlot?.kind).toBe("track");
     expect(externalVideo.featuredSlot?.kind === "track" && externalVideo.featuredSlot.trackRef.participant.identity).toBe("student-1");
     expect(externalVideo.additionalCount).toBe(1);
+  });
+
+  it("finds the teacher by exact authenticated identity and keeps other participants accessible", () => {
+    const slots = classroomCameraSlots(
+      [track("student-2", false), track("teacher-1", false), track("student-1", true)], [], {}, false,
+    );
+    const result = classroomTabletSlots(slots, "teacher-1");
+    expect(result.teacherSlot?.kind === "track" && result.teacherSlot.trackRef.participant.identity).toBe("teacher-1");
+    expect(result.localSlot?.kind === "track" && result.localSlot.trackRef.participant.identity).toBe("student-1");
+    expect(result.otherSlots.map((slot) => slot.kind === "track" && slot.trackRef.participant.identity)).toEqual(["student-2"]);
+  });
+
+  it("never substitutes another remote for an absent or unknown teacher", () => {
+    const slots = classroomCameraSlots([track("student-2", false), track("student-1", true)], [], {}, false);
+    expect(classroomTabletSlots(slots, "teacher-1").teacherSlot).toBeUndefined();
+    expect(classroomTabletSlots(slots, null).teacherSlot).toBeUndefined();
+    expect(classroomTabletSlots(slots, null).otherSlots).toHaveLength(1);
   });
 });
 

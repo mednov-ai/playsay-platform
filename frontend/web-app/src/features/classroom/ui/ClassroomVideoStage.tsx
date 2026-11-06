@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { ConnectionStateToast, ParticipantTile, RoomAudioRenderer, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { ScreenShare, UserRound, Video } from "lucide-react";
+import { ScreenShare, UserRound, Users, Video } from "lucide-react";
 import { ClassroomControlBar } from "./ClassroomControlBar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { useLessonTranslation } from "../hooks/useLessonTranslation";
@@ -10,6 +10,7 @@ import type { LessonParticipantPresenceMap, LessonParticipantPresenceState } fro
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import { externalActivityTrackPrefix } from "../model/externalActivityProtocol";
 import { ClassroomParticipantConnectionDot } from "./ClassroomConnectionStatus";
+import { ClassroomFloatingWindow } from "./ClassroomFloatingWindow";
 
 type ClassroomTrackReference = ReturnType<typeof useTracks>[number];
 type ExpectedParticipant = ScheduledLesson["participants"][number];
@@ -22,7 +23,7 @@ export type ClassroomVideoSlot =
       subject: string;
     };
 type ClassroomStripLayout = "single" | "row";
-export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly" | "externalActivity";
+export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly" | "externalActivity" | "tabletFloating";
 
 export function ClassroomVideoStage({
   expectedParticipants,
@@ -40,6 +41,8 @@ export function ClassroomVideoStage({
   participantPresence,
   showExpectedParticipants,
   showLearnerConnectionDots,
+  teacherName,
+  teacherSubject,
   translationAllowed,
   translationRole,
 }: {
@@ -58,6 +61,8 @@ export function ClassroomVideoStage({
   participantPresence: LessonParticipantPresenceMap;
   showExpectedParticipants: boolean;
   showLearnerConnectionDots: boolean;
+  teacherName?: string | null;
+  teacherSubject?: string | null;
   translationAllowed: boolean;
   translationRole: TranslationRole | null;
 }) {
@@ -68,6 +73,7 @@ export function ClassroomVideoStage({
   const stripRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const [pipPosition, setPipPosition] = useState({ x: 12, y: 120 });
+  const [selectedVideoSubject, setSelectedVideoSubject] = useState<string | null>(null);
   const translation = useLessonTranslation({ allowed: translationAllowed, lessonId, lessonType, role: translationRole });
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
@@ -83,6 +89,12 @@ export function ClassroomVideoStage({
     participantPresence,
     showExpectedParticipants,
   );
+  const selectedVideoPresent = selectedVideoSubject !== null && cameraSlots.some((slot) => (
+    slot.kind === "track" && !slot.trackRef.participant.isLocal && slot.trackRef.participant.identity === selectedVideoSubject
+  ));
+  useEffect(() => {
+    if (selectedVideoSubject && !selectedVideoPresent) setSelectedVideoSubject(null);
+  }, [selectedVideoPresent, selectedVideoSubject]);
   const activeScreenShareTrack = classroomScreenShareTrack(screenShareTracks);
   const screenShareActive = Boolean(activeScreenShareTrack);
   const featuredSlot = cameraSlots[0];
@@ -239,6 +251,78 @@ export function ClassroomVideoStage({
     };
   }, [canDragStrip, externalActivityVideo.additionalCount, mode, stripLayout, stripSlots.length]);
 
+  if (mode === "tabletFloating" && !activeScreenShareTrack) {
+    const { teacherSlot, activeSlot, localSlot, otherSlots } = classroomTabletSlots(cameraSlots, teacherSubject, selectedVideoSubject);
+    const teacherPlaceholder: ClassroomVideoSlot | null = teacherSubject && !teacherSlot && !activeSlot
+      ? { kind: "placeholder", displayName: teacherName?.trim() || t("classroom.connection.teacher"), state: participantPresence[teacherSubject] ?? "OFFLINE", subject: teacherSubject }
+      : null;
+    return (
+      <div className="playsay-classroom-conference" data-mode="tablet-floating">
+        <div className="playsay-tablet-video-area">
+          <ClassroomFloatingWindow>
+            <div className="playsay-tablet-video-content">
+              <div className="playsay-tablet-teacher-video">
+                {activeSlot || teacherPlaceholder ? (
+                  <ClassroomVideoSlotView slot={(activeSlot ?? teacherPlaceholder)!} />
+                ) : (
+                  <div className="playsay-video-presence" role="status">
+                    <span className="playsay-video-presence-icon"><UserRound aria-hidden="true" /></span>
+                    <span>{t("classroom.floatingVideo.teacherUnavailable")}</span>
+                  </div>
+                )}
+                {selectedVideoPresent && activeSlot?.kind === "track" ? (
+                  <span className="playsay-tablet-selected-label">{participantDisplayName(activeSlot.trackRef, t("classroom.participantFallback"))}</span>
+                ) : null}
+              </div>
+              {localSlot ? (
+                <div className="playsay-tablet-local-video">
+                  <ClassroomVideoSlotView slot={localSlot} />
+                </div>
+              ) : null}
+              {otherSlots.length || selectedVideoPresent ? (
+                <details className="playsay-tablet-other-participants">
+                  <summary aria-label={t("classroom.floatingVideo.otherParticipants")} title={t("classroom.floatingVideo.otherParticipants")}>
+                    {otherSlots.length ? `+${otherSlots.length}` : <Users aria-hidden="true" size={18} />}
+                  </summary>
+                  <div className="playsay-tablet-other-list">
+                    {selectedVideoPresent && !teacherSlot ? (
+                      <button className="playsay-tablet-other-reset" type="button" onClick={(event) => { setSelectedVideoSubject(null); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{t("classroom.connection.teacher")}</button>
+                    ) : null}
+                    {otherSlots.map((slot) => {
+                      const subject = slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject;
+                      const label = slot.kind === "track" ? participantDisplayName(slot.trackRef, t("classroom.participantFallback")) : slot.displayName;
+                      return (
+                        <button aria-label={label} className="playsay-tablet-other-select" key={classroomSlotKey(slot)} type="button" onClick={(event) => { setSelectedVideoSubject(subject === teacherSubject ? null : subject); event.currentTarget.closest("details")?.removeAttribute("open"); }}>
+                          <ClassroomMiniVideoTile layout="row" showLearnerConnectionDots={false} slot={slot} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </ClassroomFloatingWindow>
+        </div>
+        <ClassroomTranslationOverlay translation={translation} />
+        <ClassroomControlBar
+          canCompleteLesson={canCompleteLesson}
+          fullscreenActive={fullscreenActive}
+          fullscreenLabel={fullscreenLabel}
+          fullscreenPending={fullscreenPending}
+          onComplete={onComplete}
+          onLeave={onLeave}
+          onToggleFullscreen={onToggleFullscreen}
+          role={translationRole}
+          setControlsRef={(node) => { controlsRef.current = node; }}
+          translation={translation}
+        />
+        {/* Keep both keys identical in every layout so React preserves their instances. */}
+        <RoomAudioRenderer key="room-audio" />
+        <ConnectionStateToast key="connection-toast" />
+      </div>
+    );
+  }
+
   if (mode === "externalActivity") {
     return (
       <div className="playsay-classroom-conference" data-layout="pip" data-mode="external-activity">
@@ -274,8 +358,8 @@ export function ClassroomVideoStage({
           setControlsRef={(node) => { controlsRef.current = node; }}
           translation={translation}
         />
-        <RoomAudioRenderer />
-        <ConnectionStateToast />
+        <RoomAudioRenderer key="room-audio" />
+        <ConnectionStateToast key="connection-toast" />
       </div>
     );
   }
@@ -312,8 +396,8 @@ export function ClassroomVideoStage({
           setControlsRef={(node) => { controlsRef.current = node; }}
           translation={translation}
         />
-        <RoomAudioRenderer />
-        <ConnectionStateToast />
+        <RoomAudioRenderer key="room-audio" />
+        <ConnectionStateToast key="connection-toast" />
       </div>
     );
   }
@@ -394,8 +478,8 @@ export function ClassroomVideoStage({
         setControlsRef={(node) => { controlsRef.current = node; }}
         translation={translation}
       />
-      <RoomAudioRenderer />
-      <ConnectionStateToast />
+      <RoomAudioRenderer key="room-audio" />
+      <ConnectionStateToast key="connection-toast" />
     </div>
   );
 }
@@ -433,6 +517,21 @@ export function classroomExternalActivityVideo(cameraSlots: ClassroomVideoSlot[]
     additionalCount: Math.max(0, remoteSlots.length - 1),
     featuredSlot: remoteSlots[0],
   };
+}
+
+export function classroomTabletSlots(cameraSlots: ClassroomVideoSlot[], teacherSubject: string | null | undefined, selectedVideoSubject: string | null = null) {
+  // LiveKit identity is the authenticated subject. The first remote camera is
+  // not necessarily the teacher in a group, and role metadata is global.
+  const teacherSlot = teacherSubject
+    ? cameraSlots.find((slot) => slot.kind === "track" && !slot.trackRef.participant.isLocal && slot.trackRef.participant.identity === teacherSubject)
+    : undefined;
+  const localSlot = cameraSlots.find((slot) => slot.kind === "track" && slot.trackRef.participant.isLocal);
+  const selectedSlot = selectedVideoSubject
+    ? cameraSlots.find((slot) => slot.kind === "track" && !slot.trackRef.participant.isLocal && slot.trackRef.participant.identity === selectedVideoSubject)
+    : undefined;
+  const activeSlot = selectedSlot ?? teacherSlot;
+  const otherSlots = cameraSlots.filter((slot) => slot !== activeSlot && slot !== localSlot);
+  return { teacherSlot, activeSlot, localSlot, otherSlots };
 }
 
 function ClassroomTranslationOverlay({ translation }: { translation: ReturnType<typeof useLessonTranslation> }) {

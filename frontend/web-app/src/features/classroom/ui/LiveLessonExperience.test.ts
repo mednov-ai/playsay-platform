@@ -31,6 +31,17 @@ describe("classroomViewportMode", () => {
     expect(classroomViewportModeFromSnapshot(viewportSnapshot(920, 820))).toBe("desktop");
   });
 
+  it("uses the tablet layout for touch-capable iPads in either orientation and Split View", () => {
+    for (const [width, height] of [[768, 1024], [1024, 768], [512, 768], [768, 512]]) {
+      expect(classroomViewportModeFromSnapshot({ ...viewportSnapshot(width, height), tabletDevice: true })).toBe("tablet");
+    }
+  });
+
+  it("does not switch a desktop or phone to tablet layout based on dimensions alone", () => {
+    expect(classroomViewportModeFromSnapshot({ ...viewportSnapshot(768, 1024), coarsePointer: false, tabletDevice: true })).toBe("desktop");
+    expect(classroomViewportModeFromSnapshot(viewportSnapshot(390, 844))).toBe("mobilePortrait");
+  });
+
   it("keeps short desktop browser resizes in desktop mode without a coarse pointer", () => {
     expect(classroomViewportModeFromSnapshot({
       ...viewportSnapshot(920, 600),

@@ -1574,6 +1574,12 @@ export const de = {
     },
   },
   classroom: {
+    floatingVideo: {
+      options: "Videofenster-Optionen", topLeft: "Video nach oben links", topRight: "Video nach oben rechts",
+      bottomLeft: "Video nach unten links", bottomRight: "Video nach unten rechts",
+      smaller: "Video verkleinern", larger: "Video vergrößern", resize: "Videogröße ändern",
+      otherParticipants: "Teilnehmer", teacherUnavailable: "Lehrkraft nicht verfügbar",
+    },
     live: "Live",
     participantFallback: "Teilnehmer",
     screenSharePreviewTitle: "Dein Bildschirm wird geteilt",

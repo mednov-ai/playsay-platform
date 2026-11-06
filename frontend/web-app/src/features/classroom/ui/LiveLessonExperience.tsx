@@ -24,13 +24,14 @@ import type { MediaTransportEvidence } from "../model/mediaTransportEvidence";
 import type { ClassroomMediaRecoveryPhase } from "../model/mediaRecovery";
 import { Button } from "../../../components/ui/button";
 
-export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
+export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape" | "tablet";
 
 type ClassroomViewportSnapshot = {
   coarsePointer: boolean;
   height: number;
   landscapeQueryMatches: boolean;
   portraitQueryMatches: boolean;
+  tabletDevice?: boolean;
   width: number;
 };
 
@@ -105,12 +106,15 @@ export function LiveLessonExperience({
       ? "student"
       : null;
   const videoOnly = !session.materialId && !canManageLesson;
-  const rawViewportMode = useClassroomViewportMode();
+  const externalActivityFocus = presentationMode === "external-activity-focus";
+  const rawViewportMode = useClassroomViewportMode(!canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
-  const externalActivityFocus = presentationMode === "external-activity-focus";
+  const tabletFloating = viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
+    : tabletFloating
+      ? "tabletFloating"
     : videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
       ? "focusOnly"
       : videoOnly
@@ -191,6 +195,7 @@ export function LiveLessonExperience({
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
       data-media-transport-class={mediaTransportEvidence.transportClass}
       data-screen-share-active={screenShareActive ? "true" : "false"}
+      data-tablet-floating={tabletFloating ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
       data-viewport-mode={viewportMode}
@@ -263,6 +268,8 @@ export function LiveLessonExperience({
               onScreenShareActiveChange={setScreenShareActive}
               onToggleFullscreen={() => void toggleFullscreen()}
               participantPresence={session.participantPresence}
+              teacherName={session.teacherName}
+              teacherSubject={session.teacherSubject}
               showExpectedParticipants={canManageLesson}
               showLearnerConnectionDots={canManageLesson}
               translationAllowed={session.lessonTranslationAllowed}
@@ -287,8 +294,8 @@ export function LiveLessonExperience({
   );
 }
 
-function useClassroomViewportMode(): ClassroomViewportMode {
-  const [mode, setMode] = useState<ClassroomViewportMode>(() => classroomViewportMode());
+function useClassroomViewportMode(allowTablet: boolean): ClassroomViewportMode {
+  const [snapshot, setSnapshot] = useState<ClassroomViewportSnapshot>(() => readClassroomViewportSnapshot());
 
   useEffect(() => {
     const portraitQuery = window.matchMedia(mobilePortraitQuery);
@@ -296,7 +303,7 @@ function useClassroomViewportMode(): ClassroomViewportMode {
     const visualViewport = window.visualViewport;
 
     function updateMode() {
-      setMode(classroomViewportMode());
+      setSnapshot(readClassroomViewportSnapshot());
     }
 
     updateMode();
@@ -315,7 +322,7 @@ function useClassroomViewportMode(): ClassroomViewportMode {
     };
   }, []);
 
-  return mode;
+  return classroomViewportModeFromSnapshot({ ...snapshot, tabletDevice: allowTablet && snapshot.tabletDevice });
 }
 
 export function classroomViewportMode(): ClassroomViewportMode {
@@ -403,6 +410,11 @@ async function exitClassroomFullscreen(): Promise<boolean> {
 }
 
 export function classroomViewportModeFromSnapshot(snapshot: ClassroomViewportSnapshot): ClassroomViewportMode {
+  // iPadOS Safari may identify itself as a Mac. Require touch capability plus
+  // tablet device evidence, so a small desktop window doesn't change layouts.
+  if (snapshot.tabletDevice && snapshot.coarsePointer && snapshot.width >= 320 && snapshot.height >= 320) {
+    return "tablet";
+  }
   const isLandscape = snapshot.width > snapshot.height;
   const isPhoneLikeLandscape = isLandscape &&
     snapshot.coarsePointer &&
@@ -431,6 +443,9 @@ function readClassroomViewportSnapshot(): ClassroomViewportSnapshot {
     height,
     landscapeQueryMatches: window.matchMedia(mobileLandscapeQuery).matches,
     portraitQueryMatches: window.matchMedia(mobilePortraitQuery).matches,
+    tabletDevice: /iPad/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+      || (/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent)),
     width,
   };
 }

@@ -1602,6 +1602,12 @@ export const ru = {
     },
   },
   classroom: {
+    floatingVideo: {
+      options: "Настройки окна видео", topLeft: "Переместить видео влево вверх", topRight: "Переместить видео вправо вверх",
+      bottomLeft: "Переместить видео влево вниз", bottomRight: "Переместить видео вправо вниз",
+      smaller: "Уменьшить видео", larger: "Увеличить видео", resize: "Изменить размер видео",
+      otherParticipants: "Участники", teacherUnavailable: "Учитель недоступен",
+    },
     live: "В эфире",
     participantFallback: "Участник",
     screenSharePreviewTitle: "Экран транслируется",

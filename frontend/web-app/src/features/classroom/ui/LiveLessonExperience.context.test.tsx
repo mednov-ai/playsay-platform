@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LessonRoomSession } from "../model/session";
 import { LiveLessonExperience } from "./LiveLessonExperience";
 
+const permissions = vi.hoisted(() => ({ canManage: true }));
+
 vi.mock("@livekit/components-react", () => ({
   LiveKitRoom: ({ children }: { children: ReactNode }) => (
     <div data-testid="livekit-room">{children}</div>
@@ -15,7 +17,7 @@ vi.mock("@livekit/components-react", () => ({
 }));
 
 vi.mock("../../../entities/workspace/model", () => ({
-  canAssignLessons: () => true,
+  canAssignLessons: () => permissions.canManage,
 }));
 
 vi.mock("../../../entities/schedule/model", () => ({
@@ -42,7 +44,12 @@ vi.mock("../../../components/ui/button", () => ({
 }));
 
 vi.mock("./ClassroomVideoStage", () => ({
-  ClassroomVideoStage: ({ mode }: { mode: string }) => <div data-mode={mode} data-testid="video-stage" />,
+  ClassroomVideoStage: ({ mode, onScreenShareActiveChange }: { mode: string; onScreenShareActiveChange: (active: boolean) => void }) => (
+    <div data-mode={mode} data-testid="video-stage">
+      <button type="button" onClick={() => onScreenShareActiveChange(true)}>start share</button>
+      <button type="button" onClick={() => onScreenShareActiveChange(false)}>stop share</button>
+    </div>
+  ),
 }));
 
 vi.mock("./ClassroomConnectionStatus", () => ({
@@ -61,9 +68,33 @@ vi.mock("./LessonWorkspace", () => ({
   ),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); permissions.canManage = true; vi.unstubAllGlobals(); });
 
 describe("LiveLessonExperience room context", () => {
+  it("activates tablet layout only for learners with material and preserves the room across screen-share transitions", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 Macintosh", platform: "MacIntel", maxTouchPoints: 5 });
+    vi.stubGlobal("innerWidth", 768);
+    vi.stubGlobal("innerHeight", 1024);
+    permissions.canManage = false;
+    const session = { ...classroomSession(), identity: "student-1" };
+    const common = { materials: [], onAssignMaterial: vi.fn(), onComplete: vi.fn(), onLeave: vi.fn(), onMediaLifecycleChange: vi.fn(), onRetryMedia: vi.fn(), profile: null, recoveryPhase: "idle" as const };
+    const view = render(<LiveLessonExperience {...common} session={session} />);
+    const provider = screen.getByTestId("livekit-room");
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "start share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "focusOnly");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+    fireEvent.click(screen.getByRole("button", { name: "stop share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+    view.rerender(<LiveLessonExperience {...common} session={{ ...session, materialId: null }} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
+    permissions.canManage = true;
+    view.rerender(<LiveLessonExperience {...common} session={session} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+  });
   it("keeps the video stage and lesson workspace inside the same LiveKit room", () => {
     vi.stubGlobal("matchMedia", () => ({
       addEventListener: vi.fn(),

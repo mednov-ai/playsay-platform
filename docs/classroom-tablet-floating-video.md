@@ -1,0 +1,9 @@
+# Tablet classroom floating video
+
+When a learner uses a supported touch tablet viewport with lesson material, the material is the primary workspace and a compact in-page floating window shows the assigned teacher and the learner's own camera preview. The usual desktop, teacher, no-material, screen-share and external-activity views retain their presentation. This is a classroom window and does not promise system Picture-in-Picture outside the page.
+
+Dragging the window docks it to the nearest available corner with an inset. A separate, always-visible striped grip on the horizontal edge facing the workspace centre changes its size: drag upward to enlarge in a bottom corner, or downward in a top corner; the reverse movement shrinks it. Resizing retains the selected corner and aspect ratio. The window stays within the available workspace when the viewport changes. Activating the grip opens localized corner and size controls without dragging or a separate three-dot button; Escape closes them and returns focus to the grip. Other lesson and drawing controls remain accessible, and input outside the window reaches the material.
+
+The initial primary video is selected using the lesson's assigned `teacherSubject`, not the order in which remote participants arrive. When a substitute or another participant needs to be shown, the learner can select that participant by name from the participant list; this is a local display choice and does not assert a teacher role. A missing or disabled camera retains its corresponding presence state. Position, size and participant selection do not change the lesson, media tracks or another participant's layout.
+
+The production baseline used by this hotfix does not include the standalone whiteboard introduced later in develop. The integration into that branch must preserve the floating layout for the presented board and verify board gestures, state and media continuity separately.

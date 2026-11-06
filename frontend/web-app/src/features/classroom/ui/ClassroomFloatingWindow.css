@@ -1,0 +1,112 @@
+.classroom-floating-window {
+  position: absolute;
+  z-index: 20;
+  overflow: visible;
+  color: white;
+  background: #18202d;
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.3rem 1rem rgb(0 0 0 / 30%);
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* Restrict gestures on the draggable video, not the participant list which needs native scrolling. */
+.playsay-tablet-teacher-video,
+.playsay-tablet-local-video {
+  touch-action: none;
+}
+
+.classroom-floating-window__content {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.classroom-floating-window__resize,
+.classroom-floating-window__menu button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: white;
+  background: rgb(20 27 39 / 80%);
+  border: 0;
+  cursor: pointer;
+}
+
+.classroom-floating-window__resize:focus-visible,
+.classroom-floating-window__menu button:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: -3px;
+}
+
+.classroom-floating-window__resize svg,
+.classroom-floating-window__menu svg {
+  width: 19px;
+  height: 19px;
+}
+
+.classroom-floating-window__resize {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  background: transparent;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.classroom-floating-window__resize[data-edge="top"] {
+  top: 0;
+}
+
+.classroom-floating-window__resize[data-edge="bottom"] {
+  bottom: 0;
+}
+
+.classroom-floating-window__grip {
+  display: flex;
+  width: 28px;
+  height: 19px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: rgb(20 27 39 / 85%);
+}
+
+.classroom-floating-window__resize[data-edge="top"] .classroom-floating-window__grip {
+  align-self: start;
+  border-radius: 0 0 0.4rem 0.4rem;
+}
+
+.classroom-floating-window__resize[data-edge="bottom"] .classroom-floating-window__grip {
+  align-self: end;
+  border-radius: 0.4rem 0.4rem 0 0;
+}
+
+.classroom-floating-window__grip > span {
+  width: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: white;
+}
+
+.classroom-floating-window__menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  overflow: hidden;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 30%);
+}
+
+.classroom-floating-window__menu button[aria-pressed="true"] {
+  background: #9a5310;
+}

@@ -54,7 +54,12 @@ vi.mock("../../../components/ui/button", () => ({
 }));
 
 vi.mock("./ClassroomVideoStage", () => ({
-  ClassroomVideoStage: ({ mode }: { mode: string }) => <div data-mode={mode} data-testid="video-stage" />,
+  ClassroomVideoStage: ({ mode, onScreenShareActiveChange }: { mode: string; onScreenShareActiveChange: (active: boolean) => void }) => (
+    <div data-mode={mode} data-testid="video-stage">
+      <button type="button" onClick={() => onScreenShareActiveChange(true)}>start share</button>
+      <button type="button" onClick={() => onScreenShareActiveChange(false)}>stop share</button>
+    </div>
+  ),
 }));
 
 vi.mock("./ClassroomConnectionStatus", () => ({
@@ -75,7 +80,7 @@ vi.mock("./LessonWorkspace", () => ({
   ),
 }));
 
-afterEach(() => { cleanup(); liveState.practice = null; liveState.teacher = true; liveState.remoteBoard = false; liveState.launch = null; liveState.stop.mockClear(); });
+afterEach(() => { cleanup(); liveState.practice = null; liveState.teacher = true; liveState.remoteBoard = false; liveState.launch = null; liveState.stop.mockClear(); vi.unstubAllGlobals(); });
 
 describe("LiveLessonExperience room context", () => {
   it("suspends and restores a library game around board presentation without a shared stop or media remount", () => {
@@ -127,6 +132,67 @@ describe("LiveLessonExperience room context", () => {
     expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
   });
 
+  it("activates tablet layout only for learners with material and preserves the room across screen-share transitions", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 Macintosh", platform: "MacIntel", maxTouchPoints: 5 });
+    vi.stubGlobal("innerWidth", 768);
+    vi.stubGlobal("innerHeight", 1024);
+    liveState.teacher = false;
+    const session = { ...classroomSession(), identity: "student-1" };
+    const common = { materials: [], onAssignMaterial: vi.fn(), onComplete: vi.fn(), onLeave: vi.fn(), onMediaLifecycleChange: vi.fn(), onRetryMedia: vi.fn(), profile: null, recoveryPhase: "idle" as const };
+    const view = render(<LiveLessonExperience {...common} session={session} />);
+    const provider = screen.getByTestId("livekit-room");
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "start share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "focusOnly");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+    fireEvent.click(screen.getByRole("button", { name: "stop share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+    view.rerender(<LiveLessonExperience {...common} session={{ ...session, materialId: null }} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
+    liveState.teacher = true;
+    view.rerender(<LiveLessonExperience {...common} session={session} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+  });
+  it("keeps a material-free learner's board visible across screen-share transitions", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 Macintosh", platform: "MacIntel", maxTouchPoints: 5 });
+    vi.stubGlobal("innerWidth", 768);
+    vi.stubGlobal("innerHeight", 1024);
+    liveState.teacher = false;
+    liveState.remoteBoard = true;
+    const props = { materials: [], onAssignMaterial: vi.fn(), onComplete: vi.fn(), onLeave: vi.fn(), onMediaLifecycleChange: vi.fn(), onRetryMedia: vi.fn(), profile: null, recoveryPhase: "idle" as const, session: { ...classroomSession(), identity: "student-1", materialId: null } };
+    const view = render(<LiveLessonExperience {...props} />);
+    const provider = screen.getByTestId("livekit-room");
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "start share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "stop share" }));
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+    liveState.remoteBoard = false;
+    view.rerender(<LiveLessonExperience {...props} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
+  });
+  it("retains the established layout for an active library game and returns to video-only when it stops", () => {
+    vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 Macintosh", platform: "MacIntel", maxTouchPoints: 5 });
+    vi.stubGlobal("innerWidth", 768);
+    vi.stubGlobal("innerHeight", 1024);
+    liveState.teacher = false;
+    liveState.launch = { id: "game-one" };
+    const props = { materials: [], onAssignMaterial: vi.fn(), onComplete: vi.fn(), onLeave: vi.fn(), onMediaLifecycleChange: vi.fn(), onRetryMedia: vi.fn(), profile: null, recoveryPhase: "idle" as const, session: { ...classroomSession(), identity: "student-1", materialId: null } };
+    const view = render(<LiveLessonExperience {...props} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+    expect(screen.getByTestId("library-game-stage")).toBeInTheDocument();
+    liveState.launch = null;
+    view.rerender(<LiveLessonExperience {...props} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
+  });
   it("keeps the video stage and lesson workspace inside the same LiveKit room", () => {
     vi.stubGlobal("matchMedia", () => ({
       addEventListener: vi.fn(),

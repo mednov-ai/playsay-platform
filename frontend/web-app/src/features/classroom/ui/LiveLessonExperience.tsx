@@ -30,13 +30,14 @@ import { useLiveVocabularyPractice } from "../../vocabulary/hooks/useLiveVocabul
 import { vocabularyFeatures } from "../../../shared/config/vocabularyFeatures";
 import { useWhiteboardPresentation } from "../hooks/useLessonWhiteboard";
 
-export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape";
+export type ClassroomViewportMode = "desktop" | "mobilePortrait" | "mobileLandscape" | "tablet";
 
 type ClassroomViewportSnapshot = {
   coarsePointer: boolean;
   height: number;
   landscapeQueryMatches: boolean;
   portraitQueryMatches: boolean;
+  tabletDevice?: boolean;
   width: number;
 };
 
@@ -123,12 +124,16 @@ export function LiveLessonExperience({
   const [gameMinimized, setGameMinimized] = useState(false);
   useEffect(() => setGameMinimized(false), [libraryGame.launch?.id]);
   const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch && !whiteboardPresented;
-  const rawViewportMode = useClassroomViewportMode();
+  const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
+  const libraryGameActive = Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented);
+  const rawViewportMode = useClassroomViewportMode(!canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
-  const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
+  const tabletFloating = viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
+    : tabletFloating
+      ? "tabletFloating"
     : videoExpanded || (videoOnly && viewportMode === "mobilePortrait")
       ? "focusOnly"
       : videoOnly
@@ -209,6 +214,7 @@ export function LiveLessonExperience({
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
       data-media-transport-class={mediaTransportEvidence.transportClass}
       data-screen-share-active={screenShareActive ? "true" : "false"}
+      data-tablet-floating={tabletFloating ? "true" : "false"}
       data-video-expanded={videoExpanded ? "true" : "false"}
       data-video-only={videoOnly ? "true" : "false"}
       data-viewport-mode={viewportMode}
@@ -282,6 +288,8 @@ export function LiveLessonExperience({
               onScreenShareActiveChange={setScreenShareActive}
               onToggleFullscreen={() => void toggleFullscreen()}
               participantPresence={session.participantPresence}
+              teacherName={session.teacherName}
+              teacherSubject={session.teacherSubject}
               showExpectedParticipants={canManageLesson}
               showLearnerConnectionDots={canManageLesson}
               translationAllowed={session.lessonTranslationAllowed}
@@ -317,8 +325,8 @@ export function LiveLessonExperience({
   );
 }
 
-function useClassroomViewportMode(): ClassroomViewportMode {
-  const [mode, setMode] = useState<ClassroomViewportMode>(() => classroomViewportMode());
+function useClassroomViewportMode(allowTablet: boolean): ClassroomViewportMode {
+  const [snapshot, setSnapshot] = useState<ClassroomViewportSnapshot>(() => readClassroomViewportSnapshot());
 
   useEffect(() => {
     const portraitQuery = window.matchMedia(mobilePortraitQuery);
@@ -326,7 +334,7 @@ function useClassroomViewportMode(): ClassroomViewportMode {
     const visualViewport = window.visualViewport;
 
     function updateMode() {
-      setMode(classroomViewportMode());
+      setSnapshot(readClassroomViewportSnapshot());
     }
 
     updateMode();
@@ -345,7 +353,7 @@ function useClassroomViewportMode(): ClassroomViewportMode {
     };
   }, []);
 
-  return mode;
+  return classroomViewportModeFromSnapshot({ ...snapshot, tabletDevice: allowTablet && snapshot.tabletDevice });
 }
 
 export function classroomViewportMode(): ClassroomViewportMode {
@@ -433,6 +441,11 @@ async function exitClassroomFullscreen(): Promise<boolean> {
 }
 
 export function classroomViewportModeFromSnapshot(snapshot: ClassroomViewportSnapshot): ClassroomViewportMode {
+  // iPadOS Safari may identify itself as a Mac. Require touch capability plus
+  // tablet device evidence, so a small desktop window doesn't change layouts.
+  if (snapshot.tabletDevice && snapshot.coarsePointer && snapshot.width >= 320 && snapshot.height >= 320) {
+    return "tablet";
+  }
   const isLandscape = snapshot.width > snapshot.height;
   const isPhoneLikeLandscape = isLandscape &&
     snapshot.coarsePointer &&
@@ -461,6 +474,9 @@ function readClassroomViewportSnapshot(): ClassroomViewportSnapshot {
     height,
     landscapeQueryMatches: window.matchMedia(mobileLandscapeQuery).matches,
     portraitQueryMatches: window.matchMedia(mobilePortraitQuery).matches,
+    tabletDevice: /iPad/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+      || (/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent)),
     width,
   };
 }

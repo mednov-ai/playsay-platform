@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { setTemporaryProfile } from "./temporary-profile.mjs";
 
 const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://dev.online.honey.school");
 const apiBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_API_BASE_URL ?? new URL("/api", `${webBaseUrl}/`).toString());
@@ -62,6 +63,7 @@ const created = {
 
 let browser;
 const sessions = [];
+const profileRestorers = [];
 
 try {
   const { chromium } = loadPlaywright();
@@ -73,11 +75,14 @@ try {
   const studentB = await createSession(browser, "studentB", passwords.studentB, { width: 1180, height: 860 });
   sessions.push(teacher, studentA, studentB);
 
-  const [, studentAProfile, studentBProfile] = await Promise.all([
+  const profileResults = await Promise.allSettled([
     ensureSmokeProfileLocale(teacher.tokens.accessToken),
     ensureSmokeProfileLocale(studentA.tokens.accessToken),
     ensureSmokeProfileLocale(studentB.tokens.accessToken),
   ]);
+  const failedProfile = profileResults.find((result) => result.status === "rejected");
+  if (failedProfile) throw failedProfile.reason;
+  const [, studentAProfile, studentBProfile] = profileResults.map((result) => result.value);
   addCheck("keycloak-login-and-student-profiles");
 
   const material = await createHomeworkMaterial(teacher.tokens.accessToken);
@@ -272,6 +277,12 @@ try {
   console.error(JSON.stringify(summary, null, 2));
   process.exitCode = 1;
 } finally {
+  for (const restore of profileRestorers.reverse()) {
+    try { await restore(); } catch (error) {
+      console.error(`Temporary demo profile restore failed: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  }
   await Promise.allSettled(sessions.map((session) => session.context.close()));
   await browser?.close();
 }
@@ -684,15 +695,9 @@ async function studentCanReadOwnAssignment(token, assignmentId) {
 }
 
 async function ensureSmokeProfileLocale(token) {
-  const profile = await apiRequest(token, "GET", "/users/me/profile", 200);
-  if (profile.locale === "en") {
-    return profile;
-  }
-  return apiRequest(token, "PUT", "/users/me/profile", 200, {
-    displayName: profile.displayName,
-    learningGoal: profile.learningGoal,
-    locale: "en",
-    timezone: profile.timezone,
+  return setTemporaryProfile({
+    apiRequest, token, overrides: { locale: "en" },
+    registerRestore: (restore) => profileRestorers.push(restore),
   });
 }
 

@@ -5,10 +5,6 @@ import com.playsay.gateway.dto.LessonMaterialDraftResponse
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialAiDraftRequest
-import com.playsay.gateway.dto.MaterialAnnotationRequest
-import com.playsay.gateway.dto.MaterialAnnotationResponse
-import com.playsay.gateway.dto.UnallocatedAnnotationSnapshotPage
-import com.playsay.gateway.dto.UnallocatedAnnotationMaterialPage
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialAssetResponse
@@ -54,9 +50,6 @@ class LessonMaterialStore(
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
-    private val materialAnnotationService: MaterialAnnotationService,
-    private val lessonAuthorizationService: ScheduledLessonAuthorizationService,
-    private val admissionGuard: LessonAdmissionGuard,
     private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val gameUploadCommands: com.playsay.gateway.service.game.LegacyGameUploadCommandService? = null,
@@ -171,88 +164,6 @@ class LessonMaterialStore(
             content = content,
             submitted = submitted,
         )
-
-    @Transactional
-    fun getAnnotationForScheduledLesson(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-    ): MaterialAnnotationResponse {
-        lockScheduledLesson(lessonId)
-        val context = annotationContext(authentication, lessonId)
-        return context.studentUserId?.let { materialAnnotationService.getOrCreateParallel(lessonId, context.materialId, it) }
-            ?: materialAnnotationService.getOrCreate(lessonId, context.materialId)
-    }
-
-    @Transactional
-    fun saveAnnotationForScheduledLesson(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-        request: MaterialAnnotationRequest,
-    ): MaterialAnnotationResponse {
-        lockScheduledLesson(lessonId)
-        val context = annotationContext(authentication, lessonId)
-        return context.studentUserId?.let { materialAnnotationService.saveParallel(lessonId, context.materialId, it, request) }
-            ?: materialAnnotationService.save(lessonId, context.materialId, request)
-    }
-
-    @Transactional
-    fun getParallelStudentAnnotations(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-        materialId: UUID,
-        studentSubject: String,
-    ): MaterialAnnotationResponse? {
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) ||
-            !lessonAuthorizationService.canManageLesson(authentication, lessonId) ||
-            admissionGuard.isKicked(lessonId, authentication.token.requireSubject())
-        ) throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        lockScheduledLesson(lessonId)
-        val lookup = scheduledMaterialLookup(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        val participant = lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lessonId, studentSubject.trim())
-        if (lookup.workMode != MetaData.LessonWorkModes.PARALLEL || participant?.materialId != materialId) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        }
-        return materialAnnotationService.getExistingParallel(lessonId, materialId, participant.userId)
-    }
-
-    @Transactional(readOnly = true)
-    fun getUnallocatedAnnotations(authentication: JwtAuthenticationToken, lessonId: UUID, materialId: UUID): MaterialAnnotationResponse? {
-        requireUnallocatedAnnotationAccess(authentication, lessonId, materialId)
-        return materialAnnotationService.getUnallocated(lessonId, materialId)
-    }
-
-    @Transactional(readOnly = true)
-    fun getUnallocatedMaterials(authentication: JwtAuthenticationToken, lessonId: UUID, page: Int): UnallocatedAnnotationMaterialPage {
-        requireUnallocatedLessonAccess(authentication, lessonId)
-        return materialAnnotationService.unallocatedMaterials(lessonId, page)
-    }
-
-    @Transactional(readOnly = true)
-    fun getUnallocatedAnnotationSnapshots(authentication: JwtAuthenticationToken, lessonId: UUID, materialId: UUID, page: Int): UnallocatedAnnotationSnapshotPage {
-        requireUnallocatedAnnotationAccess(authentication, lessonId, materialId)
-        return materialAnnotationService.quarantined(lessonId, materialId, page)
-    }
-
-    private fun requireUnallocatedAnnotationAccess(authentication: JwtAuthenticationToken, lessonId: UUID, materialId: UUID) {
-        val lookup = requireUnallocatedLessonAccess(authentication, lessonId)
-        if (lookup.materialId != materialId && materialId !in lessonParticipantRepo.findAssignedMaterialIdsByLessonId(lessonId) &&
-            !materialAnnotationService.hasUnallocated(lessonId, materialId)
-        ) throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-    }
-
-    private fun requireUnallocatedLessonAccess(authentication: JwtAuthenticationToken, lessonId: UUID): ScheduledMaterialLookup {
-        if (authentication.authorities.none { it.authority == MetaData.Authorities.TEACHER } ||
-            admissionGuard.isKicked(lessonId, authentication.token.requireSubject()) ||
-            !lessonAuthorizationService.canManageLesson(authentication, lessonId)
-        ) throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        val lookup = scheduledMaterialLookup(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        if (lookup.workMode != MetaData.LessonWorkModes.PARALLEL) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        }
-        return lookup
-    }
 
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
@@ -460,29 +371,6 @@ class LessonMaterialStore(
         return materialGameAdaptationService.rollback(materialId, assetId, jobId)
     }
 
-    private data class AnnotationContext(val materialId: UUID, val studentUserId: UUID?)
-
-    private fun annotationContext(authentication: JwtAuthenticationToken, lessonId: UUID): AnnotationContext {
-        if (admissionGuard.isKicked(lessonId, authentication)) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
-        val lookup = scheduledMaterialLookup(authentication, lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        val manager = lessonMaterialCatalogService.canManageMaterials(authentication)
-        if (manager && !lessonAuthorizationService.canManageLesson(authentication, lessonId)) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
-        if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL && manager) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
-        val materialId = materialIdForAccessibleScheduledLesson(authentication, lessonId)
-        val studentId = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL) {
-            lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lessonId, authentication.token.requireSubject())?.userId
-                ?: throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        } else null
-        return AnnotationContext(materialId, studentId)
-    }
-
     private fun materialForAccessibleScheduledLesson(
         authentication: JwtAuthenticationToken,
         lessonId: UUID,
@@ -521,11 +409,6 @@ class LessonMaterialStore(
         } else {
             lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.requireSubject())
         }
-
-    private fun lockScheduledLesson(lessonId: UUID) {
-        lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-    }
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0

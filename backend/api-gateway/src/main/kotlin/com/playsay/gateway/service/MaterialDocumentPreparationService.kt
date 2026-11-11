@@ -16,8 +16,6 @@ import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
-import org.apache.pdfbox.Loader
-import org.apache.pdfbox.cos.COSName
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.multipart.MultipartFile
@@ -35,7 +33,7 @@ class MaterialDocumentPreparationService {
         val fileName = cleanMaterialAssetFileName(file.originalFilename)
         val format = detectFormat(fileName, file.contentType, bytes)
         val prepared = when (format) {
-            MaterialDocumentFormat.PDF -> preparePdf(bytes.copyOf())
+            MaterialDocumentFormat.PDF -> prepareMaterialPdf(bytes.copyOf(), DOCUMENT_MAX_PAGES)
             MaterialDocumentFormat.PPTX -> preparePptx(bytes.copyOf())
         }
         return prepared.copy(
@@ -55,51 +53,6 @@ class MaterialDocumentPreparationService {
                 (normalizedType == PPTX_MIME || lowerName.endsWith(".pptx")) -> MaterialDocumentFormat.PPTX
             else -> fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSUPPORTED_TYPE)
         }
-    }
-
-    private fun preparePdf(source: ByteArray): PreparedMaterialDocument = try {
-        Loader.loadPDF(source).use { document ->
-            if (document.isEncrypted || document.numberOfPages !in 1..DOCUMENT_MAX_PAGES) {
-                fail(
-                    if (document.numberOfPages > DOCUMENT_MAX_PAGES) MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED
-                    else MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE,
-                )
-            }
-            val catalog = document.documentCatalog
-            catalog.openAction = null
-            catalog.actions = null
-            catalog.acroForm = null
-            catalog.names?.apply {
-                embeddedFiles = null
-                cosObject.removeItem(COSName.JAVA_SCRIPT)
-            }
-            val pages = document.pages.mapIndexed { index, page ->
-                page.actions = null
-                page.annotations.clear()
-                MaterialDocumentPageManifestResponse(
-                    id = "page-${index + 1}",
-                    index = index,
-                    width = page.mediaBox.width.toDouble(),
-                    height = page.mediaBox.height.toDouble(),
-                )
-            }
-            val output = ByteArrayOutputStream()
-            document.save(output)
-            PreparedMaterialDocument(
-                format = MaterialDocumentFormat.PDF,
-                mimeType = "application/pdf",
-                extension = "pdf",
-                originalFileName = null,
-                sourceBytes = source,
-                displayBytes = output.toByteArray(),
-                revision = "",
-                pages = pages,
-            )
-        }
-    } catch (exception: ProjectResponseException) {
-        throw exception
-    } catch (exception: Exception) {
-        fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
     }
 
     private fun preparePptx(source: ByteArray): PreparedMaterialDocument {
@@ -457,19 +410,6 @@ class MaterialDocumentPreparationService {
     private fun fail(code: String, vararg args: Any): Nothing =
         throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, code, *args)
 }
-
-enum class MaterialDocumentFormat { PDF, PPTX }
-
-data class PreparedMaterialDocument(
-    val format: MaterialDocumentFormat,
-    val mimeType: String,
-    val extension: String,
-    val originalFileName: String?,
-    val sourceBytes: ByteArray,
-    val displayBytes: ByteArray,
-    val revision: String,
-    val pages: List<MaterialDocumentPageManifestResponse>,
-)
 
 private data class PptxSlides(
     val visible: List<String>,

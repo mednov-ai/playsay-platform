@@ -8,6 +8,7 @@ import com.playsay.gateway.dto.UnallocatedAnnotationMaterialPage
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.service.LessonMaterialStore
+import com.playsay.gateway.service.ScheduledMaterialAnnotationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "Materials")
 class ScheduledMaterialController(
     private val store: LessonMaterialStore,
+    private val annotations: ScheduledMaterialAnnotationService,
 ) {
     @GetMapping("/schedule/lessons/{lessonId}/material", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
@@ -111,7 +113,7 @@ class ScheduledMaterialController(
         @RequestParam(defaultValue = "0") page: Int,
     ): ResponseEntity<UnallocatedAnnotationMaterialPage> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore().cachePrivate())
-        .body(store.getUnallocatedMaterials(authentication, lessonId, page))
+        .body(annotations.getUnallocatedMaterials(authentication, lessonId, page))
 
     @GetMapping("/schedule/lessons/{lessonId}/materials/{materialId}/unallocated-annotations", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
@@ -130,7 +132,7 @@ class ScheduledMaterialController(
         @PathVariable lessonId: UUID,
         @PathVariable materialId: UUID,
     ): ResponseEntity<MaterialAnnotationResponse> =
-        store.getUnallocatedAnnotations(authentication, lessonId, materialId)
+        annotations.getUnallocatedAnnotations(authentication, lessonId, materialId)
             ?.let { ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(it) }
             ?: ResponseEntity.noContent().cacheControl(CacheControl.noStore().cachePrivate()).build()
 
@@ -153,7 +155,7 @@ class ScheduledMaterialController(
         @PathVariable materialId: UUID,
         @PathVariable studentSubject: String,
     ): ResponseEntity<MaterialAnnotationResponse> =
-        store.getParallelStudentAnnotations(authentication, lessonId, materialId, studentSubject)
+        annotations.getParallelStudentAnnotations(authentication, lessonId, materialId, studentSubject)
             ?.let { ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(it) }
             ?: ResponseEntity.noContent().cacheControl(CacheControl.noStore().cachePrivate()).build()
 
@@ -178,7 +180,7 @@ class ScheduledMaterialController(
         @RequestParam(defaultValue = "0") page: Int,
     ): ResponseEntity<UnallocatedAnnotationSnapshotPage> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore().cachePrivate())
-        .body(store.getUnallocatedAnnotationSnapshots(authentication, lessonId, materialId, page))
+        .body(annotations.getUnallocatedAnnotationSnapshots(authentication, lessonId, materialId, page))
 
     @GetMapping("/schedule/lessons/{lessonId}/material-annotation", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
@@ -198,7 +200,7 @@ class ScheduledMaterialController(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
     ): MaterialAnnotationResponse =
-        store.getAnnotationForScheduledLesson(authentication, lessonId)
+        annotations.getAnnotationForScheduledLesson(authentication, lessonId)
 
     @PutMapping(
         "/schedule/lessons/{lessonId}/material-annotation",
@@ -224,7 +226,7 @@ class ScheduledMaterialController(
         @PathVariable lessonId: UUID,
         @RequestBody request: MaterialAnnotationRequest,
     ): MaterialAnnotationResponse =
-        store.saveAnnotationForScheduledLesson(authentication, lessonId, request)
+        annotations.saveAnnotationForScheduledLesson(authentication, lessonId, request)
 
     @PutMapping(
         "/schedule/lessons/{lessonId}/material-submission",

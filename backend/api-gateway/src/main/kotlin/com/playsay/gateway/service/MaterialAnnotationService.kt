@@ -10,9 +10,11 @@ import com.playsay.gateway.dto.UnallocatedAnnotationMaterialPage
 import com.playsay.gateway.entity.LessonMaterialAnnotationEntity
 import com.playsay.gateway.entity.LessonMaterialParallelAnnotationEntity
 import com.playsay.gateway.entity.LessonMaterialParallelAnnotationSnapshotEntity
+import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.LessonMaterialAnnotationRepo
 import com.playsay.gateway.repo.LessonMaterialParallelAnnotationRepo
 import com.playsay.gateway.repo.LessonMaterialParallelAnnotationSnapshotRepo
+import com.playsay.gateway.utils.MetaData
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -21,7 +23,6 @@ import java.util.UUID
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
-import org.springframework.web.server.ResponseStatusException
 
 private typealias StoredMaterialAnnotation = LessonMaterialAnnotationEntity
 
@@ -40,13 +41,13 @@ class MaterialAnnotationService(
         findMaterialAnnotation(lessonId, materialId) != null || parallelSnapshots.existsByLessonIdAndMaterialId(lessonId, materialId)
 
     fun unallocatedMaterials(lessonId: UUID, page: Int): UnallocatedAnnotationMaterialPage {
-        if (page !in 0..100_000) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        if (page !in 0..100_000) throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_REQUEST)
         val slice = lessonMaterialAnnotationRepo.findUnallocatedMaterialIds(lessonId, PageRequest.of(page, 10))
         return UnallocatedAnnotationMaterialPage(slice.content, slice.hasNext())
     }
 
     fun quarantined(lessonId: UUID, materialId: UUID, page: Int): UnallocatedAnnotationSnapshotPage {
-        if (page !in 0..100_000) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        if (page !in 0..100_000) throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.INVALID_REQUEST)
         val slice = parallelSnapshots.findByLessonIdAndMaterialIdOrderByCreatedAtAscIdAsc(lessonId, materialId, PageRequest.of(page, 5))
         return UnallocatedAnnotationSnapshotPage(slice.content.map { entity ->
             MaterialAnnotationResponse(entity.id, entity.lessonId, entity.materialId, objectMapper.readTree(entity.content), entity.createdAt, entity.createdAt)

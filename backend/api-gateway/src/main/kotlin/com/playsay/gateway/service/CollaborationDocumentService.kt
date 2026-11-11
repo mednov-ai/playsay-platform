@@ -235,45 +235,62 @@ class CollaborationDocumentService(
 
     @Transactional(readOnly = true)
     fun requireCurrentMaterialAccess(presentedToken: String?, documentId: UUID, subject: String) {
-        val expected = collaborationServiceToken.trim().toByteArray(StandardCharsets.UTF_8)
-        val presented = presentedToken?.trim()?.toByteArray(StandardCharsets.UTF_8) ?: byteArrayOf()
-        if (expected.size < 32 || !MessageDigest.isEqual(expected, presented)) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
-        val user = appUserRepo.findByKeycloakSubject(subject)
-            ?: throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        if (user.deletedAt != null || appUserRepo.hasDeletionIntent(subject)) {
-            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-        }
+        requireMaterialServiceToken(presentedToken)
+        val user = activeMaterialUser(subject)
         val document = collaborationDocumentRepo.findById(documentId).orElse(null)
             ?.takeIf { it.materialId != null && it.documentKind !in setOf("LESSON_GAME", "LESSON_WHITEBOARD") }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.COLLABORATION_DOCUMENT_NOT_FOUND)
         val lesson = lessonRepo.findById(document.lessonId).orElse(null)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
         val roster = lessonParticipantRepo.findByLessonId(lesson.id)
-        val roles = user.roles.toApplicationRoles()
-        val manager = "ADMIN" in roles || ("TEACHER" in roles && (lesson.teacherUserId == user.id ||
-            (roster.isNotEmpty() && studentAccessPolicy.canAccessEveryStudent(user.id, roster.map { it.studentUserId }))))
+        val manager = canManageCurrentMaterial(user, lesson.teacherUserId, roster)
         if (admissionGuard.isKicked(lesson.id, subject)) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
         val lookup = if (manager) lessonRepo.findScheduledMaterialLookup(lesson.id)
             else lessonRepo.findScheduledMaterialLookupForStudent(lesson.id, subject)
-        if (lookup == null || !isAllowedParallelDocument(lookup, document, roster)) {
+        if (lookup == null || !isAllowedParallelDocument(lookup, document, roster) ||
+            !canAccessCurrentMaterial(user, document, roster, lookup, manager)
+        ) throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+    }
+
+    private fun requireMaterialServiceToken(presentedToken: String?) {
+        val expected = collaborationServiceToken.trim().toByteArray(StandardCharsets.UTF_8)
+        val presented = presentedToken?.trim()?.toByteArray(StandardCharsets.UTF_8) ?: byteArrayOf()
+        if (expected.size < 32 || !MessageDigest.isEqual(expected, presented)) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
-        val allowed = if (manager) {
+    }
+
+    private fun activeMaterialUser(subject: String): AppUserEntity {
+        val user = appUserRepo.findByKeycloakSubject(subject)
+            ?: throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+        if (user.deletedAt != null || appUserRepo.hasDeletionIntent(subject)) {
+            throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
+        }
+        return user
+    }
+
+    private fun canManageCurrentMaterial(user: AppUserEntity, teacherUserId: UUID?, roster: List<LessonParticipantEntity>): Boolean {
+        val roles = user.roles.toApplicationRoles()
+        return "ADMIN" in roles || ("TEACHER" in roles && (teacherUserId == user.id ||
+            (roster.isNotEmpty() && studentAccessPolicy.canAccessEveryStudent(user.id, roster.map { it.studentUserId }))))
+    }
+
+    private fun canAccessCurrentMaterial(
+        user: AppUserEntity, document: CollaborationDocumentEntity, roster: List<LessonParticipantEntity>,
+        lookup: ScheduledMaterialLookupRow, manager: Boolean,
+    ): Boolean =
+        if (manager) {
             val materialIds = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL)
                 roster.mapNotNull { it.materialId } + listOfNotNull(lookup.materialId)
             else listOfNotNull(lookup.materialId)
             document.materialId in materialIds
         } else {
-            "STUDENT" in roles && roster.any { it.studentUserId == user.id } &&
+            "STUDENT" in user.roles.toApplicationRoles() && roster.any { it.studentUserId == user.id } &&
                 lookup.materialId == document.materialId && lookup.isVisibleToParticipant(clock.instant()) &&
                 (document.collaborationScope == MetaData.CollaborationScopes.GROUP || document.studentUserId == user.id)
         }
-        if (!allowed) throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
-    }
 
     fun requireDocumentAccess(
         authentication: JwtAuthenticationToken,

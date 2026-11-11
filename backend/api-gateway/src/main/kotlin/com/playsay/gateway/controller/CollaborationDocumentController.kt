@@ -58,6 +58,7 @@ class CollaborationDocumentController(
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Individual collaboration document"),
+        ApiResponse(responseCode = "400", description = "Invalid student subject", content = [Content()]),
         ApiResponse(responseCode = "403", description = "Lesson management denied", content = [Content()]),
         ApiResponse(responseCode = "404", description = "Student or assigned material not found", content = [Content()]),
     ])

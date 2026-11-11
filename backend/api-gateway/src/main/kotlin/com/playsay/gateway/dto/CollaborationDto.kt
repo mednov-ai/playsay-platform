@@ -32,7 +32,7 @@ data class CreateCollaborationDocumentRequest(
 
 data class CreateParallelCollaborationDocumentRequest(
     val materialId: UUID,
-    @field:Schema(maxLength = 255) val studentSubject: String,
+    @field:Schema(minLength = 1, maxLength = 255) val studentSubject: String,
 )
 
 data class CollaborationMaterialPolicyRequest(val subject: String)

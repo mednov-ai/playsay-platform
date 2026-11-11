@@ -153,32 +153,36 @@ class MaterialDocumentPreparationService {
         validatePrinterSettingsContentTypes(contentTypes, printerSettings)
         val referencedPrinterSettings = mutableSetOf<String>()
         entries.filterKeys { it.endsWith(".rels") }.forEach { (path, bytes) ->
-            val relationships = parseXml(bytes)
-            requirePackageRoot(relationships, RELATIONSHIPS_NS, "Relationships")
-            val nodes = relationships.getElementsByTagNameNS(RELATIONSHIPS_NS, "Relationship")
-            repeat(nodes.length) { index ->
-                val relation = nodes.item(index) as? Element ?: return@repeat
-                val mode = relation.getAttribute("TargetMode")
-                val rawTarget = relation.getAttribute("Target")
-                if ((mode.isNotEmpty() && !mode.equals("Internal", ignoreCase = true)) ||
-                    rawTarget.startsWith("//") || URI_SCHEME.containsMatchIn(rawTarget)
-                ) {
-                    fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
-                }
-                val type = relation.getAttribute("Type")
-                if (type.substringAfterLast('/').lowercase() in UNSAFE_RELATIONSHIP_TYPES) {
-                    fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
-                }
-                val target = resolvePptTarget(relsOwnerPath(path), rawTarget)
-                if (target in printerSettings || type == PRINTER_SETTINGS_RELATIONSHIP) {
-                    if (path != PRESENTATION_RELS_PATH || type != PRINTER_SETTINGS_RELATIONSHIP ||
-                        target !in printerSettings || !referencedPrinterSettings.add(target)
-                    ) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
-                }
-            }
+            validatePptxRelationships(path, bytes, printerSettings, referencedPrinterSettings)
         }
         if (referencedPrinterSettings != printerSettings) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
         return printerSettings
+    }
+
+    private fun validatePptxRelationships(path: String, bytes: ByteArray, printerSettings: Set<String>, referenced: MutableSet<String>) {
+        val relationships = parseXml(bytes)
+        requirePackageRoot(relationships, RELATIONSHIPS_NS, "Relationships")
+        val nodes = relationships.getElementsByTagNameNS(RELATIONSHIPS_NS, "Relationship")
+        repeat(nodes.length) { index ->
+            val relation = nodes.item(index) as? Element ?: return@repeat
+            validatePptxRelationship(path, relation, printerSettings, referenced)
+        }
+    }
+
+    private fun validatePptxRelationship(path: String, relation: Element, printerSettings: Set<String>, referenced: MutableSet<String>) {
+        val mode = relation.getAttribute("TargetMode")
+        val rawTarget = relation.getAttribute("Target")
+        if ((mode.isNotEmpty() && !mode.equals("Internal", ignoreCase = true)) ||
+            rawTarget.startsWith("//") || URI_SCHEME.containsMatchIn(rawTarget)
+        ) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        val type = relation.getAttribute("Type")
+        if (type.substringAfterLast('/').lowercase() in UNSAFE_RELATIONSHIP_TYPES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        val target = resolvePptTarget(relsOwnerPath(path), rawTarget)
+        if (target in printerSettings || type == PRINTER_SETTINGS_RELATIONSHIP) {
+            if (path != PRESENTATION_RELS_PATH || type != PRINTER_SETTINGS_RELATIONSHIP ||
+                target !in printerSettings || !referenced.add(target)
+            ) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        }
     }
 
     private fun validatePrinterSettingsContentTypes(bytes: ByteArray, printerSettings: Set<String>) {

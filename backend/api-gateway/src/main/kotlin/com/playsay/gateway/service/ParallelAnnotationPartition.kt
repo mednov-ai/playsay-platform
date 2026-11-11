@@ -11,18 +11,10 @@ internal class ParallelAnnotationPartition(private val mapper: ObjectMapper) {
 
     fun split(historical: JsonNode?, incoming: JsonNode): Result {
         if (historical == null || isKnownEmpty(incoming)) return Result(incoming, false)
-        val historicalObject = historical as? ObjectNode ?: return Result(null, true)
-        if (historicalObject.fieldNames().asSequence().any { it !in knownFields }) return Result(null, true)
-        if (arrayFields.any { historicalObject.has(it) && !historicalObject.get(it).isArray }) return Result(null, true)
-        val historicalArrays = arrayFields.mapNotNull { name -> historicalObject.get(name)?.takeIf(JsonNode::isArray) }
-        if (historicalArrays.isEmpty()) return Result(null, true)
-        val historicalElements = historicalArrays.flatMap { it.toList() }
-        if (historicalElements.isEmpty()) return Result(incoming, false)
-        val historicalIds = historicalElements.map { stableId(it) ?: return Result(null, true) }.toSet()
+        val historicalIds = historicalIds(historical) ?: return Result(null, true)
+        if (historicalIds.isEmpty()) return Result(incoming, false)
         val incomingObject = incoming as? ObjectNode ?: return Result(null, true)
-        if (incomingObject.fieldNames().asSequence().any { it !in knownFields }) return Result(null, true)
-        val incomingArrays = arrayFields.mapNotNull { name -> incomingObject.get(name)?.let { name to it } }
-        if (incomingArrays.isEmpty() || incomingArrays.any { (_, value) -> !value.isArray }) return Result(null, true)
+        val incomingArrays = validatedArrays(incomingObject) ?: return Result(null, true)
         if (incomingArrays.any { (_, value) -> value.any { stableId(it) == null } }) return Result(null, true)
 
         var overlap = false
@@ -35,6 +27,18 @@ internal class ParallelAnnotationPartition(private val mapper: ObjectMapper) {
             personal.set<ArrayNode>(name, clean)
         }
         return Result(personal, overlap)
+    }
+
+    private fun historicalIds(node: JsonNode): Set<String>? {
+        val arrays = validatedArrays(node as? ObjectNode ?: return null) ?: return null
+        return arrays.flatMap { (_, value) -> value.toList() }.map { stableId(it) ?: return null }.toSet()
+    }
+
+    private fun validatedArrays(node: ObjectNode): List<Pair<String, JsonNode>>? {
+        if (node.fieldNames().asSequence().any { it !in knownFields }) return null
+        val arrays = arrayFields.mapNotNull { name -> node.get(name)?.let { name to it } }
+        if (arrays.isEmpty() || arrays.any { (_, value) -> !value.isArray }) return null
+        return arrays
     }
 
     private fun isKnownEmpty(node: JsonNode): Boolean {

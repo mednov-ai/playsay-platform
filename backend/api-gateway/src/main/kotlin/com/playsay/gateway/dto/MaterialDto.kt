@@ -7,7 +7,7 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
-data class UnallocatedAnnotationMaterialPage(val materialIds: List<UUID>, val hasNext: Boolean)
+data class UnallocatedAnnotationMaterialPage(@field:ArraySchema(maxItems = 10) val materialIds: List<UUID>, val hasNext: Boolean)
 
 data class LessonMaterialRequest(
     @field:Schema(maxLength = 160)
@@ -301,7 +301,7 @@ data class MaterialAnnotationRequest(
     val content: JsonNode,
 )
 
-data class UnallocatedAnnotationSnapshotPage(val items: List<MaterialAnnotationResponse>, val hasNext: Boolean)
+data class UnallocatedAnnotationSnapshotPage(@field:ArraySchema(maxItems = 5) val items: List<MaterialAnnotationResponse>, val hasNext: Boolean)
 
 data class MaterialAnnotationResponse(
     val id: UUID,

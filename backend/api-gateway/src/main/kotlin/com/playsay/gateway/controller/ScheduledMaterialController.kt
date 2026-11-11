@@ -9,7 +9,9 @@ import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.service.LessonMaterialStore
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -93,10 +95,19 @@ class ScheduledMaterialController(
         store.listSubmissionsForScheduledLesson(authentication, lessonId)
 
     @GetMapping("/schedule/lessons/{lessonId}/unallocated-annotation-materials", produces = [MediaType.APPLICATION_JSON_VALUE])
-    @Operation(operationId = "listUnallocatedAnnotationMaterials", summary = "List materials with unallocated annotations for the authorized teacher", security = [SecurityRequirement(name = "bearerAuth")])
+    @Operation(operationId = "listUnallocatedAnnotationMaterials", summary = "List materials with unallocated annotations for the authorized teacher",
+        description = "Includes historical materials after their lesson assignments are removed. Responses are private and not cacheable.",
+        security = [SecurityRequirement(name = "bearerAuth")])
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "A page of material identifiers"),
+        ApiResponse(responseCode = "400", description = "Invalid page", content = [Content()]),
+        ApiResponse(responseCode = "403", description = "Teacher access denied", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Parallel lesson not found", content = [Content()]),
+    ])
     fun unallocatedAnnotationMaterials(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
+        @Parameter(schema = Schema(type = "integer", format = "int32", minimum = "0", maximum = "100000", defaultValue = "0"))
         @RequestParam(defaultValue = "0") page: Int,
     ): ResponseEntity<UnallocatedAnnotationMaterialPage> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore().cachePrivate())
@@ -110,7 +121,7 @@ class ScheduledMaterialController(
     )
     @ApiResponses(value = [
         ApiResponse(responseCode = "200", description = "Historical unallocated annotation"),
-        ApiResponse(responseCode = "204", description = "No historical annotation"),
+        ApiResponse(responseCode = "204", description = "No historical annotation", content = [Content()]),
         ApiResponse(responseCode = "403", description = "Teacher access denied", content = [Content()]),
         ApiResponse(responseCode = "404", description = "Parallel lesson or historical material not found", content = [Content()]),
     ])
@@ -127,8 +138,15 @@ class ScheduledMaterialController(
     @Operation(
         operationId = "getParallelStudentLegacyAnnotations",
         summary = "Read an assigned student's separate older-client annotation layer",
+        description = "The authorized lesson manager may read the selected student's sanitized legacy layer. Responses are private and not cacheable.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Assigned student's legacy annotation"),
+        ApiResponse(responseCode = "204", description = "No legacy annotation", content = [Content()]),
+        ApiResponse(responseCode = "403", description = "Lesson management access denied", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Parallel lesson or student assignment not found", content = [Content()]),
+    ])
     fun parallelStudentAnnotations(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
@@ -143,12 +161,20 @@ class ScheduledMaterialController(
     @Operation(
         operationId = "listUnallocatedParallelAnnotationSnapshots",
         summary = "Read unallocated snapshots retained from older clients as the authorized teacher",
+        description = "Only the authorized teacher may read snapshots that contain ambiguous historical annotations.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Retained unallocated snapshots, without student attribution"),
+        ApiResponse(responseCode = "400", description = "Invalid page", content = [Content()]),
+        ApiResponse(responseCode = "403", description = "Teacher access denied", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Parallel lesson or historical material not found", content = [Content()]),
+    ])
     fun unallocatedParallelAnnotationSnapshots(
         authentication: JwtAuthenticationToken,
         @PathVariable lessonId: UUID,
         @PathVariable materialId: UUID,
+        @Parameter(schema = Schema(type = "integer", format = "int32", minimum = "0", maximum = "100000", defaultValue = "0"))
         @RequestParam(defaultValue = "0") page: Int,
     ): ResponseEntity<UnallocatedAnnotationSnapshotPage> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore().cachePrivate())
@@ -157,8 +183,8 @@ class ScheduledMaterialController(
     @GetMapping("/schedule/lessons/{lessonId}/material-annotation", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(
         operationId = "getScheduledLessonMaterialAnnotation",
-        summary = "Get shared material annotation layer",
-        description = "Returns the shared drawing layer for the material attached to a scheduled lesson.",
+        summary = "Get the authorized lesson material annotation layer",
+        description = "Returns the shared layer in SHARED or the authenticated student's separate legacy layer in PARALLEL. Teacher access to the latter is denied.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(
@@ -181,8 +207,8 @@ class ScheduledMaterialController(
     )
     @Operation(
         operationId = "saveScheduledLessonMaterialAnnotation",
-        summary = "Save shared material annotation layer",
-        description = "Creates or updates the shared drawing layer for the material attached to a scheduled lesson.",
+        summary = "Save the authorized lesson material annotation layer",
+        description = "Saves the shared layer in SHARED or the authenticated student's separate legacy layer in PARALLEL.",
         security = [SecurityRequirement(name = "bearerAuth")],
     )
     @ApiResponses(

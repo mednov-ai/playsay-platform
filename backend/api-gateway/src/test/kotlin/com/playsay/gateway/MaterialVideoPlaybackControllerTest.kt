@@ -360,7 +360,7 @@ class MaterialVideoPlaybackControllerTest @Autowired constructor(
         )
 
         val thumbnailAssetId = assertNotNull(response.thumbnailAssetId)
-        assertEquals("/api/materials/${material.id}/assets/$thumbnailAssetId/content", response.thumbnailUrl)
+        assertEquals("/api/materials/${material.id}/assets/$thumbnailAssetId/content?access=private-v1", response.thumbnailUrl)
         val assets = materialAssetService.list(material.id)
         assertEquals(1, assets.size)
         assertEquals("VIDEO_THUMBNAIL", assets.single().kind)

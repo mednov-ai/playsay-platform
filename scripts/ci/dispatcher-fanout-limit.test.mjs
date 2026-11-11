@@ -18,7 +18,7 @@ test("dispatcher validates the four-agent operator override", () => {
 });
 
 test("dispatcher runs downstream jobs in bounded batches and aggregates their results", () => {
-  assert.match(dispatcher, /jobs\.collate\(maxParallelModuleJobs\)/);
+  assert.match(dispatcher, /firstJobs\.collate\(maxParallelModuleJobs\)/);
   assert.match(dispatcher, /batchResults = parallel branches/);
   assert.match(dispatcher, /wait: true, propagate: false/);
   assert.match(dispatcher, /Downstream module job results:/);

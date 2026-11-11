@@ -282,12 +282,22 @@ spec:
             return
           }
 
+          // DEV web smoke uses the live API, collaboration and keyboard services.
+          // Keep it in a separate final batch when any other target is changing.
+          def webJob = 'playsay-web-app-develop'
+          def deferDevWeb = env.CI_BRANCH == 'develop' && jobs.size() > 1 && jobs.contains(webJob)
+          def firstJobs = deferDevWeb ? jobs.findAll { it != webJob } : jobs
+          def jobBatches = firstJobs.collate(maxParallelModuleJobs)
+          if (deferDevWeb) {
+            jobBatches << [webJob]
+          }
+
           def downstreamResults = []
-          jobs.collate(maxParallelModuleJobs).eachWithIndex { batch, batchIndex ->
+          jobBatches.eachWithIndex { batch, batchIndex ->
             def branches = [:]
             batch.eachWithIndex { jobName, batchOffset ->
               def downstreamJobName = jobName
-              def jobIndex = batchIndex * maxParallelModuleJobs + batchOffset
+              def jobIndex = jobs.indexOf(jobName)
               def branchKey = "${jobIndex + 1}-${downstreamJobName}"
               branches[branchKey] = {
                 def downstreamParams = [
@@ -307,7 +317,7 @@ spec:
             }
             def batchResults = parallel branches
             batch.eachWithIndex { jobName, batchOffset ->
-              def jobIndex = batchIndex * maxParallelModuleJobs + batchOffset
+              def jobIndex = jobs.indexOf(jobName)
               downstreamResults << batchResults["${jobIndex + 1}-${jobName}"]
             }
           }

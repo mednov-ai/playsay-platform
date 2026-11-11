@@ -75,6 +75,11 @@
   background: hsl(var(--background));
 }
 
+.playsay-workbench[data-work-mode="SHARED"] .playsay-document-stage,
+.playsay-workbench[data-work-mode="PARALLEL"] .playsay-document-stage {
+  isolation: isolate;
+}
+
 .playsay-document-stage {
   min-height: 0;
   overflow: auto;

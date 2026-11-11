@@ -20,6 +20,8 @@ export function StudentLiveWorkspace({
   onSaveAnswers,
   onPresentationModeChange,
   profileSubject,
+  parallelWork = false,
+  studentSubject,
   score,
   sharedPresenceEnabled = false,
   submission,
@@ -34,6 +36,8 @@ export function StudentLiveWorkspace({
   onSaveAnswers: (content: LessonMaterialJson) => void;
   onPresentationModeChange?: (mode: LessonPresentationMode) => void;
   profileSubject?: string | null;
+  parallelWork?: boolean;
+  studentSubject?: string | null;
   score: number | null;
   sharedPresenceEnabled?: boolean;
   submission: LessonMaterialSubmission | null;
@@ -45,10 +49,11 @@ export function StudentLiveWorkspace({
   const { t } = useAppTranslation();
   const participantColor = collaborationParticipantColor(profileSubject ?? displayName);
   const groupAnnotationDocumentState = useCollaborationDocument({
-    enabled: true,
+    enabled: !parallelWork || Boolean(profileSubject),
     lessonId,
     materialId: material.id,
-    mode: "group",
+    mode: parallelWork ? "individual" : "group",
+    studentSubject,
   });
   const groupAnnotationWorkspace = useYjsWorkspace({
     color: participantColor,
@@ -56,6 +61,8 @@ export function StudentLiveWorkspace({
     enabled: Boolean(groupAnnotationDocumentState.document),
     onDocumentInvalid: groupAnnotationDocumentState.invalidateDocument,
     participantName: displayName,
+    preserveDraftKey: parallelWork && profileSubject && groupAnnotationDocumentState.document
+      ? JSON.stringify([profileSubject, groupAnnotationDocumentState.document.id]) : undefined,
   });
   const annotationSync = useMemo(() => {
     if (!groupAnnotationDocumentState.document) {
@@ -64,7 +71,7 @@ export function StudentLiveWorkspace({
     return {
       canRedo: groupAnnotationWorkspace.annotationUndoState.canRedo,
       canUndo: groupAnnotationWorkspace.annotationUndoState.canUndo,
-      participants: sharedPresenceEnabled ? groupAnnotationWorkspace.participants : [],
+      participants: sharedPresenceEnabled || parallelWork ? groupAnnotationWorkspace.participants : [],
       ready: groupAnnotationWorkspace.connected,
       reconnectCount: groupAnnotationWorkspace.reconnectCount,
       retry: groupAnnotationWorkspace.retryConnection,
@@ -73,7 +80,7 @@ export function StudentLiveWorkspace({
       setElements: groupAnnotationWorkspace.setAnnotationElements,
       status: groupAnnotationWorkspace.status,
       undo: groupAnnotationWorkspace.undoAnnotation,
-      updateCursor: sharedPresenceEnabled ? groupAnnotationWorkspace.updateCursor : () => undefined,
+      updateCursor: sharedPresenceEnabled || parallelWork ? groupAnnotationWorkspace.updateCursor : () => undefined,
     };
   }, [
     groupAnnotationDocumentState.document?.id,
@@ -89,6 +96,7 @@ export function StudentLiveWorkspace({
     groupAnnotationWorkspace.undoAnnotation,
     groupAnnotationWorkspace.updateCursor,
     sharedPresenceEnabled,
+    parallelWork,
   ]);
   const htmlGameSync = useMemo(
     () => groupAnnotationWorkspace.htmlGameSync(false),
@@ -113,7 +121,7 @@ export function StudentLiveWorkspace({
   const externalActivitiesEnabled = externalActivityFeatureEnabled();
   const externalActivitySync = useExternalActivitySession({
     blocks: externalActivityBlocks,
-    enabled: externalActivitiesEnabled,
+    enabled: externalActivitiesEnabled && !parallelWork,
     isHost: false,
     participantColor,
     participantName: displayName,
@@ -123,18 +131,27 @@ export function StudentLiveWorkspace({
 
   return (
     <section className="playsay-live-workspace" aria-label={t("classroom.collaboration.workspaceAria")}>
+      {parallelWork && groupAnnotationWorkspace.hasUnconfirmedDraft ? (
+        <div className="playsay-lesson-inline-message" role="status">{t("classroom.collaborationRecovery.waitingForSave")}</div>
+      ) : null}
       {groupAnnotationDocumentState.error ? (
-        <div className="playsay-lesson-inline-message">{groupAnnotationDocumentState.error}</div>
+        <div className="playsay-lesson-inline-message" role="alert">
+          {groupAnnotationDocumentState.error}
+          {parallelWork ? <button type="button" className="playsay-ghost-button" onClick={() => void groupAnnotationDocumentState.refresh()}>{t("classroom.collaborationRecovery.retry")}</button> : null}
+        </div>
       ) : null}
 
-      <LessonTaskCanvas
+      {parallelWork && !groupAnnotationDocumentState.document ? (
+        !groupAnnotationDocumentState.error ? <div role="status">{t("classroom.material.loading")}</div> : null
+      ) : <LessonTaskCanvas
+        collaborationControls={studentSubject ? null : undefined}
         lessonId={lessonId}
         material={material}
         annotationSync={annotationSync}
-        exerciseSync={groupAnnotationWorkspace.exerciseSync}
-        htmlGameSync={htmlGameSync}
-        videoSync={groupAnnotationWorkspace.videoSync}
-        externalActivitySync={externalActivitySync}
+        exerciseSync={parallelWork ? undefined : groupAnnotationWorkspace.exerciseSync}
+        htmlGameSync={parallelWork ? undefined : htmlGameSync}
+        videoSync={parallelWork ? undefined : groupAnnotationWorkspace.videoSync}
+        externalActivitySync={parallelWork ? undefined : externalActivitySync}
         onSaveAnswers={onSaveAnswers}
         onPresentationModeChange={onPresentationModeChange}
         score={score}
@@ -142,8 +159,8 @@ export function StudentLiveWorkspace({
         submissionMessage={submissionMessage}
         submissionSaving={submissionSaving}
         teacherName={teacherName}
-        viewportSync={viewportSync}
-      />
+        viewportSync={parallelWork ? undefined : viewportSync}
+      />}
     </section>
   );
 }

@@ -6,6 +6,7 @@ const hiddenActions: ToolbarActionId[] = [
   "slideShow", "record", "review", "view", "help", "share", "broadcast", "export", "undo", "redo",
   "notes", "fullscreen", "zoom", "navigation",
 ];
+const viewerLoadTimeoutMs = 60_000;
 
 export default function PptxDocumentAdapter({
   fileName,
@@ -61,6 +62,13 @@ export default function PptxDocumentAdapter({
   useEffect(() => {
     viewerRef.current?.setZoom(zoom);
   }, [content, zoom]);
+  useEffect(() => {
+    if (!content) return;
+    const timeout = window.setTimeout(() => {
+      if ((viewerRef.current?.getSlideCount() ?? 0) === 0) onErrorRef.current();
+    }, viewerLoadTimeoutMs);
+    return () => window.clearTimeout(timeout);
+  }, [content]);
   if (!content) return null;
   return (
     <div className="playsay-pptx-static-viewer">

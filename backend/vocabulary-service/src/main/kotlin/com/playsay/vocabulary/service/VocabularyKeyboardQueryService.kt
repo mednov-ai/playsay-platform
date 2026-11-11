@@ -7,6 +7,7 @@ import com.playsay.vocabulary.entity.VocabularyPracticeItemEntity
 import com.playsay.vocabulary.mapper.VocabularyPracticeResponseMapper
 import com.playsay.vocabulary.mapper.toResponse
 import com.playsay.vocabulary.repo.VocabularyEntryRepo
+import com.playsay.vocabulary.repo.VocabularyKeyResultRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeItemRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeRepo
 import com.playsay.vocabulary.repo.VocabularyPracticeSessionRepo
@@ -25,6 +26,7 @@ class VocabularyKeyboardQueryService(
     private val items: VocabularyPracticeItemRepo,
     private val responseMapper: VocabularyPracticeResponseMapper,
     private val keySnapshots: VocabularyKeySnapshotService,
+    private val keyResults: VocabularyKeyResultRepo,
 ) {
     fun keySet(actorSubject: String, sessionId: UUID): VocabularyKeySetResponse {
         val session = sessions.findById(sessionId).orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
@@ -37,6 +39,12 @@ class VocabularyKeyboardQueryService(
                 ?: item.answer.takeIf(String::isNotBlank)
         }
         val snapshot = keySnapshots.getOrCreate(session, practice, keyItems, sourceText)
+        val recordedTargetIds = keyResults.findAllBySessionIdOrderByPositionAsc(session.id)
+            .asSequence()
+            .filter { it.snapshotId == snapshot.entity.id }
+            .map { it.targetId }
+            .toSet()
+        val lastRecordedPosition = snapshot.targets.takeWhile { it.targetId in recordedTargetIds }.size
         val entryIds = keyItems.mapNotNull(VocabularyPracticeItemEntity::entryId).distinct()
         return VocabularyKeySetResponse(
             sessionId = session.id,
@@ -54,7 +62,10 @@ class VocabularyKeyboardQueryService(
             materializerSeed = snapshot.entity.materializerSeed,
             ngramSettings = snapshot.settings,
             targets = snapshot.targets,
-            completionContext = snapshot.completionContext.copy(lastAcknowledgedPosition = session.currentItemPosition),
+            completionContext = snapshot.completionContext.copy(
+                lastAcknowledgedPosition = session.keyAcknowledgedPosition,
+                lastRecordedPosition = lastRecordedPosition,
+            ),
             returnContext = snapshot.returnContext,
         )
     }

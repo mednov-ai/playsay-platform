@@ -60,6 +60,11 @@ class OpenApiExportTest {
             "operationId: getMaterialAssetContent",
             "operationId: saveScheduledLessonMaterialSubmission",
             "operationId: getScheduledLessonMaterialSubmission",
+            "operationId: createParallelStudentCollaborationDocument",
+            "operationId: listUnallocatedAnnotationMaterials",
+            "operationId: getUnallocatedParallelMaterialAnnotations",
+            "operationId: listUnallocatedParallelAnnotationSnapshots",
+            "operationId: getParallelStudentLegacyAnnotations",
             "operationId: createWorksheetImport",
             "operationId: materializeWorksheetImport",
         ).forEach { operation ->

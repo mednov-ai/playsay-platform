@@ -382,6 +382,26 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KeySet' }
+  /api/vocabulary/practice-sessions/{sessionId}/key-target-results:
+    post:
+      summary: Durably record one immutable Key target for its owning learner
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KeyTargetResultInput' }
+      responses:
+        '200':
+          description: Target accepted or already recorded; safe to retry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KeyTargetResultReceipt' }
+        '400': { description: Invalid target metrics }
+        '403': { description: Session belongs to another learner }
+        '404': { description: Session or target is unavailable }
+        '409': { description: Snapshot is unavailable or the session is closed }
   /api/vocabulary/practice-sessions/{sessionId}/key-acknowledgement:
     patch:
       summary: Persist the owning learner's monotonic position in an immutable Key target stream
@@ -1008,13 +1028,26 @@ components:
             completionPolicyVersion: { type: string, maxLength: 64 }
             assignmentId: { type: [string, 'null'], format: uuid }
             lessonId: { type: [string, 'null'], format: uuid }
-            lastAcknowledgedPosition: { type: integer, minimum: 0 }
+            lastAcknowledgedPosition: { type: integer, minimum: 0, description: "Typing acknowledgement; not proof of an accepted result." }
+            lastRecordedPosition: { type: integer, minimum: 0, description: "Length of the contiguous prefix of target results durably accepted by Vocabulary." }
         returnContext:
           type: [object, 'null']
           required: [target, path]
           properties:
             target: { type: string, enum: [HONEY_SCHOOL_VOCABULARY, HONEY_SCHOOL_LESSON, HONEY_SCHOOL_HOMEWORK] }
             path: { type: string, enum: ['/'] }
+    KeyTargetResultInput:
+      type: object
+      required: [targetId, errors, durationMs]
+      properties:
+        targetId: { type: string, format: uuid }
+        errors: { type: integer, minimum: 0, maximum: 999 }
+        durationMs: { type: integer, format: int64, minimum: 0, maximum: 3600000 }
+    KeyTargetResultReceipt:
+      type: object
+      required: [targetId]
+      properties:
+        targetId: { type: string, format: uuid }
     KeyAcknowledgementRequest:
       type: object
       required: [position]
@@ -1052,7 +1085,7 @@ components:
         attempts:
           type: array
           minItems: 1
-          maxItems: 100
+          maxItems: 200
           items:
             type: object
             required: [itemId, entryId, errors]

@@ -5,8 +5,6 @@ import com.playsay.gateway.dto.LessonMaterialDraftResponse
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialAiDraftRequest
-import com.playsay.gateway.dto.MaterialAnnotationRequest
-import com.playsay.gateway.dto.MaterialAnnotationResponse
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
 import com.playsay.gateway.dto.MaterialAssetResponse
@@ -52,7 +50,6 @@ class LessonMaterialStore(
     private val materialHtmlGameEnrichmentService: MaterialHtmlGameEnrichmentService,
     private val materialGameAdaptationService: MaterialGameAdaptationService,
     private val materialSubmissionService: MaterialSubmissionService,
-    private val materialAnnotationService: MaterialAnnotationService,
     private val gameRegistration: com.playsay.gateway.service.game.HtmlGameLegacyRegistrationService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val gameUploadCommands: com.playsay.gateway.service.game.LegacyGameUploadCommandService? = null,
@@ -167,27 +164,6 @@ class LessonMaterialStore(
             content = content,
             submitted = submitted,
         )
-
-    @Transactional
-    fun getAnnotationForScheduledLesson(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-    ): MaterialAnnotationResponse {
-        val materialId = materialIdForAccessibleScheduledLesson(authentication, lessonId)
-        lockScheduledLesson(lessonId)
-        return materialAnnotationService.getOrCreate(lessonId, materialId)
-    }
-
-    @Transactional
-    fun saveAnnotationForScheduledLesson(
-        authentication: JwtAuthenticationToken,
-        lessonId: UUID,
-        request: MaterialAnnotationRequest,
-    ): MaterialAnnotationResponse {
-        val materialId = materialIdForAccessibleScheduledLesson(authentication, lessonId)
-        lockScheduledLesson(lessonId)
-        return materialAnnotationService.save(lessonId, materialId, request)
-    }
 
     fun draft(authentication: JwtAuthenticationToken, request: MaterialAiDraftRequest): LessonMaterialDraftResponse {
         lessonMaterialCatalogService.requireMaterialManager(authentication)
@@ -433,11 +409,6 @@ class LessonMaterialStore(
         } else {
             lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.requireSubject())
         }
-
-    private fun lockScheduledLesson(lessonId: UUID) {
-        lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-    }
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0

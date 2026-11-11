@@ -776,7 +776,8 @@ export function MaterialLibraryPanel({
       documentUploadDraftRef.current = null;
       onRefresh();
     } catch (caught) {
-      setAssetUploadMessage(caught instanceof Error ? caught.message : t("materials.document.uploadFailed"));
+      const reason = caught instanceof Error ? caught.message : t("materials.document.uploadFailed");
+      setAssetUploadMessage(`${reason} ${t("materials.document.uploadRecovery")}`);
     }
   }
 

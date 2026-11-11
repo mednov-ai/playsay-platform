@@ -74,6 +74,42 @@ beforeEach(() => {
 });
 
 describe("useLessonMaterial live uploads", () => {
+  it("preserves the current material and provides recovery after a document upload error", async () => {
+    apiMocks.fetchMaterial.mockResolvedValue(material("old-material", "page-1"));
+    documentUploadMocks.create.mockRejectedValueOnce(new Error("Synthetic validation failure."));
+    const { result } = renderHook(() => useLessonMaterial({
+      onAssignMaterial: vi.fn(),
+      session: { ...session, materialId: "old-material" },
+    }));
+    await waitFor(() => expect(result.current.material?.id).toBe("old-material"));
+    await act(() => result.current.uploadDocumentPage(new File(["invalid"], "bad.pptx")));
+    expect(result.current.assignmentMessage).toBe("Synthetic validation failure. materials.document.uploadRecovery");
+    expect(result.current.material?.id).toBe("old-material");
+  });
+
+  it("refuses an ambiguous parallel assignment without changing either student", async () => {
+    const onAssignMaterial = vi.fn();
+    const { result } = renderHook(() => useLessonMaterial({ onAssignMaterial, session: { ...session, workMode: "PARALLEL" } }));
+    act(() => result.current.setSelectedMaterialId("new-material"));
+    await act(() => result.current.assignMaterial());
+    expect(onAssignMaterial).not.toHaveBeenCalled();
+    expect(result.current.assignmentMessage).toBe("classroom.messages.parallelMaterialUnsupported");
+  });
+
+  it("does not report removal when the server returns a different assignment", async () => {
+    apiMocks.fetchMaterial.mockResolvedValue(material("old-material", "page-1"));
+    const onAssignMaterial = vi.fn().mockResolvedValue({ materialId: null });
+    const { result } = renderHook(() => useLessonMaterial({
+      onAssignMaterial,
+      session: { ...session, materialId: "old-material", workMode: "SHARED" },
+    }));
+    await waitFor(() => expect(result.current.material?.id).toBe("old-material"));
+    act(() => result.current.setSelectedMaterialId("new-material"));
+    await act(() => result.current.assignMaterial());
+    expect(result.current.assignmentMessage).toBe("classroom.messages.materialAssignmentMismatch");
+    expect(result.current.material?.id).toBe("old-material");
+  });
+
   it("hides the previous material while a newly assigned material is loading", async () => {
     let resolveSecond: ((value: LessonMaterial) => void) | undefined;
     apiMocks.fetchMaterial

@@ -173,6 +173,7 @@ class VocabularyPracticeSessionEntity(
     @Column(name = "owner_subject", nullable = false, length = 255) var ownerSubject: String = "",
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 24) var status: SessionStatus = SessionStatus.NOT_STARTED,
     @Column(name = "current_item_position", nullable = false) var currentItemPosition: Int = 0,
+    @Column(name = "key_acknowledged_position", nullable = false) var keyAcknowledgedPosition: Int = 0,
     @Column(name = "attempt_sequence", nullable = false) var attemptSequence: Int = 0,
     @Column(nullable = false) var revision: Long = 0,
     @Column(name = "correct_count", nullable = false) var correctCount: Int = 0,

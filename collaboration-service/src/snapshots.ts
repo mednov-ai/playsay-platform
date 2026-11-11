@@ -1,6 +1,14 @@
 import * as Y from "yjs";
 import type { CollaborationClaims } from "./rooms.js";
 
+export function materialPersistenceState(doc: Y.Doc): { stateVectorBase64: string; deleteSetBase64: string } {
+  const stateVector = Y.encodeStateVector(doc);
+  return {
+    stateVectorBase64: Buffer.from(stateVector).toString("base64"),
+    deleteSetBase64: Buffer.from(Y.encodeStateAsUpdate(doc, stateVector)).toString("base64"),
+  };
+}
+
 export interface SnapshotConfig {
   playsayApiBaseUrl: string;
   collaborationServiceToken: string;
@@ -148,8 +156,16 @@ export class SnapshotQueue {
     }
     this.metrics?.recordSnapshotFlush(outcome === "saved" ? "saved" : outcome === "document_invalid" ? "discard" : "retry", (performance.now() - start) / 1_000);
     if (outcome !== "saved") console.warn(JSON.stringify({ event: "snapshot_outcome", outcome, severity: "warn" }));
-    if (entry.claims.documentKind === "LESSON_WHITEBOARD" && outcome === "saved") this.onOutcome?.(entry.claims, outcome, JSON.parse(entry.body).snapshot);
-    else this.onOutcome?.(entry.claims, outcome);
+    if (outcome === "saved" && entry.claims.documentKind === "LESSON_WHITEBOARD") {
+      this.onOutcome?.(entry.claims, outcome, JSON.parse(entry.body).snapshot);
+    } else if (outcome === "saved" && entry.claims.documentKind !== "LESSON_GAME") {
+      const document = new Y.Doc();
+      try {
+        const snapshot = JSON.parse(entry.body).snapshot as { yjsUpdateBase64: string };
+        Y.applyUpdate(document, Buffer.from(snapshot.yjsUpdateBase64, "base64"));
+        this.onOutcome?.(entry.claims, outcome, materialPersistenceState(document));
+      } finally { document.destroy(); }
+    } else this.onOutcome?.(entry.claims, outcome);
   }
   private remove(id: string): void {
     const current = this.pending.get(id);

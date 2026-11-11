@@ -3,6 +3,7 @@ import { LAYOUTS, resolveKeyInput } from "../../entities/layouts";
 import type { ChordSet, Finger, LayoutId } from "../../shared/types";
 import { computeAverageTempo, computeCadence } from "./mastery";
 import { typingWindowLineLength, typingWindowRows } from "./typingWindow";
+import { queueVocabularyTarget, type VocabularyTargetJournalEntry } from "./vocabularyResultJournal";
 
 export type CharStatus = "pending" | "correct" | "error";
 
@@ -34,6 +35,8 @@ export interface SessionResult {
   cadence: number;
 }
 
+type PendingVocabularyTarget = VocabularyTargetJournalEntry & { sessionId: string; persisted: boolean };
+
 interface TypingState {
   layoutId: LayoutId;
   chordSet: ChordSet | null;
@@ -53,6 +56,11 @@ interface TypingState {
   lastInputAt: number | null;
   excludedDurationMs: number;
   pausedAt: number | null;
+  vocabularyTargetStartedAt: number | null;
+  vocabularyTargetExcludedAtStart: number;
+  vocabularyTargetErrors: number;
+  pendingVocabularyTargets: PendingVocabularyTarget[];
+  discardPendingVocabularyTarget: (sessionId: string, targetId: string) => void;
   loadSet: (layoutId: LayoutId, chordSet: ChordSet, visibleCapacity?: number) => void;
   reset: () => void;
   pauseTiming: () => void;
@@ -155,6 +163,13 @@ export const useTypingStore = create<TypingState>((set, get) => ({
   lastInputAt: null,
   excludedDurationMs: 0,
   pausedAt: null,
+  vocabularyTargetStartedAt: null,
+  vocabularyTargetExcludedAtStart: 0,
+  vocabularyTargetErrors: 0,
+  pendingVocabularyTargets: [],
+  discardPendingVocabularyTarget: (sessionId, targetId) => set((state) => ({
+    pendingVocabularyTargets: state.pendingVocabularyTargets.filter((entry) => entry.sessionId !== sessionId || entry.targetId !== targetId),
+  })),
 
   loadSet: (layoutId, chordSet, visibleCapacity) => {
     const stream = buildStream(layoutId, chordSet, visibleCapacity);
@@ -177,6 +192,9 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       lastInputAt: null,
       excludedDurationMs: 0,
       pausedAt: null,
+      vocabularyTargetStartedAt: null,
+      vocabularyTargetExcludedAtStart: 0,
+      vocabularyTargetErrors: 0,
     });
   },
 
@@ -198,6 +216,9 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       lastInputAt: null,
       excludedDurationMs: 0,
       pausedAt: null,
+      vocabularyTargetStartedAt: null,
+      vocabularyTargetExcludedAtStart: 0,
+      vocabularyTargetErrors: 0,
     });
   },
 
@@ -250,6 +271,14 @@ export const useTypingStore = create<TypingState>((set, get) => ({
     const timestamp = Date.now();
     const startedAt = state.startedAt ?? timestamp;
     const target = stream[pos];
+    const vocabularyContext = state.chordSet?.vocabularyContext;
+    const vocabularyTarget = vocabularyContext?.durableResultsSupported && !target.isSpace
+      ? vocabularyContext.targets[target.chordIndex]
+      : undefined;
+    const targetStartedAt = vocabularyTarget ? state.vocabularyTargetStartedAt ?? timestamp : null;
+    const targetExcludedAtStart = state.vocabularyTargetStartedAt == null
+      ? state.excludedDurationMs
+      : state.vocabularyTargetExcludedAtStart;
 
     if (pressedChar === target.char) {
       const statuses = state.statuses.slice();
@@ -258,6 +287,21 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       const done = nextPos >= stream.length;
       const intervals =
         state.lastCorrectAt != null ? [...state.intervals, timestamp - state.lastCorrectAt] : state.intervals;
+      const nextTarget = stream[nextPos];
+      const targetCompleted = Boolean(vocabularyTarget && (done || nextTarget?.isSpace || nextTarget?.chordIndex !== target.chordIndex));
+      let pendingVocabularyTargets = state.pendingVocabularyTargets;
+      if (targetCompleted && vocabularyTarget && vocabularyContext && targetStartedAt != null) {
+        const entry: VocabularyTargetJournalEntry = {
+          targetId: vocabularyTarget.targetId,
+          position: vocabularyTarget.position,
+          errors: Math.min(state.vocabularyTargetErrors, 999),
+          durationMs: Math.min(3_600_000, Math.max(0, timestamp - targetStartedAt - (state.excludedDurationMs - targetExcludedAtStart))),
+        };
+        const persisted = queueVocabularyTarget(vocabularyContext.sessionId, entry);
+        if (!pendingVocabularyTargets.some((item) => item.sessionId === vocabularyContext.sessionId && item.targetId === entry.targetId)) {
+          pendingVocabularyTargets = [...pendingVocabularyTargets, { ...entry, sessionId: vocabularyContext.sessionId, persisted }];
+        }
+      }
       set({
         statuses,
         pos: nextPos,
@@ -268,6 +312,10 @@ export const useTypingStore = create<TypingState>((set, get) => ({
         intervals,
         lastCorrectAt: timestamp,
         lastInputAt: timestamp,
+        pendingVocabularyTargets,
+        vocabularyTargetStartedAt: targetCompleted ? null : targetStartedAt ?? state.vocabularyTargetStartedAt,
+        vocabularyTargetExcludedAtStart: targetCompleted ? 0 : targetExcludedAtStart,
+        vocabularyTargetErrors: targetCompleted ? 0 : state.vocabularyTargetErrors,
       });
       return;
     }
@@ -291,6 +339,9 @@ export const useTypingStore = create<TypingState>((set, get) => ({
       perChord,
       errorFlash: pos,
       lastInputAt: timestamp,
+      vocabularyTargetStartedAt: targetStartedAt ?? state.vocabularyTargetStartedAt,
+      vocabularyTargetExcludedAtStart: targetExcludedAtStart,
+      vocabularyTargetErrors: state.vocabularyTargetErrors + (vocabularyTarget ? 1 : 0),
     });
   },
 

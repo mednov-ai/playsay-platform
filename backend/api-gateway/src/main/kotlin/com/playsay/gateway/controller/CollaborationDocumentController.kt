@@ -1,8 +1,10 @@
 package com.playsay.gateway.controller
 
+import com.playsay.gateway.dto.CollaborationMaterialPolicyRequest
 import com.playsay.gateway.dto.CollaborationDocumentResponse
 import com.playsay.gateway.dto.CollaborationTokenResponse
 import com.playsay.gateway.dto.CreateCollaborationDocumentRequest
+import com.playsay.gateway.dto.CreateParallelCollaborationDocumentRequest
 import com.playsay.gateway.dto.FinalizeCollaborationDocumentRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
@@ -34,6 +36,38 @@ class CollaborationDocumentController(
     private val service: CollaborationDocumentService,
     private val snapshotService: CollaborationSnapshotService,
 ) {
+    @PostMapping("/internal/collaboration-documents/{documentId}/policy")
+    @Operation(hidden = true)
+    fun materialPolicy(
+        @RequestHeader("X-PlaySay-Collaboration-Service-Token", required = false) token: String?,
+        @PathVariable documentId: UUID,
+        @RequestBody request: CollaborationMaterialPolicyRequest,
+    ) {
+        service.requireCurrentMaterialAccess(token, documentId, request.subject)
+    }
+
+    @PostMapping(
+        "/schedule/lessons/{lessonId}/collaboration-documents/parallel-current",
+        consumes = [MediaType.APPLICATION_JSON_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE],
+    )
+    @Operation(
+        operationId = "createParallelStudentCollaborationDocument",
+        summary = "Create or get an assigned student's individual material context",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Individual collaboration document"),
+        ApiResponse(responseCode = "400", description = "Invalid student subject", content = [Content()]),
+        ApiResponse(responseCode = "403", description = "Lesson management denied", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Student or assigned material not found", content = [Content()]),
+    ])
+    fun parallelCurrent(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestBody request: CreateParallelCollaborationDocumentRequest,
+    ): CollaborationDocumentResponse = service.createParallelForStudent(authentication, lessonId, request)
+
     @GetMapping(
         "/schedule/lessons/{lessonId}/collaboration-documents/current",
         produces = [MediaType.APPLICATION_JSON_VALUE],

@@ -8,10 +8,11 @@ import {
   isScheduledLessonReadyToStart,
   scheduleStateLabel,
 } from "../../../entities/schedule/model";
-import type { ScheduledLesson } from "../../../shared/api/playsay";
+import type { LessonMaterial, ScheduledLesson } from "../../../shared/api/playsay";
 import type { LessonAccessOrigin } from "../../../shared/api/types";
 import { useAppTranslation } from "../../../shared/i18n";
 import { WhiteboardHistoryAction } from "../../classroom/ui/WhiteboardHistoryAction";
+import { UnallocatedAnnotationsHistory } from "./UnallocatedAnnotationsHistory";
 
 export function ScheduledLessonCard({
   canManage,
@@ -28,6 +29,8 @@ export function ScheduledLessonCard({
   onPrepare = () => undefined,
   onReschedule = () => undefined,
   roomLoading,
+  canViewUnallocated = false,
+  materials = [],
 }: {
   canManage: boolean;
   disabled: boolean;
@@ -43,6 +46,8 @@ export function ScheduledLessonCard({
   onPrepare?: () => void;
   onReschedule?: () => void;
   roomLoading: boolean;
+  canViewUnallocated?: boolean;
+  materials?: LessonMaterial[];
 }) {
   const { t } = useAppTranslation();
   const translate = (key: string, options?: Record<string, unknown>) => t(key, options);
@@ -158,6 +163,7 @@ export function ScheduledLessonCard({
           )}
         </div>
       </div>
+      {canViewUnallocated && lesson.workMode === "PARALLEL" ? <UnallocatedAnnotationsHistory lessonId={lesson.id} materials={materials} teacherName={lesson.teacherName ?? ""} /> : null}
     </article>
   );
 }

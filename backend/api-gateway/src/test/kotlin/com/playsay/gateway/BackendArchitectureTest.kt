@@ -115,7 +115,7 @@ class BackendArchitectureTest : KotlinSpringModuleArchitectureTest() {
             "WorksheetStagingObjectStorage",
         )
         val documentPreparationAllowlist = mapOf(
-            "service/MaterialDocumentPreparationService.kt" to setOf("org.apache.pdfbox"),
+            "service/MaterialPdfPreparation.kt" to setOf("org.apache.pdfbox"),
         )
         val violations = kotlinSources()
             .flatMap { source ->

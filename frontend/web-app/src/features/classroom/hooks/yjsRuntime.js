@@ -30,6 +30,7 @@ const annotationElementKinds = new Set([
 
 export function createYjsWorkspaceRuntime({
   color,
+  additionalSnapshot,
   onAnnotationChange,
   onHtmlGameEffectsChange,
   onHtmlGameInputsChange,
@@ -54,6 +55,7 @@ export function createYjsWorkspaceRuntime({
 }) {
   const ydoc = new Y.Doc();
   applyPersistedSnapshot(ydoc, snapshot);
+  applyPersistedSnapshot(ydoc, additionalSnapshot);
   const ytext = ydoc.getText("workspace");
   const yannotations = ydoc.getMap("annotations");
   const yhtmlGameSnapshots = ydoc.getMap("htmlGameSnapshots");
@@ -232,7 +234,7 @@ export function createYjsWorkspaceRuntime({
     onVideoPlaybackChange(videoPlaybackStates);
   };
   const syncUpdateHandler = (update, origin) => {
-    onDocumentUpdate?.(update);
+    onDocumentUpdate?.(update, !socket || origin !== socket);
     if (origin !== socket) {
       sendSyncUpdate(socket, update);
     }
@@ -468,6 +470,17 @@ export function createYjsWorkspaceRuntime({
       videoPlaybackStates = { ...videoPlaybackStates, [cleanBlockId]: next };
       onVideoPlaybackChange(videoPlaybackStates);
       awareness.setLocalStateField("videoPlayback", localStates);
+    },
+    isPersisted(stateVectorBase64, deleteSetBase64) {
+      try {
+        if (ydoc.store.pendingStructs || ydoc.store.pendingDs) return false;
+        const persisted = Y.decodeStateVector(base64ToUint8Array(stateVectorBase64));
+        const vector = Y.encodeStateVector(ydoc);
+        const covered = [...Y.decodeStateVector(vector)].every(([id, clock]) => (persisted.get(id) ?? 0) >= clock);
+        return covered && uint8ArrayToBase64(Y.encodeStateAsUpdate(ydoc, vector)) === deleteSetBase64;
+      } catch {
+        return false;
+      }
     },
     snapshot() {
       return {

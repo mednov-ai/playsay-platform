@@ -89,9 +89,19 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         assertFailsWith<ProjectResponseException> { service.get(students[0], lesson.id, b.id) }
         lesson.status = "COMPLETED"; lesson.actualEnd = Instant.now(); lessons.saveAndFlush(lesson)
         assertTrue(service.get(students[0], lesson.id, a.id).readOnly)
+        assertFailsWith<ProjectResponseException> { service.get(students[0], lesson.id, b.id) }
         assertFalse(service.get(teacher, lesson.id, a.id).canDraw)
+        val studentLibrary = index.list(students[0], MaterialLibraryQuery(category = "LESSON", kind = "LESSON_WHITEBOARD", limit = 200))
+        assertTrue(studentLibrary.items.any { it.id == a.id })
+        assertFalse(studentLibrary.items.any { it.id == b.id })
+        assertFailsWith<ProjectResponseException> { service.update(students[0], lesson.id, a.id, UpdateLessonWhiteboardRequest(0, clear = true)) }
         assertFailsWith<ProjectResponseException> { service.ensure(teacher, lesson.id, students[0].token.requireSubject()) }
         assertFailsWith<ProjectResponseException> { service.policy(token, a.document.id, WhiteboardPolicyRequest(students[0].token.requireSubject(), 0)) }
+        val studentId = users.findByKeycloakSubject(students[0].token.requireSubject())!!.id
+        participants.deleteAll(participants.findByLessonId(lesson.id).filter { it.studentUserId == studentId })
+        participants.flush()
+        assertFailsWith<ProjectResponseException> { service.get(students[0], lesson.id, a.id) }
+        assertFalse(index.list(students[0], MaterialLibraryQuery(category = "LESSON", kind = "LESSON_WHITEBOARD", limit = 200)).items.any { it.id == a.id })
     }
 
     @Test fun `concurrent ensure serializes context and material replacement keeps identity`() {

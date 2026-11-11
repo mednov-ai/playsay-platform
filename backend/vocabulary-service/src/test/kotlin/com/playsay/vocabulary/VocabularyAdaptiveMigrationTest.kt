@@ -74,6 +74,36 @@ class VocabularyAdaptiveMigrationTest {
         )
     }
 
+    @Test
+    fun `key acknowledgement migration preserves old parent position without inferring a key position`() {
+        val dataSource = DriverManagerDataSource(
+            "jdbc:h2:mem:vocabulary_key_upgrade_${UUID.randomUUID().toString().replace("-", "")};MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+            "sa", "",
+        ).apply { setDriverClassName("org.h2.Driver") }
+        val jdbc = JdbcTemplate(dataSource)
+        listOf(
+            "classpath:db/changelog/2026-07-11-001-vocabulary.xml",
+            "classpath:db/changelog/2026-07-28-001-vocabulary-practice.xml",
+        ).forEach { migrate(dataSource, it) }
+        val now = Timestamp.from(Instant.parse("2026-08-20T12:00:00Z"))
+        val practiceId = UUID.randomUUID()
+        val sessionId = UUID.randomUUID()
+        jdbc.update(
+            "insert into vocabulary_practices (id, created_by_subject, delivery, status, mode, settings_json, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
+            practiceId, "learner", "SELF", "ACTIVE", "KEYBOARD", "{}", now, now,
+        )
+        jdbc.update(
+            "insert into vocabulary_practice_sessions (id, practice_id, owner_subject, status, current_item_position, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)",
+            sessionId, practiceId, "learner", "IN_PROGRESS", 7, now, now,
+        )
+        val changelog = "classpath:db/changelog/2026-11-11-001-vocabulary-key-progress.xml"
+        migrate(dataSource, changelog)
+        migrate(dataSource, changelog)
+        val row = jdbc.queryForMap("select current_item_position, key_acknowledged_position from vocabulary_practice_sessions where id = ?", sessionId)
+        assertEquals(7, (row["CURRENT_ITEM_POSITION"] as Number).toInt())
+        assertEquals(0, (row["KEY_ACKNOWLEDGED_POSITION"] as Number).toInt())
+    }
+
     private fun migrate(dataSource: DataSource, changelog: String) {
         SpringLiquibase().apply {
             this.dataSource = dataSource

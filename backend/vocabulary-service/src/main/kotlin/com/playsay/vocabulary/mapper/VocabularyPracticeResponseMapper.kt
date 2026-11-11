@@ -74,7 +74,7 @@ class VocabularyPracticeResponseMapper(
         mode = practice?.mode,
         lessonId = practice?.lessonId,
         assignmentId = practice?.assignmentId,
-        lastAcknowledgedPosition = entity.currentItemPosition,
+        lastAcknowledgedPosition = entity.keyAcknowledgedPosition,
     )
 
     fun learningEntry(

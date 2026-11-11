@@ -1168,6 +1168,15 @@ export interface FinalizeCollaborationDocumentRequest {
   submitted: boolean;
 }
 
+export interface CreateParallelCollaborationDocumentRequest {
+  materialId: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  studentSubject: string;
+}
+
 export type CreateCollaborationDocumentRequestScope = typeof CreateCollaborationDocumentRequestScope[keyof typeof CreateCollaborationDocumentRequestScope];
 
 
@@ -2202,6 +2211,18 @@ export interface LessonWhiteboardContextResponse {
   board?: LessonWhiteboardResponse | null;
 }
 
+export interface UnallocatedAnnotationMaterialPage {
+  /** @maxItems 10 */
+  materialIds: string[];
+  hasNext: boolean;
+}
+
+export interface UnallocatedAnnotationSnapshotPage {
+  /** @maxItems 5 */
+  items: MaterialAnnotationResponse[];
+  hasNext: boolean;
+}
+
 export interface LessonGameStateResponse {
   launch?: LessonGameLaunchResponse | null;
   revision: number;
@@ -2563,6 +2584,22 @@ status?: string;
 
 export type GetHtmlGameParams = {
 revisionId?: string;
+};
+
+export type ListUnallocatedAnnotationMaterialsParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+page?: number;
+};
+
+export type ListUnallocatedParallelAnnotationSnapshotsParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+page?: number;
 };
 
 export type ListCollaborationDocumentsParams = {
@@ -3445,8 +3482,8 @@ export const getGetScheduledLessonMaterialAnnotationUrl = (lessonId: string,) =>
 }
 
 /**
- * Returns the shared drawing layer for the material attached to a scheduled lesson.
- * @summary Get shared material annotation layer
+ * Returns the shared layer in SHARED or the authenticated student's separate legacy layer in PARALLEL. Teacher access to the latter is denied.
+ * @summary Get the authorized lesson material annotation layer
  */
 export const getScheduledLessonMaterialAnnotation = async (lessonId: string, options?: RequestInit): Promise<getScheduledLessonMaterialAnnotationResponse> => {
 
@@ -3506,8 +3543,8 @@ export const getSaveScheduledLessonMaterialAnnotationUrl = (lessonId: string,) =
 }
 
 /**
- * Creates or updates the shared drawing layer for the material attached to a scheduled lesson.
- * @summary Save shared material annotation layer
+ * Saves the shared layer in SHARED or the authenticated student's separate legacy layer in PARALLEL.
+ * @summary Save the authorized lesson material annotation layer
  */
 export const saveScheduledLessonMaterialAnnotation = async (lessonId: string,
     materialAnnotationRequest: MaterialAnnotationRequest, options?: RequestInit): Promise<saveScheduledLessonMaterialAnnotationResponse> => {
@@ -6607,6 +6644,81 @@ const res = await fetch(getFinalizeCollaborationDocumentUrl(lessonId,documentId)
 
   const data: finalizeCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as finalizeCollaborationDocumentResponse
+}
+
+
+
+export type createParallelStudentCollaborationDocumentResponse200 = {
+  data: CollaborationDocumentResponse
+  status: 200
+}
+
+export type createParallelStudentCollaborationDocumentResponse400 = {
+  data: void
+  status: 400
+}
+
+export type createParallelStudentCollaborationDocumentResponse403 = {
+  data: void
+  status: 403
+}
+
+export type createParallelStudentCollaborationDocumentResponse404 = {
+  data: void
+  status: 404
+}
+
+export type createParallelStudentCollaborationDocumentResponseSuccess = (createParallelStudentCollaborationDocumentResponse200) & {
+  headers: Headers;
+};
+export type createParallelStudentCollaborationDocumentResponseError = (createParallelStudentCollaborationDocumentResponse400 | createParallelStudentCollaborationDocumentResponse403 | createParallelStudentCollaborationDocumentResponse404) & {
+  headers: Headers;
+};
+
+export type createParallelStudentCollaborationDocumentResponse = (createParallelStudentCollaborationDocumentResponseSuccess | createParallelStudentCollaborationDocumentResponseError)
+
+export const getCreateParallelStudentCollaborationDocumentUrl = (lessonId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/collaboration-documents/parallel-current`
+}
+
+/**
+ * @summary Create or get an assigned student's individual material context
+ */
+export const createParallelStudentCollaborationDocument = async (lessonId: string,
+    createParallelCollaborationDocumentRequest: CreateParallelCollaborationDocumentRequest, options?: RequestInit): Promise<createParallelStudentCollaborationDocumentResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateParallelStudentCollaborationDocumentUrl(lessonId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createParallelCollaborationDocumentRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createParallelStudentCollaborationDocumentResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createParallelStudentCollaborationDocumentResponse
 }
 
 
@@ -12064,6 +12176,275 @@ export const listLessonWhiteboards = async (lessonId: string, options?: RequestI
 
   const data: listLessonWhiteboardsResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as listLessonWhiteboardsResponse
+}
+
+
+
+export type listUnallocatedAnnotationMaterialsResponse200 = {
+  data: UnallocatedAnnotationMaterialPage
+  status: 200
+}
+
+export type listUnallocatedAnnotationMaterialsResponse400 = {
+  data: void
+  status: 400
+}
+
+export type listUnallocatedAnnotationMaterialsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listUnallocatedAnnotationMaterialsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type listUnallocatedAnnotationMaterialsResponseSuccess = (listUnallocatedAnnotationMaterialsResponse200) & {
+  headers: Headers;
+};
+export type listUnallocatedAnnotationMaterialsResponseError = (listUnallocatedAnnotationMaterialsResponse400 | listUnallocatedAnnotationMaterialsResponse403 | listUnallocatedAnnotationMaterialsResponse404) & {
+  headers: Headers;
+};
+
+export type listUnallocatedAnnotationMaterialsResponse = (listUnallocatedAnnotationMaterialsResponseSuccess | listUnallocatedAnnotationMaterialsResponseError)
+
+export const getListUnallocatedAnnotationMaterialsUrl = (lessonId: string,
+    params?: ListUnallocatedAnnotationMaterialsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/unallocated-annotation-materials?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/unallocated-annotation-materials`
+}
+
+/**
+ * Includes historical materials after their lesson assignments are removed. Responses are private and not cacheable.
+ * @summary List materials with unallocated annotations for the authorized teacher
+ */
+export const listUnallocatedAnnotationMaterials = async (lessonId: string,
+    params?: ListUnallocatedAnnotationMaterialsParams, options?: RequestInit): Promise<listUnallocatedAnnotationMaterialsResponse> => {
+
+  const res = await fetch(getListUnallocatedAnnotationMaterialsUrl(lessonId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listUnallocatedAnnotationMaterialsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listUnallocatedAnnotationMaterialsResponse
+}
+
+
+
+export type getUnallocatedParallelMaterialAnnotationsResponse200 = {
+  data: MaterialAnnotationResponse
+  status: 200
+}
+
+export type getUnallocatedParallelMaterialAnnotationsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type getUnallocatedParallelMaterialAnnotationsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getUnallocatedParallelMaterialAnnotationsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getUnallocatedParallelMaterialAnnotationsResponseSuccess = (getUnallocatedParallelMaterialAnnotationsResponse200 | getUnallocatedParallelMaterialAnnotationsResponse204) & {
+  headers: Headers;
+};
+export type getUnallocatedParallelMaterialAnnotationsResponseError = (getUnallocatedParallelMaterialAnnotationsResponse403 | getUnallocatedParallelMaterialAnnotationsResponse404) & {
+  headers: Headers;
+};
+
+export type getUnallocatedParallelMaterialAnnotationsResponse = (getUnallocatedParallelMaterialAnnotationsResponseSuccess | getUnallocatedParallelMaterialAnnotationsResponseError)
+
+export const getGetUnallocatedParallelMaterialAnnotationsUrl = (lessonId: string,
+    materialId: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/materials/${materialId}/unallocated-annotations`
+}
+
+/**
+ * @summary Read unallocated historical parallel annotations as the authorized teacher
+ */
+export const getUnallocatedParallelMaterialAnnotations = async (lessonId: string,
+    materialId: string, options?: RequestInit): Promise<getUnallocatedParallelMaterialAnnotationsResponse> => {
+
+  const res = await fetch(getGetUnallocatedParallelMaterialAnnotationsUrl(lessonId,materialId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getUnallocatedParallelMaterialAnnotationsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getUnallocatedParallelMaterialAnnotationsResponse
+}
+
+
+
+export type listUnallocatedParallelAnnotationSnapshotsResponse200 = {
+  data: UnallocatedAnnotationSnapshotPage
+  status: 200
+}
+
+export type listUnallocatedParallelAnnotationSnapshotsResponse400 = {
+  data: void
+  status: 400
+}
+
+export type listUnallocatedParallelAnnotationSnapshotsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type listUnallocatedParallelAnnotationSnapshotsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type listUnallocatedParallelAnnotationSnapshotsResponseSuccess = (listUnallocatedParallelAnnotationSnapshotsResponse200) & {
+  headers: Headers;
+};
+export type listUnallocatedParallelAnnotationSnapshotsResponseError = (listUnallocatedParallelAnnotationSnapshotsResponse400 | listUnallocatedParallelAnnotationSnapshotsResponse403 | listUnallocatedParallelAnnotationSnapshotsResponse404) & {
+  headers: Headers;
+};
+
+export type listUnallocatedParallelAnnotationSnapshotsResponse = (listUnallocatedParallelAnnotationSnapshotsResponseSuccess | listUnallocatedParallelAnnotationSnapshotsResponseError)
+
+export const getListUnallocatedParallelAnnotationSnapshotsUrl = (lessonId: string,
+    materialId: string,
+    params?: ListUnallocatedParallelAnnotationSnapshotsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/lessons/${lessonId}/materials/${materialId}/unallocated-annotation-snapshots?${stringifiedParams}` : `/api/schedule/lessons/${lessonId}/materials/${materialId}/unallocated-annotation-snapshots`
+}
+
+/**
+ * Only the authorized teacher may read snapshots that contain ambiguous historical annotations.
+ * @summary Read unallocated snapshots retained from older clients as the authorized teacher
+ */
+export const listUnallocatedParallelAnnotationSnapshots = async (lessonId: string,
+    materialId: string,
+    params?: ListUnallocatedParallelAnnotationSnapshotsParams, options?: RequestInit): Promise<listUnallocatedParallelAnnotationSnapshotsResponse> => {
+
+  const res = await fetch(getListUnallocatedParallelAnnotationSnapshotsUrl(lessonId,materialId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listUnallocatedParallelAnnotationSnapshotsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listUnallocatedParallelAnnotationSnapshotsResponse
+}
+
+
+
+export type getParallelStudentLegacyAnnotationsResponse200 = {
+  data: MaterialAnnotationResponse
+  status: 200
+}
+
+export type getParallelStudentLegacyAnnotationsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type getParallelStudentLegacyAnnotationsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type getParallelStudentLegacyAnnotationsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type getParallelStudentLegacyAnnotationsResponseSuccess = (getParallelStudentLegacyAnnotationsResponse200 | getParallelStudentLegacyAnnotationsResponse204) & {
+  headers: Headers;
+};
+export type getParallelStudentLegacyAnnotationsResponseError = (getParallelStudentLegacyAnnotationsResponse403 | getParallelStudentLegacyAnnotationsResponse404) & {
+  headers: Headers;
+};
+
+export type getParallelStudentLegacyAnnotationsResponse = (getParallelStudentLegacyAnnotationsResponseSuccess | getParallelStudentLegacyAnnotationsResponseError)
+
+export const getGetParallelStudentLegacyAnnotationsUrl = (lessonId: string,
+    materialId: string,
+    studentSubject: string,) => {
+
+
+
+
+  return `/api/schedule/lessons/${lessonId}/materials/${materialId}/students/${studentSubject}/parallel-annotations`
+}
+
+/**
+ * The authorized lesson manager may read the selected student's sanitized legacy layer. Responses are private and not cacheable.
+ * @summary Read an assigned student's separate older-client annotation layer
+ */
+export const getParallelStudentLegacyAnnotations = async (lessonId: string,
+    materialId: string,
+    studentSubject: string, options?: RequestInit): Promise<getParallelStudentLegacyAnnotationsResponse> => {
+
+  const res = await fetch(getGetParallelStudentLegacyAnnotationsUrl(lessonId,materialId,studentSubject),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getParallelStudentLegacyAnnotationsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getParallelStudentLegacyAnnotationsResponse
 }
 
 

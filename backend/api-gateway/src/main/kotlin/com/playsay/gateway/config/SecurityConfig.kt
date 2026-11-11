@@ -39,6 +39,7 @@ class SecurityConfig {
                         "/schedule/lessons/*/collaboration-documents/*/snapshot",
                         "/internal/vocabulary/**",
                         "/internal/whiteboards/*/policy",
+                        "/internal/collaboration-documents/*/policy",
                         "/ws/lessons",
                         "/ws/chat",
                     ).permitAll()

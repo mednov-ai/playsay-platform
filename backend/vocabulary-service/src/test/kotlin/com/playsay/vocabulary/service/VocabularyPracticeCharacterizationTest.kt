@@ -11,6 +11,7 @@ import com.playsay.vocabulary.dto.SessionStatus
 import com.playsay.vocabulary.dto.VocabularyAttemptRequest
 import com.playsay.vocabulary.dto.VocabularyHomeworkPreparationRequest
 import com.playsay.vocabulary.dto.VocabularyKeyResultRequest
+import com.playsay.vocabulary.dto.VocabularyKeyTargetResultRequest
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
 import com.playsay.vocabulary.dto.VocabularyKeyWordAttemptRequest
 import com.playsay.vocabulary.dto.VocabularyPracticeSettingsRequest
@@ -748,6 +749,116 @@ class VocabularyPracticeCharacterizationTest @Autowired constructor(
                 }
             }
         }
+    }
+
+    @Test
+    fun `key resume uses recorded target prefix without conflating parent position or double counting`() {
+        val owner = seedOwner("keyboard-durable-resume")
+        val seeded = seedPractice(owner, owner, PracticeDelivery.SELF, PracticeExerciseType.KEYBOARD, VocabularySkill.SPELLING)
+        seeded.practice.keyMode = com.playsay.vocabulary.dto.VocabularyKeyMode.CHARACTER_NGRAMS
+        seeded.practice.keyNgramSettingsJson = """{"minLength":3,"maxLength":3,"targetLimit":3,"maxRepetitions":1}"""
+        practices.save(seeded.practice)
+        seeded.session.currentItemPosition = 7
+        sessions.saveAndFlush(seeded.session)
+        val first = practice.keySet(owner, seeded.session.id)
+        assertTrue(first.targets.size >= 2)
+        val total = first.targets.size
+        practice.acknowledgeKeyPosition(owner, seeded.session.id, VocabularyKeyAcknowledgementRequest(total, first.targets.last().targetId))
+        val afterAck = practice.keySet(owner, seeded.session.id)
+        assertEquals(total, afterAck.completionContext!!.lastAcknowledgedPosition)
+        assertEquals(0, afterAck.completionContext!!.lastRecordedPosition)
+        assertEquals(7, sessions.findById(seeded.session.id).orElseThrow().currentItemPosition)
+        assertTrue(items.findById(seeded.item.id).orElseThrow().completedAt == null)
+
+        fun record(position: Int, resultId: UUID) {
+            val target = first.targets[position]
+            practice.recordKeyResult(seeded.session.id, VocabularyKeyResultRequest(
+                clientResultId = "keyboard-durable-$resultId",
+                attempts = listOf(VocabularyKeyWordAttemptRequest(
+                    itemId = seeded.item.id, entryId = seeded.entry.id, errors = 0,
+                    resultId = resultId, targetId = target.targetId, targetType = target.type,
+                    position = target.position, sourceEntryIds = target.sourceEntryIds, sourceItemIds = target.sourceItemIds,
+                )),
+            ))
+        }
+        record(1, UUID.randomUUID())
+        assertEquals(0, practice.keySet(owner, seeded.session.id).completionContext!!.lastRecordedPosition)
+        record(1, UUID.randomUUID())
+        assertEquals(1, keyResults.findAllBySessionIdOrderByPositionAsc(seeded.session.id).size)
+        record(0, UUID.randomUUID())
+        assertEquals(2, practice.keySet(owner, seeded.session.id).completionContext!!.lastRecordedPosition)
+        for (position in 2 until total) record(position, UUID.randomUUID())
+        assertEquals(total, practice.keySet(owner, seeded.session.id).completionContext!!.lastRecordedPosition)
+        assertEquals(SessionStatus.COMPLETED, sessions.findById(seeded.session.id).orElseThrow().status)
+        assertEquals(total, keyResults.findAllBySessionIdOrderByPositionAsc(seeded.session.id).size)
+        assertEquals(total, learningEvidence.findAllBySessionIdOrderByOccurredAtAsc(seeded.session.id).size)
+    }
+
+    @Test
+    fun `owner target results survive retries and reject foreign or closed contexts`() {
+        val owner = seedOwner("keyboard-target-owner")
+        val other = seedOwner("keyboard-target-other")
+        val seeded = seedPractice(owner, owner, PracticeDelivery.SELF, PracticeExerciseType.KEYBOARD, VocabularySkill.SPELLING)
+        val otherPractice = seedPractice(other, other, PracticeDelivery.SELF, PracticeExerciseType.KEYBOARD, VocabularySkill.SPELLING)
+        val target = practice.keySet(owner, seeded.session.id).targets.single()
+        val foreignTarget = practice.keySet(other, otherPractice.session.id).targets.single()
+        val input = VocabularyKeyTargetResultRequest(target.targetId, errors = 1, durationMs = 500)
+        val denied = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+            practice.recordOwnedKeyTarget(other, seeded.session.id, input)
+        }
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, denied.statusCode)
+        val foreign = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+            practice.recordOwnedKeyTarget(owner, seeded.session.id, input.copy(targetId = foreignTarget.targetId))
+        }
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, foreign.statusCode)
+        assertEquals(target.targetId, practice.recordOwnedKeyTarget(owner, seeded.session.id, input).targetId)
+        assertEquals(SessionStatus.COMPLETED, sessions.findById(seeded.session.id).orElseThrow().status)
+        assertEquals(target.targetId, practice.recordOwnedKeyTarget(owner, seeded.session.id, input.copy(errors = 0)).targetId)
+        practice.recordKeyResult(seeded.session.id, VocabularyKeyResultRequest(
+            clientResultId = "late-bulk-callback",
+            attempts = listOf(VocabularyKeyWordAttemptRequest(
+                itemId = seeded.item.id, entryId = seeded.entry.id, errors = 0,
+                resultId = UUID.randomUUID(), targetId = target.targetId, targetType = target.type,
+                position = target.position, sourceEntryIds = target.sourceEntryIds, sourceItemIds = target.sourceItemIds,
+            )),
+        ))
+        assertEquals(1, keyResults.findAllBySessionIdOrderByPositionAsc(seeded.session.id).size)
+        assertEquals(1, learningEvidence.findAllBySessionIdOrderByOccurredAtAsc(seeded.session.id).size)
+        assertEquals(1, practice.keySet(owner, seeded.session.id).completionContext!!.lastRecordedPosition)
+
+        otherPractice.session.status = SessionStatus.CANCELLED
+        sessions.saveAndFlush(otherPractice.session)
+        val closed = org.junit.jupiter.api.assertThrows<org.springframework.web.server.ResponseStatusException> {
+            practice.recordOwnedKeyTarget(other, otherPractice.session.id, input.copy(targetId = foreignTarget.targetId))
+        }
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, closed.statusCode)
+        assertTrue(keyResults.findAllBySessionIdOrderByPositionAsc(otherPractice.session.id).isEmpty())
+    }
+
+    @Test
+    fun `concurrent owner retries accept one target result`() {
+        val owner = seedOwner("keyboard-target-concurrent")
+        val seeded = seedPractice(owner, owner, PracticeDelivery.SELF, PracticeExerciseType.KEYBOARD, VocabularySkill.SPELLING)
+        val target = practice.keySet(owner, seeded.session.id).targets.single()
+        val ready = java.util.concurrent.CountDownLatch(2)
+        val start = java.util.concurrent.CountDownLatch(1)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val calls = (1..2).map {
+                executor.submit<UUID> {
+                    ready.countDown()
+                    check(start.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    practice.recordOwnedKeyTarget(owner, seeded.session.id, VocabularyKeyTargetResultRequest(target.targetId, 0, 100)).targetId
+                }
+            }
+            assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            start.countDown()
+            assertEquals(listOf(target.targetId, target.targetId), calls.map { it.get(10, java.util.concurrent.TimeUnit.SECONDS) })
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(1, keyResults.findAllBySessionIdOrderByPositionAsc(seeded.session.id).size)
+        assertEquals(1, learningEvidence.findAllBySessionIdOrderByOccurredAtAsc(seeded.session.id).size)
     }
 
     @Test

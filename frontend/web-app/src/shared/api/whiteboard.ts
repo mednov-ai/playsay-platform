@@ -34,11 +34,15 @@ export function fetchLessonWhiteboards(lessonId: string): Promise<WhiteboardSumm
   return apiJson(`/api/schedule/lessons/${lessonId}/whiteboards`, { method: "GET" }, authConfig);
 }
 export type WhiteboardLibraryItem = { id: string; kind: "LESSON_WHITEBOARD"; lessonId: string; title: string | null; createdAt: string; updatedAt: string };
+export function fetchWhiteboardLibraryPage(offset: number, limit: number): Promise<{ items: WhiteboardLibraryItem[]; total: number }> {
+  return apiJson(`/api/library/items?category=LESSON&kind=LESSON_WHITEBOARD&offset=${offset}&limit=${limit}`, { method: "GET" }, authConfig);
+}
+
 export async function fetchWhiteboardLibrary(): Promise<WhiteboardLibraryItem[]> {
   const entries: WhiteboardLibraryItem[] = [];
   let offset = 0;
   for (;;) {
-    const page = await apiJson<{ items: WhiteboardLibraryItem[]; total: number }>(`/api/library/items?category=LESSON&kind=LESSON_WHITEBOARD&offset=${offset}&limit=200`, { method: "GET" }, authConfig);
+    const page = await fetchWhiteboardLibraryPage(offset, 200);
     entries.push(...page.items); offset += page.items.length;
     if (offset >= page.total || !page.items.length) return entries;
   }

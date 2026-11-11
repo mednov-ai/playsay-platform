@@ -46,6 +46,7 @@ import {
   updatePracticeState,
 } from "../../features/typing/practiceState";
 import { initialSessionFlow, sessionFlowReducer } from "../../features/typing/sessionFlow";
+import { recoverVocabularyResult } from "../../features/typing/recoverVocabularyResult";
 import { chooseTechniqueAdvice } from "../../features/typing/techniqueAdvice";
 import {
   initialTrainerIntroPhase,
@@ -57,9 +58,8 @@ import { buildTrainingSubmitPayload } from "../../features/typing/trainingPayloa
 import {
   buildVocabularyChordSet,
   clearPendingVocabularyResult,
-  readPendingVocabularyResult,
+  readPendingVocabularyResults,
   writePendingVocabularyResult,
-  writeVocabularyAcknowledgement,
 } from "../../features/typing/vocabularyPractice";
 import {
   buildMeasuredTypingWindow,
@@ -71,8 +71,10 @@ import {
   typingWindowRows,
 } from "../../features/typing/typingWindow";
 import { useTypingEngine } from "../../features/typing/useTypingEngine";
+import { useVocabularyTargetDelivery } from "../../features/typing/useVocabularyTargetDelivery";
 import { computeActiveDurationMs, useTypingStore, type StreamItem } from "../../features/typing/typingStore";
-import { acknowledgeVocabularyTarget, claimAnonymousProgress, fetchProgress, fetchVocabularyPractice, fetchVocabularySessionPractice, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { claimAnonymousProgress, fetchProgress, fetchVocabularyPractice, fetchVocabularySessionPractice, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult, submitResult, updateAnonymousProfile } from "../../shared/api/keyboardApi";
+import { ApiError } from "../../shared/api/errors";
 import { changeAppLanguage, supportedLanguages, type SupportedLanguage } from "../../shared/i18n";
 import type { ThemeMode } from "../../shared/theme";
 import { ThemeToggle } from "../../shared/theme/ThemeToggle";
@@ -84,6 +86,7 @@ import type {
   LayoutId,
   Me,
   Progress,
+  SubmitResult,
   TrainingResult,
   VocabularyPracticeResponse,
   VocabularySessionPracticeResponse,
@@ -92,6 +95,8 @@ import { FINGER_ORDER } from "../../shared/types";
 import { escapeActionForTrainerState } from "./keyboardShortcuts";
 import { shouldBlockDeferredPrompts, shouldShowDeferredPrompt } from "./promptFlow";
 import { registrationUrlForKeyboard } from "./registrationLink";
+import { VocabularyEmptyResume } from "./VocabularyEmptyResume";
+import { VocabularyTargetDeliveryNotice } from "./VocabularyTargetDeliveryNotice";
 
 interface Props {
   me: Me | null;
@@ -388,8 +393,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   const [restartVariant, setRestartVariant] = useState(0);
   const [closingOverlay, setClosingOverlay] = useState<ClosingOverlay | null>(null);
   const [vocabularyDeliveryStatus, setVocabularyDeliveryStatus] = useState<"IDLE" | "PENDING" | "SAVED" | "OFFLINE">("IDLE");
+  const [vocabularyBulkStored, setVocabularyBulkStored] = useState(true);
+  const [pendingResultVersion, setPendingResultVersion] = useState(0);
   const visibleCapacity = typingLineCapacity * typingWindowRows;
   const submittedResultRef = useRef<string | null>(null);
+  const pendingBulkResultRef = useRef<{ owner: string; result: SubmitResult } | null>(null);
   const typingStripRef = useRef<HTMLDivElement | null>(null);
   const visibleCapacityRef = useRef(visibleCapacity);
   const overlayCloseTimerRef = useRef<number | null>(null);
@@ -635,16 +643,41 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const pending = readPendingVocabularyResult();
-    if (!pending) return;
-    setVocabularyDeliveryStatus("PENDING");
-    void submitResult(pending)
-      .then(() => {
-        clearPendingVocabularyResult(pending.clientResultId);
-        setVocabularyDeliveryStatus("SAVED");
-      })
-      .catch(() => setVocabularyDeliveryStatus("OFFLINE"));
-  }, [isAuthenticated]);
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const recover = async () => {
+      let shouldRetry = false;
+      const pendingResults = readPendingVocabularyResults();
+      const memoryResult = pendingBulkResultRef.current;
+      if (memoryResult?.owner === me?.subject && !pendingResults.some((item) => item.clientResultId === memoryResult.result.clientResultId)) {
+        pendingResults.push(memoryResult.result);
+      }
+      for (const pending of pendingResults) {
+        const pendingSessionId = pending.practiceContext?.vocabularySessionId;
+        if (!pendingSessionId) continue;
+        try {
+          setVocabularyDeliveryStatus("PENDING");
+          const recovered = await recoverVocabularyResult(pending, fetchVocabularySessionPractice, submitResult, () => !cancelled);
+          if (cancelled || !recovered) return;
+          clearPendingVocabularyResult(pending.clientResultId);
+          if (pendingBulkResultRef.current?.result.clientResultId === pending.clientResultId) pendingBulkResultRef.current = null;
+          if (pendingSessionId === vocabularySessionId) {
+            setVocabularyBulkStored(true);
+            setSaved(true);
+            setSavedTrainingResult(recovered.trainingResult);
+          }
+          setVocabularyDeliveryStatus("SAVED");
+        } catch (caught) {
+          const status = caught instanceof ApiError ? caught.status : 0;
+          if (![401, 403, 404, 410].includes(status)) shouldRetry = true;
+          if (!cancelled && pendingSessionId === vocabularySessionId) setVocabularyDeliveryStatus("OFFLINE");
+        }
+      }
+      if (shouldRetry && !cancelled) retryTimer = window.setTimeout(() => void recover(), 5_000);
+    };
+    void recover();
+    return () => { cancelled = true; if (retryTimer != null) window.clearTimeout(retryTimer); };
+  }, [isAuthenticated, me?.subject, pendingResultVersion, vocabularySessionId]);
 
   useEffect(() => {
     if (!shouldReloadActiveSetForLayout({ layoutId, chordSet, phase: sessionFlow.phase })) {
@@ -789,12 +822,14 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     const save = async () => {
       if (submitPayload) {
         if (submitPayload.practiceContext?.practiceKind === "VOCABULARY") {
-          writePendingVocabularyResult(submitPayload);
+          if (me?.subject) pendingBulkResultRef.current = { owner: me.subject, result: submitPayload };
+          setVocabularyBulkStored(writePendingVocabularyResult(submitPayload));
           setVocabularyDeliveryStatus("PENDING");
         }
         const savedResult = await submitResult(submitPayload);
         if (submitPayload.practiceContext?.practiceKind === "VOCABULARY") {
           clearPendingVocabularyResult(submitPayload.clientResultId);
+          if (pendingBulkResultRef.current?.result.clientResultId === submitPayload.clientResultId) pendingBulkResultRef.current = null;
           setVocabularyDeliveryStatus("SAVED");
         }
         setSavedTrainingResult(savedResult.trainingResult);
@@ -820,12 +855,13 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
       .catch((error: unknown) => {
         if (submitPayload?.practiceContext?.practiceKind === "VOCABULARY") {
           setVocabularyDeliveryStatus("OFFLINE");
+          setPendingResultVersion((version) => version + 1);
         } else {
           setLoadError(error instanceof Error ? error.message : String(error));
         }
       })
       .finally(() => setSaving(false));
-  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, ownerKey, perChar, profileSeed, resultKey, sessionCalibrationComplete, sessionResult, sessionSavedLayoutMasteryCpm, sets, t]);
+  }, [anonymousDeviceId, chordSet, guestDisplayName, isAuthenticated, me?.subject, ownerKey, perChar, profileSeed, resultKey, sessionCalibrationComplete, sessionResult, sessionSavedLayoutMasteryCpm, sets, t]);
 
   const liveStats = useMemo(() => {
     const elapsedMs =
@@ -849,23 +885,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   }, [correctCount, errorCount, excludedDurationMs, finishedAt, intervals, pausedAt, pos, startedAt, stream.length]);
   const completedChordCount = useMemo(() => countCompletedChords(stream, pos), [pos, stream]);
 
-  useEffect(() => {
-    const context = chordSet?.vocabularyContext;
-    if (!context || completedChordCount <= 0) return;
-    const absolutePosition = Math.min(context.totalTargets, context.startPosition + completedChordCount);
-    const targetId = context.targets[completedChordCount - 1]?.targetId;
-    writeVocabularyAcknowledgement(context.sessionId, absolutePosition);
-    setVocabularyDeliveryStatus((current) => current === "SAVED" ? current : "PENDING");
-    const timeoutId = window.setTimeout(() => {
-      void acknowledgeVocabularyTarget(context.sessionId, absolutePosition, targetId)
-        .then((acknowledgement) => {
-          writeVocabularyAcknowledgement(context.sessionId, acknowledgement.lastAcknowledgedPosition);
-          setVocabularyDeliveryStatus((current) => current === "SAVED" ? current : "IDLE");
-        })
-        .catch(() => setVocabularyDeliveryStatus("OFFLINE"));
-    }, 350);
-    return () => window.clearTimeout(timeoutId);
-  }, [chordSet, completedChordCount]);
+  const vocabularyTargetDelivery = useVocabularyTargetDelivery(
+    chordSet?.vocabularyContext?.sessionId,
+    Boolean(chordSet?.vocabularyContext?.durableResultsSupported),
+    completedChordCount,
+  );
 
   const typingWindow = useMemo(
     () =>
@@ -1018,7 +1042,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     sessionFlow.finishOverlayVisible;
   const advancedSettingsLocked = isSessionLocked;
   const startableSet = chordSet ?? sets[0];
-  const canStartSession = Boolean(startableSet?.chords.length && (sessionFlow.phase === "idle" || sessionFlow.phase === "finished"));
+  const completedDurableVocabulary = sessionFlow.phase === "finished" && Boolean(chordSet?.vocabularyContext?.durableResultsSupported);
+  const canStartSession = Boolean(startableSet?.chords.length && (sessionFlow.phase === "idle" || sessionFlow.phase === "finished") && !completedDurableVocabulary);
   const canResumeSession = sessionFlow.phase === "paused";
 
   const keyboardLabels: KeyboardLabels = {
@@ -1058,6 +1083,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
   );
   const activeSetTitle = chordSet ? formatTrainingSetTitle(chordSet) : loading ? t("auth.loading") : t("trainer.noSet");
   const vocabularyContext = chordSet?.vocabularyContext;
+  const hasEmptyVocabularyResume = Boolean(vocabularyContext && vocabularyContext.targets.length === 0 && !sessionResult);
   const isVocabularyPractice = chordSet?.practiceKind === "VOCABULARY";
   const vocabularyAbsoluteProgress = vocabularyContext
     ? Math.min(vocabularyContext.totalTargets, vocabularyContext.startPosition + completedChordCount)
@@ -1746,10 +1772,12 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               </div>
               <div className="vocabulary-context__facts">
                 <span>{t(`trainer.vocabularyMode_${vocabularyContext.mode}`)}</span>
-                <span>{t("trainer.vocabularyProgress", { current: vocabularyAbsoluteProgress, total: vocabularyContext.totalTargets })}</span>
-                <span>{t(`trainer.vocabularyDelivery_${vocabularyDeliveryStatus}`)}</span>
+                {!hasEmptyVocabularyResume ? <span>{t("trainer.vocabularyProgress", { current: vocabularyAbsoluteProgress, total: vocabularyContext.totalTargets })}</span> : null}
+                {!hasEmptyVocabularyResume && !vocabularyTargetDelivery.hasPending ? <span>{t(`trainer.vocabularyDelivery_${vocabularyDeliveryStatus}`)}</span> : null}
               </div>
               <small>{t(`trainer.vocabularyPolicy_${vocabularyContext.completionPolicy}`)}</small>
+              {hasEmptyVocabularyResume ? <VocabularyEmptyResume href={returnTarget} target={vocabularyContext.returnTarget} allTargetsRecorded={vocabularyContext.allTargetsRecorded} deliveryStatus={vocabularyTargetDelivery.hasPending ? vocabularyTargetDelivery.status : undefined} onRetry={vocabularyTargetDelivery.retry} /> : null}
+              {!hasEmptyVocabularyResume && vocabularyTargetDelivery.hasPending ? <VocabularyTargetDeliveryNotice status={vocabularyTargetDelivery.status} onRetry={vocabularyTargetDelivery.retry} /> : null}
               {sessionFlow.phase === "running" && errorCount > 0 ? (
                 <p className="vocabulary-context__correction" role="status">{t("trainer.vocabularyCorrection")}</p>
               ) : null}
@@ -1786,7 +1814,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                   <Play size={24} fill="currentColor" aria-hidden="true" />
                   <span>{startLabel}</span>
                 </button>
-                <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || sessionFlow.phase === "running"}>
+                <button type="button" className="secondary-button" onClick={restartSession} disabled={!chordSet || hasEmptyVocabularyResume || sessionFlow.phase === "running" || Boolean(vocabularyContext?.durableResultsSupported && completedChordCount > 0)}>
                   <RotateCcw size={18} aria-hidden="true" />
                   <span>{t("trainer.restart")}</span>
                 </button>
@@ -1859,7 +1887,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
               bpmUnit={t("units.bpm")}
               suggestedBpm={suggestedMetronomeBpm}
             />
-            <div className="result-box">
+            {!(isVocabularyPractice && vocabularyTargetDelivery.hasPending) ? <div className="result-box">
               {saving ? (
                 <>
                   <Save size={18} aria-hidden="true" />
@@ -1872,8 +1900,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 </>
               ) : isVocabularyPractice && vocabularyDeliveryStatus === "OFFLINE" ? (
                 <>
-                  <strong>{t("trainer.vocabularyResultPending")}</strong>
-                  <span>{t("trainer.vocabularyRetryAutomatic")}</span>
+                  <strong>{t(vocabularyBulkStored ? "trainer.vocabularyResultPending" : "trainer.vocabularyBulkUnsaved")}</strong>
+                  {vocabularyBulkStored ? <span>{t("trainer.vocabularyRetryAutomatic")}</span> : <button type="button" className="secondary-button" onClick={() => setPendingResultVersion((version) => version + 1)}>{t("trainer.vocabularyRetryTargetSave")}</button>}
                 </>
               ) : saved && masterySummaryText ? (
                 <>
@@ -1899,7 +1927,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                       : t("trainer.nextRepeat")}
                 </span>
               ) : null}
-            </div>
+            </div> : null}
           </div>
 
           {renderPausedOverlay ? (
@@ -1955,6 +1983,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                     </div>
                     <p>{vocabularyContext.mode === "CHARACTER_NGRAMS" ? t("trainer.vocabularyNgramResult") : vocabularyContext.mode === "MIXED" ? t("trainer.vocabularyMixedResult") : t("trainer.vocabularyWholeWordResult")}</p>
                     <small>{t("trainer.vocabularyNoMasteryClaim")}</small>
+                    {vocabularyTargetDelivery.hasPending ? <VocabularyTargetDeliveryNotice status={vocabularyTargetDelivery.status} onRetry={vocabularyTargetDelivery.retry} /> : null}
                   </>
                 ) : effectiveMastery && sessionResult ? (
                   <>
@@ -2015,7 +2044,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                     {savedTechniqueAdvice ? null : <small>{t("trainer.techniqueAdviceHistoryHint")}</small>}
                   </div>
                 ) : null}
-                <button
+                {canStartSession ? <button
                   type="button"
                   className="play-button"
                   onClick={startSession}
@@ -2025,7 +2054,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                 >
                   <Play size={58} fill="currentColor" aria-hidden="true" />
                   <span>{startLabel}</span>
-                </button>
+                </button> : null}
                 {!isAuthenticated ? (
                   <button type="button" className="secondary-button result-card__save-progress" onClick={onSignIn}>
                     <LogIn size={18} aria-hidden="true" />
@@ -2037,7 +2066,7 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
                     <span>{t(`trainer.vocabularyReturn_${vocabularyContext?.returnTarget ?? "HONEY_SCHOOL_VOCABULARY"}`)}</span>
                   </a>
                 ) : null}
-                <span>{t("trainer.startShortcut")}</span>
+                {canStartSession ? <span>{t("trainer.startShortcut")}</span> : null}
               </div>
             </div>
           ) : null}

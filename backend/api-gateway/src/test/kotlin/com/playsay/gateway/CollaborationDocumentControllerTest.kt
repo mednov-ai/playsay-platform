@@ -5,7 +5,9 @@ import com.nimbusds.jwt.SignedJWT
 import com.playsay.gateway.controller.CollaborationDocumentController
 import com.playsay.gateway.controller.MaterialCrudController
 import com.playsay.gateway.controller.ScheduledLessonController
+import com.playsay.gateway.dto.CollaborationMaterialPolicyRequest
 import com.playsay.gateway.dto.CreateCollaborationDocumentRequest
+import com.playsay.gateway.dto.CreateParallelCollaborationDocumentRequest
 import com.playsay.gateway.dto.FinalizeCollaborationDocumentRequest
 import com.playsay.gateway.dto.LessonMaterialRequest
 import com.playsay.gateway.dto.SaveCollaborationSnapshotRequest
@@ -318,6 +320,61 @@ class CollaborationDocumentControllerTest @Autowired constructor(
             serviceToken = "service-token-01234567890123456789",
         )
         assertEquals(snapshot, restored.snapshot)
+    }
+
+    @Test
+    fun `parallel contexts isolate students and teacher focus even with the same material`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val otherTeacher = authentication(subject = "teacher-other", username = "teacher.other", role = "ROLE_TEACHER")
+        val a = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val b = authentication(subject = "student-2", username = "student.two", role = "ROLE_STUDENT")
+        val classroom = classroom(teacher, listOf("student-1", "student-2"))
+        val oldGroup = collaborationController.createCurrent(a, classroom.lessonId, CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "GROUP"))
+        val oldAlternateGroup = collaborationController.createCurrent(a, classroom.lessonId, CreateCollaborationDocumentRequest(classroom.materialId, "LEGACY_MATERIAL", "GROUP"))
+        val lesson = lessonRepo.findById(classroom.lessonId).orElseThrow()
+        lesson.workMode = "PARALLEL"
+        lessonRepo.saveAndFlush(lesson)
+        lessonParticipantRepo.findByLessonId(lesson.id).forEach { it.materialId = classroom.materialId; lessonParticipantRepo.save(it) }
+        lessonParticipantRepo.flush()
+
+        val serviceToken = "service-token-01234567890123456789"
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy(serviceToken, oldGroup.id, CollaborationMaterialPolicyRequest("student-1")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy(serviceToken, oldAlternateGroup.id, CollaborationMaterialPolicyRequest("student-1")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.createCurrent(a, lesson.id, CreateCollaborationDocumentRequest(classroom.materialId, "LEGACY_MATERIAL", "GROUP")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.token(a, lesson.id, oldGroup.id) }
+        assertFailsWith<ResponseStatusException> { collaborationController.createCurrent(a, lesson.id, CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "GROUP")) }
+        val docA = collaborationController.parallelCurrent(teacher, lesson.id, CreateParallelCollaborationDocumentRequest(classroom.materialId, "student-1"))
+        val docB = collaborationController.parallelCurrent(teacher, lesson.id, CreateParallelCollaborationDocumentRequest(classroom.materialId, "student-2"))
+        collaborationController.materialPolicy(serviceToken, docA.id, CollaborationMaterialPolicyRequest("teacher-1"))
+        collaborationController.materialPolicy(serviceToken, docA.id, CollaborationMaterialPolicyRequest("student-1"))
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy("wrong", docA.id, CollaborationMaterialPolicyRequest("student-1")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy(serviceToken, docA.id, CollaborationMaterialPolicyRequest("student-2")) }
+        assertTrue(docA.id != docB.id)
+        assertTrue(docA.yjsDocumentId != docB.yjsDocumentId)
+        assertEquals(docA.id, collaborationController.createCurrent(a, lesson.id, CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "INDIVIDUAL")).id)
+        assertEquals(docB.id, collaborationController.createCurrent(b, lesson.id, CreateCollaborationDocumentRequest(classroom.materialId, "MATERIAL_WORK", "INDIVIDUAL")).id)
+        assertFailsWith<ResponseStatusException> { collaborationController.token(a, lesson.id, docB.id) }
+        assertFailsWith<ResponseStatusException> { collaborationController.parallelCurrent(otherTeacher, lesson.id, CreateParallelCollaborationDocumentRequest(classroom.materialId, "student-1")) }
+        assertEquals(false, SignedJWT.parse(collaborationController.token(teacher, lesson.id, docB.id).token).jwtClaimsSet.getBooleanClaim("canPublishMaterialViewport"))
+        assertEquals(setOf(docA.id, docB.id), collaborationController.list(teacher, lesson.id, classroom.materialId).map { it.id }.toSet())
+        assertEquals(listOf(docA.id), collaborationController.list(a, lesson.id, classroom.materialId).map { it.id })
+
+        val anotherMaterial = materialCrudController.create(teacher, LessonMaterialRequest(title = "Other synthetic material", status = "PUBLISHED")).body!!
+        val participantB = lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lesson.id, "student-2")!!
+        val bEntity = lessonParticipantRepo.findByLessonId(lesson.id).single { it.studentUserId == participantB.userId }
+        bEntity.materialId = anotherMaterial.id
+        lessonParticipantRepo.saveAndFlush(bEntity)
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy(serviceToken, docB.id, CollaborationMaterialPolicyRequest("student-2")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.token(teacher, lesson.id, docB.id) }
+        assertFailsWith<ResponseStatusException> { collaborationController.parallelCurrent(teacher, lesson.id, CreateParallelCollaborationDocumentRequest(classroom.materialId, "student-2")) }
+        val newDocB = collaborationController.parallelCurrent(teacher, lesson.id, CreateParallelCollaborationDocumentRequest(anotherMaterial.id, "student-2"))
+        assertEquals(anotherMaterial.id, newDocB.materialId)
+        val participantA = lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lesson.id, "student-1")!!
+        lessonParticipantRepo.deleteAll(lessonParticipantRepo.findByLessonId(lesson.id).filter { it.studentUserId == participantA.userId })
+        lessonParticipantRepo.flush()
+        assertFailsWith<ResponseStatusException> { collaborationController.materialPolicy(serviceToken, docA.id, CollaborationMaterialPolicyRequest("student-1")) }
+        assertFailsWith<ResponseStatusException> { collaborationController.token(a, lesson.id, docA.id) }
+        assertFailsWith<ResponseStatusException> { collaborationController.token(teacher, lesson.id, docA.id) }
     }
 
     @Test

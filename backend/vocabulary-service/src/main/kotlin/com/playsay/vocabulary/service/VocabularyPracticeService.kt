@@ -17,6 +17,7 @@ import com.playsay.vocabulary.dto.VocabularyKeySetResponse
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
 import com.playsay.vocabulary.dto.VocabularyKeyItemResponse
 import com.playsay.vocabulary.dto.VocabularyKeyResultRequest
+import com.playsay.vocabulary.dto.VocabularyKeyTargetResultRequest
 import com.playsay.vocabulary.dto.VocabularyLearnerSummaryResponse
 import com.playsay.vocabulary.dto.VocabularyLearningEntryResponse
 import com.playsay.vocabulary.dto.VocabularyPracticeItemResponse
@@ -205,6 +206,10 @@ class VocabularyPracticeService(
     @Transactional
     fun acknowledgeKeyPosition(actorSubject: String, sessionId: UUID, request: VocabularyKeyAcknowledgementRequest) =
         keyboardService.acknowledgePosition(actorSubject, sessionId, request)
+
+    @Transactional
+    fun recordOwnedKeyTarget(actorSubject: String, sessionId: UUID, request: VocabularyKeyTargetResultRequest) =
+        keyboardService.recordOwnedTarget(actorSubject, sessionId, request)
 
     @Transactional
     fun recordKeyResult(sessionId: UUID, request: VocabularyKeyResultRequest) =

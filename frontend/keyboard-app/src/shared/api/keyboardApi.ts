@@ -126,6 +126,16 @@ export function fetchVocabularySessionPractice(sessionId: string): Promise<Vocab
   );
 }
 
+export function recordVocabularyTarget(
+  sessionId: string,
+  result: { targetId: string; errors: number; durationMs: number },
+): Promise<{ targetId: string }> {
+  return apiJson(
+    `${apiBaseUrl}/api/vocabulary/practice-sessions/${encodeURIComponent(sessionId)}/key-target-results`,
+    { method: "POST", body: JSON.stringify(result) },
+  );
+}
+
 export function acknowledgeVocabularyTarget(
   sessionId: string,
   position: number,

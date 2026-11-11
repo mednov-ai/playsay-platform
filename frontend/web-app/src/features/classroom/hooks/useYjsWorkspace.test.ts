@@ -12,6 +12,7 @@ import {
 } from "../../../shared/api/playsay";
 import { createYjsWorkspaceRuntime } from "./yjsRuntime";
 import { isInvalidCollaborationDocumentError, useYjsWorkspace } from "./useYjsWorkspace";
+import { confirmParallelDraftPersisted } from "./parallelDraftGuard";
 
 const apiMocks = vi.hoisted(() => ({ createToken: vi.fn() }));
 
@@ -38,6 +39,8 @@ vi.mock("./yjsRuntime", () => ({
   createYjsWorkspaceRuntime: vi.fn(() => ({
     destroy: vi.fn(),
     getClientId: () => 42,
+    isPersisted: vi.fn(() => false),
+    snapshot: () => ({ encoding: "yjs-update-v1", yjsUpdateBase64: "AAA=" }),
     handleSocketMessage: vi.fn(),
     setSocket: vi.fn(),
     startSocketSync: vi.fn(),
@@ -125,6 +128,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  confirmParallelDraftPersisted("teacher:doc");
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -145,6 +149,34 @@ describe("foreground responsiveness through the connection owner", () => {
     hook.rerender({suspended:false});await act(async()=>{await Promise.resolve();});
     expect(FakeWebSocket.instances).toHaveLength(2);expect(createYjsWorkspaceRuntime).toHaveBeenCalledTimes(1);expect(hook.result.current.workspaceClientId).toBe(42);hook.unmount();
   });
+  it("keeps an edited context pending until its saved state is confirmed", async () => {
+    apiMocks.createToken.mockResolvedValue(token("wss://example.test/collab"));
+    vi.mocked(createYjsWorkspaceRuntime).mockClear();
+    const hook = renderHook(() => useYjsWorkspace({ ...options, preserveDraftKey: "teacher:doc" }));
+    await act(async () => { await Promise.resolve(); });
+    const socket = FakeWebSocket.instances[0];
+    act(() => socket.open());
+    const runtime = vi.mocked(createYjsWorkspaceRuntime).mock.results[0].value;
+    const update = vi.mocked(createYjsWorkspaceRuntime).mock.calls[0][0].onDocumentUpdate!;
+    act(() => update(new Uint8Array([1]), true));
+    expect(hook.result.current.hasUnconfirmedDraft).toBe(true);
+    expect(window.dispatchEvent(new Event("beforeunload", { cancelable: true }))).toBe(false);
+    const persisted = (documentId: string) => {
+      const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, 6);
+      encoding.writeVarString(encoder, JSON.stringify({ type: "material-persisted", version: 1, documentId, stateVector: "AA==", deleteSet: "AAA=" }));
+      socket.onmessage?.(new MessageEvent("message", { data: encoding.toUint8Array(encoder).buffer }));
+    };
+    act(() => persisted("other-doc"));
+    expect(hook.result.current.hasUnconfirmedDraft).toBe(true);
+    act(() => persisted("document-1"));
+    expect(hook.result.current.hasUnconfirmedDraft).toBe(true);
+    vi.mocked(runtime.isPersisted).mockReturnValue(true);
+    act(() => persisted("document-1"));
+    expect(hook.result.current.hasUnconfirmedDraft).toBe(false);
+    expect(window.dispatchEvent(new Event("beforeunload", { cancelable: true }))).toBe(true);
+    hook.unmount();
+  });
+
   it("replaces a half-open negotiated socket using a fresh token", async () => {
     vi.spyOn(globalThis.document, "visibilityState", "get").mockReturnValue("visible");
     apiMocks.createToken.mockResolvedValue(token("wss://example.test/collab"));

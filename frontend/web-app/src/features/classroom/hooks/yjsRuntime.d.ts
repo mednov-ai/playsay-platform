@@ -45,6 +45,7 @@ export type YjsWorkspaceRuntime = {
   destroy: () => void;
   getClientId: () => number;
   getText: () => string;
+  isPersisted: (stateVectorBase64: string, deleteSetBase64: string) => boolean;
   handleSocketMessage: (data: unknown) => void;
   setSocket: (socket: WebSocket | null) => void;
   setAnnotationElements: (elements: AnnotationElement[]) => void;
@@ -85,6 +86,7 @@ export type YjsWorkspaceRuntime = {
 };
 
 export function createYjsWorkspaceRuntime(options: {
+  additionalSnapshot?: LessonMaterialJson | null;
   color: string;
   onAnnotationChange: (elements: AnnotationElement[]) => void;
   onHtmlGameEffectsChange: (effects: MaterialHtmlGameEffect[]) => void;
@@ -104,7 +106,7 @@ export function createYjsWorkspaceRuntime(options: {
   onMaterialViewportChange?: (viewport: MaterialViewportState | null) => void;
   onVideoPlaybackChange?: (states: Record<string, MaterialVideoPlaybackState>) => void;
   onAnnotationUndoStateChange?: (state: { canRedo: boolean; canUndo: boolean }) => void;
-  onDocumentUpdate?: (update: Uint8Array) => void;
+  onDocumentUpdate?: (update: Uint8Array, local: boolean) => void;
   onParticipantsChange: (participants: CollaborationParticipant[]) => void;
   onTextChange: (text: string) => void;
   participantName: string;

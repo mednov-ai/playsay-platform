@@ -233,7 +233,7 @@ class ScheduledMaterialControllerTest : MaterialControllerTestFixture() {
 
     @Test
     fun `first classroom annotation lookup uses writable transaction`() {
-        val method = LessonMaterialStore::class.java.getDeclaredMethod(
+        val method = ScheduledMaterialAnnotationService::class.java.getDeclaredMethod(
             "getAnnotationForScheduledLesson",
             JwtAuthenticationToken::class.java,
             UUID::class.java,

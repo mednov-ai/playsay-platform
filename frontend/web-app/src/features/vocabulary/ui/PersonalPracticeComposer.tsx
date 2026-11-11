@@ -469,7 +469,7 @@ export function PersonalPracticeComposer({
       </details>
 
       {preview?.categoryCounts && Object.keys(preview.categoryCounts).length ? (
-        <div className="flex flex-wrap gap-2" aria-label={t("vocabulary.practice.composer.categorySummary")}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("vocabulary.practice.composer.categorySummary")}>
           {Object.entries(preview.categoryCounts).map(([category, count]) => (
             <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-extrabold" key={category}>{t(`vocabulary.practice.reason.${category}`)} · {count}</span>
           ))}

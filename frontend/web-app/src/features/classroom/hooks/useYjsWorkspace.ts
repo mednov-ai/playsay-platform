@@ -1,3 +1,5 @@
+import { decodeMaterialPersistence } from "../model/materialPersistenceProtocol";
+import { confirmParallelDraftPersisted, isParallelDraftPending, markParallelDraftPending, parallelDraftEpoch, readRetainedParallelDraft, retainParallelDraft } from "./parallelDraftGuard";
 import { decodeRecoveryControl, encodeRecoveryProbe } from "../model/collaborationRecoveryProtocol";
 import { observeConnection } from "../../../shared/routing/connectionDiagnostics";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -55,6 +57,7 @@ export function useYjsWorkspace({
   enabled = true,
   onDocumentInvalid,
   participantName,
+  preserveDraftKey,
   suspended = false,
 }: {
   color: string;
@@ -62,6 +65,7 @@ export function useYjsWorkspace({
   enabled?: boolean;
   onDocumentInvalid?: (documentId: string) => void;
   participantName: string;
+  preserveDraftKey?: string;
   suspended?: boolean;
 }) {
   const contextSuspended = useContext(CollaborationSuspensionContext);
@@ -86,6 +90,7 @@ export function useYjsWorkspace({
   const [workspaceClientId, setWorkspaceClientId] = useState<number | null>(null);
   const [annotationUndoState, setAnnotationUndoState] = useState({ canRedo: false, canUndo: false });
   const [reconnectCount, setReconnectCount] = useState(0);
+  const [hasUnconfirmedDraft, setHasUnconfirmedDraft] = useState(false);
   const retryConnectionRef = useRef<(() => void) | null>(null);
   const retryConnection = useCallback(() => retryConnectionRef.current?.(), []);
   const runtimeRef = useRef<YjsWorkspaceRuntime | null>(null);
@@ -133,6 +138,8 @@ export function useYjsWorkspace({
       return undefined;
     }
 
+    setHasUnconfirmedDraft(Boolean(preserveDraftKey && isParallelDraftPending(preserveDraftKey)));
+    const draftEpoch = parallelDraftEpoch();
     let disposed = false;
     let reconnectTimer: number | null = null;
     let reconnectAttempt = 0;
@@ -155,7 +162,13 @@ export function useYjsWorkspace({
     let gameRealtime: ReturnType<typeof createGameRealtimeClient> | null = null;
     let latestHtmlGameSdkCheckpoints: Record<string, MaterialHtmlGameSdkCheckpoint> = {};
     const runtime = createYjsWorkspaceRuntime({
+      additionalSnapshot: preserveDraftKey ? readRetainedParallelDraft(preserveDraftKey) : undefined,
       color,
+      onDocumentUpdate: (_update, local) => {
+        if (!local || !preserveDraftKey || draftEpoch !== parallelDraftEpoch()) return;
+        markParallelDraftPending(preserveDraftKey);
+        setHasUnconfirmedDraft(true);
+      },
       onAnnotationChange: (elements) => {
         annotationElementsRef.current = elements;
         setAnnotationElementsState(elements);
@@ -296,6 +309,14 @@ export function useYjsWorkspace({
           if (socketRef.current === socket) {
             observeConnection("collaboration", socket.url, true);
             try {
+              const persisted = decodeMaterialPersistence(event.data);
+              if (persisted) {
+                if (preserveDraftKey && draftEpoch === parallelDraftEpoch() && persisted.documentId === document.id && runtime.isPersisted(persisted.stateVector, persisted.deleteSet)) {
+                  confirmParallelDraftPersisted(preserveDraftKey);
+                  setHasUnconfirmedDraft(false);
+                }
+                return;
+              }
               const control = decodeRecoveryControl(event.data);
               if (control?.type === "hello") { probeSupported = true; return; }
               if (control?.type === "ack") {
@@ -397,6 +418,7 @@ export function useYjsWorkspace({
       retireSocket(socketRef.current);
       socketRef.current = null;
       runtime.setSocket(null);
+      if (preserveDraftKey) retainParallelDraft(preserveDraftKey, runtime.snapshot(), draftEpoch);
       runtime.destroy();
       gameSyncController.close();
       gameRealtime?.close();
@@ -421,7 +443,7 @@ export function useYjsWorkspace({
       setAnnotationUndoState({ canRedo: false, canUndo: false });
       exerciseInteractionRef.current = null;
     };
-  }, [color, document?.id, enabled, externalActivityRealtime, onDocumentInvalid, participantName]);
+  }, [color, document?.id, enabled, externalActivityRealtime, onDocumentInvalid, participantName, preserveDraftKey]);
 
   const updateText = useCallback((nextText: string) => {
     const runtime = runtimeRef.current;
@@ -589,6 +611,7 @@ export function useYjsWorkspace({
   return {
     annotationElements,
     annotationUndoState,
+    hasUnconfirmedDraft,
     connected: status === "connected",
     participants,
     reconnectCount,

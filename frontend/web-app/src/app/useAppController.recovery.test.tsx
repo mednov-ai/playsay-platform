@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearTokens, readTokens, storeTokens, skipSilentLoginOnce, rejectAccessToken, canStartSilentRecovery } from "../shared/api/auth";
 import { reportSessionRecovery } from "../shared/api/sessionRecovery";
 import { useAppController } from "./useAppController";
+import { clearParallelDrafts, markParallelDraftPending } from "../features/classroom/hooks/parallelDraftGuard";
 
 vi.mock("./controller/useLessonRealtime", () => ({ useLessonRealtime: () => ({}) }));
 vi.mock("../features/courses", () => ({ useCourseWorkspaceData: () => ({ courses: [], courseLessons: {}, courseTopics: {}, courseLoading: false, courseMessage: null }) }));
@@ -26,7 +27,7 @@ function installApi(materialsFail = false, profileFail = false) {
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status }); }
 
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); clearTokens(); history.replaceState({}, "", "/"); storeTokens({ accessToken: "valid", expiresAt: Date.now() + 300_000 }); });
-afterEach(() => { cleanup(); clearTokens(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); clearParallelDrafts(); clearTokens(); vi.unstubAllGlobals(); });
 
 describe("session recovery through the app controller", () => {
   it("preserves login when a workspace module fails and provides its retry message", async () => {
@@ -114,6 +115,17 @@ describe("session recovery through the app controller", () => {
       else Reflect.deleteProperty(window.crypto, "subtle");
     }
   });
+  it("keeps the session when sign-out is cancelled with unconfirmed annotation changes", async () => {
+    installApi(); const view = renderHook(() => useAppController());
+    await waitFor(() => expect(view.result.current.status).toBe("authenticated"));
+    const confirm = vi.fn(() => false); vi.stubGlobal("confirm", confirm);
+    markParallelDraftPending("teacher-fixture:doc");
+    act(() => view.result.current.logout());
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(readTokens()?.accessToken).toBe("valid");
+    expect(view.result.current.profile?.subject).toBe(identity.subject);
+  });
+
   it("does not restore the old account when logout happens during bootstrap", async () => {
     let finish!: (value: Response) => void;
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; })));

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { acknowledgeVocabularyTarget, claimAnonymousProgress, fetchVocabularySessionPractice, keyboardApiPath, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
+import { acknowledgeVocabularyTarget, recordVocabularyTarget, claimAnonymousProgress, fetchVocabularySessionPractice, keyboardApiPath, resetAnonymousProfile, resolveAnonymousProfile, submitAnonymousResult } from "./keyboardApi";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -37,6 +37,18 @@ describe("keyboard API paths", () => {
         headers: expect.not.objectContaining({ Authorization: expect.any(String) }),
       }),
     );
+  });
+
+  it("sends one idempotent vocabulary target through the authenticated route", async () => {
+    const sessionStorage = memoryStorage();
+    vi.stubGlobal("window", { sessionStorage });
+    sessionStorage.setItem("playsay.keyboard.auth.tokens", JSON.stringify({ accessToken: "token-1", expiresAt: Date.now() + 60_000 }));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ targetId: "target-1" }), { status: 200 }));
+    await expect(recordVocabularyTarget("session-1", { targetId: "target-1", errors: 1, durationMs: 500 })).resolves.toEqual({ targetId: "target-1" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/vocabulary/practice-sessions/session-1/key-target-results", expect.objectContaining({
+      method: "POST", headers: expect.objectContaining({ Authorization: "Bearer token-1" }),
+      body: JSON.stringify({ targetId: "target-1", errors: 1, durationMs: 500 }),
+    }));
   });
 
   it("claims anonymous progress with an authenticated request", async () => {

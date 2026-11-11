@@ -68,6 +68,7 @@ import { useClassroomMediaRecovery } from "./controller/useClassroomMediaRecover
 import { useAppShellUiStore } from "./model/useAppShellUiStore";
 import { getSessionRecoveryPhase, subscribeSessionRecovery, reportSessionRecovery } from "../shared/api/sessionRecovery";
 import { regionalEntryUrl } from "../shared/routing/regionalEntry";
+import { clearParallelDrafts, hasUnconfirmedParallelDrafts } from "../features/classroom/hooks/parallelDraftGuard";
 
 export function useAppController(): AppShellProps {
   const { i18n, t } = useAppTranslation();
@@ -378,6 +379,7 @@ export function useAppController(): AppShellProps {
   });
 
   function leaveScheduledLessonRoom() {
+    if (hasUnconfirmedParallelDrafts() && !window.confirm(t("classroom.collaborationRecovery.leaveLessonWarning"))) return;
     classroomMediaRecovery.cancel();
     leaveScheduledLessonRoomWithoutMediaRecovery();
   }
@@ -457,6 +459,8 @@ export function useAppController(): AppShellProps {
   }
 
   function logout() {
+    if (hasUnconfirmedParallelDrafts() && !window.confirm(t("classroom.collaborationRecovery.signOutWarning"))) return;
+    clearParallelDrafts();
     classroomMediaRecovery.cancel();
     const logoutUrl = buildLogoutUrl();
     clearTokens();
@@ -500,6 +504,8 @@ export function useAppController(): AppShellProps {
   }
 
   async function continueSessionLogin() {
+    if (hasUnconfirmedParallelDrafts() && !window.confirm(t("classroom.collaborationRecovery.signOutWarning"))) return;
+    clearParallelDrafts();
     const login = startLogin();
     if (roomSession) leaveScheduledLessonRoom();
     await login;

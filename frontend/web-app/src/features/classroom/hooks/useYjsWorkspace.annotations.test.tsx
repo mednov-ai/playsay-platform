@@ -48,6 +48,22 @@ describe("live annotation state", () => {
     expect(result.current.annotationElements).toEqual([expect.objectContaining({ text: "Student one", anchorId: "jpeg-1" })]);
   });
 
+  it("preserves unsynced parallel edits across focus changes without exposing them to another account", () => {
+    const options = { document, color: "#123456", participantName: "Teacher", preserveDraftKey: "teacher:parallel-one" };
+    const first = renderHook(() => useYjsWorkspace(options));
+    act(() => first.result.current.setAnnotationElements(() => [{ ...element, text: "Unsynced A" }]));
+    first.unmount();
+    const other = renderHook(() => useYjsWorkspace({ ...options, preserveDraftKey: "other-user:parallel-one" }));
+    expect(other.result.current.annotationElements).toEqual([]);
+    other.unmount();
+    const resumed = renderHook(() => useYjsWorkspace(options));
+    expect(resumed.result.current.annotationElements).toEqual([expect.objectContaining({ text: "Unsynced A" })]);
+    act(() => resumed.result.current.setAnnotationElements(() => []));
+    resumed.unmount();
+    const deleted = renderHook(() => useYjsWorkspace(options));
+    expect(deleted.result.current.annotationElements).toEqual([]);
+  });
+
   it("does not resurrect deleted text when restoring the latest snapshot", () => {
     const { result, rerender } = renderHook(({ active }) => useYjsWorkspace({ document: active, color: "#123456", participantName: "Teacher" }), { initialProps: { active: document } });
     act(() => result.current.setAnnotationElements(() => [{ ...element, text: "Delete me" }]));

@@ -63,7 +63,10 @@ export interface VocabularyRuntimeContext {
   sessionId: string;
   mode: VocabularyKeyMode;
   targets: VocabularyKeyTarget[];
+  allTargets?: VocabularyKeyTarget[];
   typedTargets: boolean;
+  durableResultsSupported?: boolean;
+  allTargetsRecorded?: boolean;
   startPosition: number;
   totalTargets: number;
   delivery: "SELF" | "LIVE" | "HOMEWORK";
@@ -110,6 +113,7 @@ export interface VocabularySessionPracticeResponse {
     assignmentId?: string;
     lessonId?: string;
     lastAcknowledgedPosition: number;
+    lastRecordedPosition?: number;
   };
   returnContext?: {
     target: "HONEY_SCHOOL_VOCABULARY" | "HONEY_SCHOOL_LESSON" | "HONEY_SCHOOL_HOMEWORK";

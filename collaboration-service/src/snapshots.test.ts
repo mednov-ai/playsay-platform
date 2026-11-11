@@ -132,6 +132,26 @@ describe("SnapshotQueue", () => {
     expect(body.snapshot.yjsUpdateBase64).toEqual(expect.any(String));
   });
 
+  it("confirms only the state returned successfully by the snapshot API", async () => {
+    let release!: () => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { release = () => resolve(new Response(null, { status: 200 })); })));
+    const doc = new Y.Doc(); doc.getText("body").insert(0, "first");
+    const queue = new SnapshotQueue(config); const outcome = vi.fn(); queue.onOutcome = outcome;
+    queue.markDirty(claims, doc);
+    const flushing = queue.flushAll();
+    await vi.waitFor(() => expect(release).toBeDefined());
+    expect(outcome).not.toHaveBeenCalled();
+    doc.getText("body").insert(5, " later"); queue.markDirty(claims, doc);
+    release(); await flushing;
+    expect(queue.hasPending()).toBe(true);
+    const ack = outcome.mock.calls[0][2] as { stateVectorBase64: string; deleteSetBase64: string };
+    const savedVector = Y.decodeStateVector(Buffer.from(ack.stateVectorBase64, "base64"));
+    const currentVector = Y.decodeStateVector(Y.encodeStateVector(doc));
+    expect([...currentVector].some(([id, clock]) => (savedVector.get(id) ?? 0) < clock)).toBe(true);
+    expect(ack.deleteSetBase64).toEqual(expect.any(String));
+    doc.destroy();
+  });
+
   it("restores a persisted room snapshot with the service token", async () => {
     const persisted = { encoding: "yjs-update-v1", schemaVersion: 1, yjsUpdateBase64: "AQ==" };
     const fetchMock = vi.fn(async () => Response.json({ snapshot: persisted }));

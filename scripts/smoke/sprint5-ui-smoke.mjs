@@ -5,6 +5,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { setTemporaryProfile } from "./temporary-profile.mjs";
 
 const webBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_WEB_BASE_URL ?? "https://dev.online.honey.school");
 const apiBaseUrl = stripTrailingSlash(process.env.PLAY_SAY_SMOKE_API_BASE_URL ?? new URL("/api", `${webBaseUrl}/`).toString());
@@ -64,6 +65,7 @@ const created = {
 
 let browser;
 const sessions = [];
+const profileRestorers = [];
 
 try {
   const { chromium } = loadPlaywright();
@@ -213,6 +215,12 @@ try {
   console.error(JSON.stringify(summary, null, 2));
   process.exitCode = 1;
 } finally {
+  for (const restore of profileRestorers.reverse()) {
+    try { await restore(); } catch (error) {
+      console.error(`Temporary demo profile restore failed: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  }
   const logoutResults = await Promise.allSettled(sessions.map(async (session) => {
     let refreshToken = session.tokens.refreshToken;
     if (new URL(session.page.url()).origin === new URL(webBaseUrl).origin) {
@@ -412,13 +420,10 @@ async function ensureStudentBirthDate(token, profile) {
   if (profile.birthDate) {
     return profile;
   }
-  return apiRequest(token, "PUT", "/users/me/profile", 200, {
-    birthDate: "2000-01-01",
-    countryCode: profile.countryCode,
-    displayName: profile.displayName,
-    learningGoal: profile.learningGoal,
-    locale: profile.locale,
-    timezone: profile.timezone,
+  return setTemporaryProfile({
+    apiRequest, token, overrides: { birthDate: "2000-01-01" },
+    shouldApply: (current) => !current.birthDate,
+    registerRestore: (restore) => profileRestorers.push(restore),
   });
 }
 

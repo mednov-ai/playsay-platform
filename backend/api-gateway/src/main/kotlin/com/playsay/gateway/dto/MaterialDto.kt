@@ -7,6 +7,8 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
+data class UnallocatedAnnotationMaterialPage(val materialIds: List<UUID>, val hasNext: Boolean)
+
 data class LessonMaterialRequest(
     @field:Schema(maxLength = 160)
     val title: String,
@@ -298,6 +300,8 @@ data class MaterialSubmissionResponse(
 data class MaterialAnnotationRequest(
     val content: JsonNode,
 )
+
+data class UnallocatedAnnotationSnapshotPage(val items: List<MaterialAnnotationResponse>, val hasNext: Boolean)
 
 data class MaterialAnnotationResponse(
     val id: UUID,

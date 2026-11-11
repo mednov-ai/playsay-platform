@@ -6,6 +6,7 @@ import com.playsay.gateway.utils.requireSubject
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.SubProtocolCapable
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
 
@@ -13,7 +14,9 @@ import org.springframework.web.socket.handler.TextWebSocketHandler
 class ChatRealtimeWebSocketHandler(
     private val hub: ChatRealtimeHub,
     private val deliveryService: ChatDeliveryService,
-) : TextWebSocketHandler() {
+) : TextWebSocketHandler(), SubProtocolCapable {
+    override fun getSubProtocols(): List<String> = listOf(PLAY_SAY_WEBSOCKET_PROTOCOL)
+
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val authentication = session.attributes[authenticationAttribute] as? JwtAuthenticationToken
         if (authentication == null || authentication.token.subject.isNullOrBlank() || !ChatAccessPolicy.allows(authentication)) {

@@ -107,15 +107,25 @@ export function useLessonMaterial({
   }, [session.lessonId, session.lessonUpdatedAt, session.materialId]);
 
   async function assignMaterial() {
+    if (session.workMode === "PARALLEL") {
+      setAssignmentMessage(t("classroom.messages.parallelMaterialUnsupported"));
+      return;
+    }
     setAssigningMaterial(true);
     setAssignmentMessage(null);
-    setLiveActivePageId(null);
     try {
-      const updated = await onAssignMaterial(session.lessonId, selectedMaterialId || null);
+      const requestedMaterialId = selectedMaterialId || null;
+      const updated = await onAssignMaterial(session.lessonId, requestedMaterialId);
       if (!updated) {
         setAssignmentMessage(t("classroom.messages.materialNotAssigned"));
         return;
       }
+
+      if ((updated.materialId ?? null) !== requestedMaterialId) {
+        setAssignmentMessage(t("classroom.messages.materialAssignmentMismatch"));
+        return;
+      }
+      setLiveActivePageId(null);
 
       if (!updated.materialId) {
         setMaterial(null);
@@ -198,7 +208,8 @@ export function useLessonMaterial({
       documentUploadDraftRef.current = null;
       return ready;
     } catch (caught) {
-      setAssignmentMessage(caught instanceof Error ? caught.message : t("materials.document.uploadFailed"));
+      const reason = caught instanceof Error ? caught.message : t("materials.document.uploadFailed");
+      setAssignmentMessage(`${reason} ${t("materials.document.uploadRecovery")}`);
       return null;
     } finally {
       setUploadingDocumentPage(false);

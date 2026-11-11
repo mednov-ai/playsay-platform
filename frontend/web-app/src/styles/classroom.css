@@ -1566,9 +1566,9 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 .playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-submission-monitor,
 .playsay-workbench[data-presentation-mode="image-focus"] .playsay-submission-monitor,
 .playsay-workbench[data-presentation-mode="external-activity-focus"] .playsay-submission-monitor,
-.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-lesson-inline-message,
-.playsay-workbench[data-presentation-mode="image-focus"] .playsay-lesson-inline-message,
-.playsay-workbench[data-presentation-mode="external-activity-focus"] .playsay-lesson-inline-message {
+.playsay-workbench[data-presentation-mode="html-game-focus"] .playsay-lesson-inline-message:not([role="alert"]),
+.playsay-workbench[data-presentation-mode="image-focus"] .playsay-lesson-inline-message:not([role="alert"]),
+.playsay-workbench[data-presentation-mode="external-activity-focus"] .playsay-lesson-inline-message:not([role="alert"]) {
   display: none;
 }
 
@@ -2425,7 +2425,8 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 
 .playsay-lesson-inline-message {
   flex: 0 0 auto;
-  overflow: hidden;
+  max-height: min(10rem, 25vh);
+  overflow: auto;
   border: 1px solid hsl(var(--border));
   border-radius: 0.75rem;
   background: hsl(var(--muted) / 0.55);
@@ -2433,8 +2434,12 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   font-size: 0.8125rem;
   font-weight: 850;
   padding: 0.5rem 0.75rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.playsay-lesson-inline-message:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
 .playsay-submission-monitor {
@@ -2602,6 +2607,10 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
   background: #ffffff;
+}
+
+.playsay-task-board[data-read-only="true"] {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .playsay-task-board[data-presentation-mode="html-game-focus"],

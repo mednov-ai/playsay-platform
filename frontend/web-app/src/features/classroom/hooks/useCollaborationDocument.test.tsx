@@ -6,6 +6,7 @@ import { useCollaborationDocument } from "./useCollaborationDocument";
 
 const apiMocks = vi.hoisted(() => ({
   createCurrent: vi.fn(),
+  createParallel: vi.fn(),
   finalize: vi.fn(),
   saveSnapshot: vi.fn(),
 }));
@@ -15,6 +16,7 @@ const i18nMocks = vi.hoisted(() => ({
 
 vi.mock("../../../shared/api/playsay", () => ({
   createCurrentCollaborationDocument: apiMocks.createCurrent,
+  createParallelStudentCollaborationDocument: apiMocks.createParallel,
   finalizeCollaborationDocument: apiMocks.finalize,
   saveCollaborationDocumentSnapshot: apiMocks.saveSnapshot,
 }));
@@ -64,6 +66,23 @@ describe("useCollaborationDocument", () => {
 
     await act(async () => resolveNext?.(collaborationDocument("document-2", "material-2")));
     await waitFor(() => expect(result.current.document?.id).toBe("document-2"));
+  });
+
+  it("never shows the previous student's document while switching focus on the same material", async () => {
+    let resolveNext: ((value: CollaborationDocument) => void) | undefined;
+    const forStudent = (id: string, studentSubject: string) => ({ ...collaborationDocument(id, "material-1"), scope: "INDIVIDUAL", studentSubject });
+    apiMocks.createParallel.mockResolvedValueOnce(forStudent("doc-a", "student-a"))
+      .mockImplementationOnce(() => new Promise<CollaborationDocument>((resolve) => { resolveNext = resolve; }));
+    const { result, rerender } = renderHook(
+      ({ studentSubject }) => useCollaborationDocument({ lessonId: "lesson-1", materialId: "material-1", mode: "individual", studentSubject }),
+      { initialProps: { studentSubject: "student-a" } },
+    );
+    await waitFor(() => expect(result.current.document?.id).toBe("doc-a"));
+    rerender({ studentSubject: "student-b" });
+    expect(result.current.document).toBeNull();
+    await act(async () => resolveNext?.(forStudent("doc-b", "student-b")));
+    await waitFor(() => expect(result.current.document?.id).toBe("doc-b"));
+    expect(apiMocks.createParallel).toHaveBeenLastCalledWith("lesson-1", "material-1", "student-b");
   });
 
   it("replaces an invalid document instead of reconnecting to the same id", async () => {

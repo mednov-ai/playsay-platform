@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ChordSet } from "../../shared/types";
 import type { SessionResult } from "./typingStore";
-import { buildTrainingSubmitPayload } from "./trainingPayload";
+import { buildTrainingSubmitPayload, buildVocabularyResults } from "./trainingPayload";
+import { queueVocabularyTarget } from "./vocabularyResultJournal";
 
 const baseResult: SessionResult = {
   clientResultId: "keyboard-test-result",
@@ -117,9 +118,32 @@ describe("training submit payload", () => {
       },
     };
     const payload = buildTrainingSubmitPayload({ ...baseResult, perChord: { weather: 1, the: 2 } }, vocabularySet);
+    expect(payload?.clientResultId).toBe("keyboard-vocabulary-session-1");
+    expect(buildTrainingSubmitPayload({ ...baseResult, clientResultId: "different-device" }, vocabularySet)?.clientResultId).toBe(payload?.clientResultId);
     expect(payload?.vocabularyResults).toEqual([
       expect.objectContaining({ resultId: "41111111-1111-4111-a111-111111111111", targetType: "WHOLE_WORD", errors: 1 }),
       expect.objectContaining({ resultId: "51111111-1111-4111-a111-111111111111", targetType: "CHARACTER_NGRAM", errors: 2 }),
+    ]);
+  });
+
+  it("includes journaled targets from an interrupted earlier segment in the final callback", () => {
+    const values = new Map<string, string>();
+    const storage: Storage = {
+      get length() { return values.size; }, key: (index) => [...values.keys()][index] ?? null,
+      getItem: (key) => values.get(key) ?? null, setItem: (key, value) => void values.set(key, value),
+      removeItem: (key) => void values.delete(key), clear: () => values.clear(),
+    };
+    const first = { targetId: "target-1", position: 0, type: "WHOLE_WORD" as const, text: "weather", sourceEntryIds: ["entry-1"], sourceItemIds: ["item-1"], offsets: [] };
+    const second = { targetId: "target-2", position: 1, type: "CHARACTER_NGRAM" as const, text: "the", sourceEntryIds: ["entry-1"], sourceItemIds: ["item-1"], offsets: [] };
+    queueVocabularyTarget("session-1", { targetId: first.targetId, position: 0, errors: 2, durationMs: 600 }, storage);
+    const set: ChordSet = {
+      id: -900, sourceChordSetId: 7, layout: "EN", title: "Vocabulary", difficulty: 1, tier: "beginner", chords: ["the"], practiceKind: "VOCABULARY",
+      vocabularyContext: { sessionId: "session-1", mode: "MIXED", typedTargets: true, durableResultsSupported: true, startPosition: 1, totalTargets: 2,
+        delivery: "SELF", completionPolicy: "COMPLETE_SESSION", targets: [second], allTargets: [first, second] },
+    };
+    expect(buildVocabularyResults(baseResult, set, storage)).toEqual([
+      expect.objectContaining({ targetId: "target-1", errors: 2, durationMs: 600 }),
+      expect.objectContaining({ targetId: "target-2" }),
     ]);
   });
 });

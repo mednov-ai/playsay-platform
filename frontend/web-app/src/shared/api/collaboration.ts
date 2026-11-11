@@ -53,6 +53,19 @@ export async function createCurrentCollaborationDocument(
   );
 }
 
+export async function createParallelStudentCollaborationDocument(
+  lessonId: string,
+  materialId: string,
+  studentSubject: string,
+  config = authConfig,
+): Promise<CollaborationDocument> {
+  return apiJson<CollaborationDocument>(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/collaboration-documents/parallel-current`,
+    { method: "POST", body: JSON.stringify({ materialId, studentSubject }) },
+    config,
+  );
+}
+
 export async function fetchCollaborationDocuments(
   lessonId: string,
   materialId: string,

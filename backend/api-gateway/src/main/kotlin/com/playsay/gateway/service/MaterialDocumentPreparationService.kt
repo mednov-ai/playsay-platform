@@ -5,6 +5,7 @@ import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.utils.MetaData
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -102,12 +103,16 @@ class MaterialDocumentPreparationService {
     }
 
     private fun preparePptx(source: ByteArray): PreparedMaterialDocument {
-        val entries = readBoundedZip(source)
+        val entries = try {
+            readBoundedZip(source)
+        } catch (exception: IOException) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
+        }
         val presentationBytes = entries[PRESENTATION_PATH]
             ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
         val relationshipsBytes = entries[PRESENTATION_RELS_PATH]
             ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
-        validatePptxSafety(entries)
+        val printerSettings = validatePptxSafety(entries)
 
         val presentation = parseXml(presentationBytes)
         val relationships = parseXml(relationshipsBytes)
@@ -122,6 +127,7 @@ class MaterialDocumentPreparationService {
                 path.startsWith("ppt/notesMasters/") ||
                 path.startsWith("ppt/comments/") ||
                 path.startsWith("ppt/commentAuthors") ||
+                path in printerSettings ||
                 slides.hidden.any { hidden -> path == hidden || path == slideRelsPath(hidden) }
         }
         return PreparedMaterialDocument(
@@ -138,18 +144,66 @@ class MaterialDocumentPreparationService {
         )
     }
 
-    private fun validatePptxSafety(entries: Map<String, ByteArray>) {
-        if (entries.keys.any(::isUnsafePptxEntry)) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
-        entries.filterKeys { it.endsWith(".rels") }.values.forEach { bytes ->
+    private fun validatePptxSafety(entries: Map<String, ByteArray>): Set<String> {
+        val printerSettings = entries.keys.filterTo(mutableSetOf()) { PRINTER_SETTINGS_PATH.matches(it) }
+        if (entries.keys.any { isUnsafePptxEntry(it) && it !in printerSettings }) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        }
+        val contentTypes = entries["[Content_Types].xml"] ?: fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
+        validatePrinterSettingsContentTypes(contentTypes, printerSettings)
+        val referencedPrinterSettings = mutableSetOf<String>()
+        entries.filterKeys { it.endsWith(".rels") }.forEach { (path, bytes) ->
             val relationships = parseXml(bytes)
+            requirePackageRoot(relationships, RELATIONSHIPS_NS, "Relationships")
             val nodes = relationships.getElementsByTagNameNS(RELATIONSHIPS_NS, "Relationship")
             repeat(nodes.length) { index ->
                 val relation = nodes.item(index) as? Element ?: return@repeat
-                if (relation.getAttribute("TargetMode").equals("External", ignoreCase = true)) {
+                val mode = relation.getAttribute("TargetMode")
+                val rawTarget = relation.getAttribute("Target")
+                if ((mode.isNotEmpty() && !mode.equals("Internal", ignoreCase = true)) ||
+                    rawTarget.startsWith("//") || URI_SCHEME.containsMatchIn(rawTarget)
+                ) {
                     fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+                }
+                val type = relation.getAttribute("Type")
+                if (type.substringAfterLast('/').lowercase() in UNSAFE_RELATIONSHIP_TYPES) {
+                    fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+                }
+                val target = resolvePptTarget(relsOwnerPath(path), rawTarget)
+                if (target in printerSettings || type == PRINTER_SETTINGS_RELATIONSHIP) {
+                    if (path != PRESENTATION_RELS_PATH || type != PRINTER_SETTINGS_RELATIONSHIP ||
+                        target !in printerSettings || !referencedPrinterSettings.add(target)
+                    ) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
                 }
             }
         }
+        if (referencedPrinterSettings != printerSettings) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        return printerSettings
+    }
+
+    private fun validatePrinterSettingsContentTypes(bytes: ByteArray, printerSettings: Set<String>) {
+        val document = parseXml(bytes)
+        requirePackageRoot(document, CONTENT_TYPES_NS, "Types")
+        val allContentTypes = document.getElementsByTagNameNS(CONTENT_TYPES_NS, "*")
+        repeat(allContentTypes.length) { index ->
+            val contentType = (allContentTypes.item(index) as? Element)?.getAttribute("ContentType")?.lowercase().orEmpty()
+            if (UNSAFE_CONTENT_TYPE_MARKERS.any { it in contentType }) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        }
+        val defaults = document.getElementsByTagNameNS(CONTENT_TYPES_NS, "Default")
+        val binDefaults = (0 until defaults.length).map { defaults.item(it) as Element }
+            .filter { it.getAttribute("Extension").equals("bin", ignoreCase = true) }
+        if (binDefaults.size > 1 || binDefaults.any { it.getAttribute("ContentType") != PRINTER_SETTINGS_CONTENT_TYPE }) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
+        }
+        val overrides = document.getElementsByTagNameNS(CONTENT_TYPES_NS, "Override")
+        val binOverrides = (0 until overrides.length).map { overrides.item(it) as Element }
+            .filter { it.getAttribute("PartName").endsWith(".bin", ignoreCase = true) }
+        val overridePaths = binOverrides.map { it.getAttribute("PartName").removePrefix("/") }
+        if (overridePaths.size != overridePaths.toSet().size ||
+            binOverrides.any { it.getAttribute("ContentType") != PRINTER_SETTINGS_CONTENT_TYPE } ||
+            overridePaths.any { it !in printerSettings } ||
+            printerSettings.any { it !in overridePaths && binDefaults.isEmpty() }
+        ) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_UNSAFE)
     }
 
     private fun readPptxSlides(presentation: Document, relationships: Document): PptxSlides {
@@ -211,9 +265,12 @@ class MaterialDocumentPreparationService {
     private fun readBoundedZip(bytes: ByteArray): LinkedHashMap<String, ByteArray> {
         val entries = linkedMapOf<String, ByteArray>()
         var expandedBytes = 0L
+        var entryCount = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
+                entryCount += 1
+                if (entryCount > DOCUMENT_MAX_ZIP_ENTRIES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
                 expandedBytes = readZipEntry(zip, entry, entries, expandedBytes)
                 zip.closeEntry()
             }
@@ -232,7 +289,6 @@ class MaterialDocumentPreparationService {
         if (path.startsWith("/") || path.split('/').any { it == ".." } || entries.containsKey(path)) {
             fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
         }
-        if (entries.size >= DOCUMENT_MAX_ZIP_ENTRIES) fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_LIMIT_EXCEEDED)
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         var expandedBytes = initialExpandedBytes
@@ -267,6 +323,7 @@ class MaterialDocumentPreparationService {
             ) delete += relation
         }
         delete.forEach { it.parentNode.removeChild(it) }
+        normalizePackageNamespace(document, RELATIONSHIPS_NS, "Relationships")
         return serializeXml(document)
     }
 
@@ -279,7 +336,30 @@ class MaterialDocumentPreparationService {
             if (override.getAttribute("PartName").removePrefix("/") in removed) delete += override
         }
         delete.forEach { it.parentNode.removeChild(it) }
+        val defaults = document.getElementsByTagNameNS(CONTENT_TYPES_NS, "Default")
+        val binDefaults = (0 until defaults.length).map { defaults.item(it) as Element }
+            .filter { it.getAttribute("Extension").equals("bin", ignoreCase = true) }
+        binDefaults.forEach { it.parentNode.removeChild(it) }
+        normalizePackageNamespace(document, CONTENT_TYPES_NS, "Types")
         return serializeXml(document)
+    }
+
+    private fun requirePackageRoot(document: Document, namespace: String, localName: String) {
+        val root = document.documentElement
+        if (root.namespaceURI != namespace || root.localName != localName) {
+            fail(MetaData.ErrorCodes.MATERIAL_DOCUMENT_INVALID_FILE)
+        }
+    }
+
+    private fun normalizePackageNamespace(document: Document, namespace: String, localName: String) {
+        requirePackageRoot(document, namespace, localName)
+        fun normalize(element: Element) {
+            val children = (0 until element.childNodes.length).mapNotNull { element.childNodes.item(it) as? Element }
+            if (element.namespaceURI == namespace) document.renameNode(element, namespace, element.localName)
+            children.forEach(::normalize)
+        }
+        normalize(document.documentElement)
+        document.documentElement.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns", namespace)
     }
 
     private fun relationshipTargets(document: Document): Map<String, String> {
@@ -406,3 +486,9 @@ private const val PRESENTATION_NS = "http://schemas.openxmlformats.org/presentat
 private const val OFFICE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 private const val RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 private const val CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+private const val PRINTER_SETTINGS_RELATIONSHIP = "$OFFICE_RELATIONSHIPS_NS/printerSettings"
+private const val PRINTER_SETTINGS_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.printerSettings"
+private val PRINTER_SETTINGS_PATH = Regex("ppt/printerSettings/printerSettings[0-9]+\\.bin")
+private val URI_SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:")
+private val UNSAFE_RELATIONSHIP_TYPES = setOf("activexcontrol", "control", "externallink", "oleobject", "package", "vbaproject")
+private val UNSAFE_CONTENT_TYPE_MARKERS = setOf("macroenabled", "vbaproject", "activex", "oleobject")

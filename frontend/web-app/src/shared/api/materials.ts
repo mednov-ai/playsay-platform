@@ -2,7 +2,7 @@ import { gameRequest } from "./gameRequest";
 import { authConfig, getCredentialGeneration } from "./auth";
 import { apiErrorFromResponse, apiFetch, isApiStatus } from "./errors";
 import { validateHtmlGameUpload } from "./htmlGameUploadPolicy";
-import { apiJson, authorizedOptions, assertAuthorizedResponse } from "./http";
+import { apiJson, authorizedOptions, authorizedRequest, assertAuthorizedResponse } from "./http";
 import type {
   LessonMaterial,
   LessonMaterialAnnotation,
@@ -157,7 +157,8 @@ export async function fetchMaterialAssetObjectUrl(
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
   const generation = getCredentialGeneration();
-  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content?access=private-v1`, {
+    cache: "no-store",
     headers: authorized.headers,
   });
 
@@ -345,7 +346,8 @@ export async function fetchMaterialAssetText(
 ): Promise<string> {
   const authorized = await authorizedOptions(config);
   const generation = getCredentialGeneration();
-  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content`, {
+  const response = await apiFetch(`/api/materials/${materialId}/assets/${assetId}/content?access=private-v1`, {
+    cache: "no-store",
     headers: authorized.headers,
   });
   assertAuthorizedResponse(response, authorized, generation);
@@ -510,6 +512,57 @@ export async function fetchScheduledLessonMaterialAnnotation(
     }
     throw caught;
   }
+}
+
+export async function fetchUnallocatedParallelMaterialAnnotations(
+  lessonId: string, materialId: string, config = authConfig,
+): Promise<LessonMaterialAnnotation | null> {
+  const options = await authorizedOptions(config);
+  const generation = getCredentialGeneration();
+  const response = await apiFetch(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/materials/${encodeURIComponent(materialId)}/unallocated-annotations`,
+    { ...options, method: "GET", cache: "no-store" },
+  );
+  assertAuthorizedResponse(response, options, generation);
+  if (response.status === 204) return null;
+  if (response.status !== 200) throw await apiErrorFromResponse(response, "");
+  const result = await response.json() as LessonMaterialAnnotation;
+  assertAuthorizedResponse(response, options, generation);
+  return result;
+}
+
+export async function fetchParallelStudentLegacyAnnotations(
+  lessonId: string, materialId: string, studentSubject: string, config = authConfig,
+): Promise<LessonMaterialAnnotation | null> {
+  const result = await authorizedRequest(config, async (options) => {
+    const response = await apiFetch(
+      `/api/schedule/lessons/${encodeURIComponent(lessonId)}/materials/${encodeURIComponent(materialId)}/students/${encodeURIComponent(studentSubject)}/parallel-annotations`,
+      { ...options, method: "GET", cache: "no-store" },
+    );
+    return { status: response.status, response,
+      annotation: response.status === 200 ? await response.json() as LessonMaterialAnnotation : null };
+  }, 5_000);
+  if (result.status === 204) return null;
+  if (result.status !== 200) throw await apiErrorFromResponse(result.response, "");
+  return result.annotation;
+}
+
+export async function fetchUnallocatedAnnotationMaterials(
+  lessonId: string, page = 0, config = authConfig,
+): Promise<{ materialIds: string[]; hasNext: boolean }> {
+  return apiJson<{ materialIds: string[]; hasNext: boolean }>(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/unallocated-annotation-materials?page=${page}`,
+    { method: "GET", cache: "no-store" }, config,
+  );
+}
+
+export async function fetchUnallocatedParallelAnnotationSnapshots(
+  lessonId: string, materialId: string, page = 0, config = authConfig,
+): Promise<{ items: LessonMaterialAnnotation[]; hasNext: boolean }> {
+  return apiJson<{ items: LessonMaterialAnnotation[]; hasNext: boolean }>(
+    `/api/schedule/lessons/${encodeURIComponent(lessonId)}/materials/${encodeURIComponent(materialId)}/unallocated-annotation-snapshots?page=${page}`,
+    { method: "GET", cache: "no-store" }, config,
+  );
 }
 
 export async function saveScheduledLessonMaterialAnnotation(

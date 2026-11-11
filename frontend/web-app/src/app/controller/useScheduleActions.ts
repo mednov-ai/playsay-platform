@@ -157,6 +157,10 @@ export function useScheduleActions({
       setRoomMessage(t("schedule.messages.notFound"));
       return null;
     }
+    if (lesson.workMode === "PARALLEL") {
+      setRoomMessage(t("classroom.messages.parallelMaterialUnsupported"));
+      return null;
+    }
 
     setMaterialLoading(true);
     setRoomMessage(null);
@@ -175,6 +179,10 @@ export function useScheduleActions({
       });
       setScheduledLessons((current) => current.map((item) => (item.id === lessonId ? updated : item)));
       setRoomSession((current) => current?.lessonId === lessonId ? roomSessionFromScheduledLesson(current, updated) : current);
+      if ((updated.materialId ?? null) !== materialId) {
+        setRoomMessage(t("classroom.messages.materialAssignmentMismatch"));
+        return updated;
+      }
       setRoomMessage(materialId ? t("classroom.messages.materialAssigned") : t("classroom.messages.materialUnassigned"));
       return updated;
     } catch (caught) {

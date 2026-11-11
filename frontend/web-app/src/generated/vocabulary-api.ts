@@ -973,8 +973,16 @@ export type KeySetCompletionContext = {
   assignmentId?: string | null;
   /** @nullable */
   lessonId?: string | null;
-  /** @minimum 0 */
+  /**
+     * Typing acknowledgement; not proof of an accepted result.
+     * @minimum 0
+     */
   lastAcknowledgedPosition: number;
+  /**
+     * Length of the contiguous prefix of target results durably accepted by Vocabulary.
+     * @minimum 0
+     */
+  lastRecordedPosition?: number;
 } | null;
 
 export type KeySetReturnContextTarget = typeof KeySetReturnContextTarget[keyof typeof KeySetReturnContextTarget];
@@ -1017,6 +1025,24 @@ export interface KeySet {
   completionContext?: KeySetCompletionContext;
   /** @nullable */
   returnContext?: KeySetReturnContext;
+}
+
+export interface KeyTargetResultInput {
+  targetId: string;
+  /**
+     * @minimum 0
+     * @maximum 999
+     */
+  errors: number;
+  /**
+     * @minimum 0
+     * @maximum 3600000
+     */
+  durationMs: number;
+}
+
+export interface KeyTargetResultReceipt {
+  targetId: string;
 }
 
 export interface KeyAcknowledgementRequest {
@@ -1094,7 +1120,7 @@ export interface KeyResult {
   clientResultId: string;
   /**
      * @minItems 1
-     * @maxItems 100
+     * @maxItems 200
      */
   attempts: KeyResultAttemptsItem[];
 }
@@ -2974,6 +3000,86 @@ export const getApiVocabularyPracticeSessionsSessionIdKeySet = async (sessionId:
 
   const data: getApiVocabularyPracticeSessionsSessionIdKeySetResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getApiVocabularyPracticeSessionsSessionIdKeySetResponse
+}
+
+
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse200 = {
+  data: KeyTargetResultReceipt
+  status: 200
+}
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse400 = {
+  data: void
+  status: 400
+}
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse403 = {
+  data: void
+  status: 403
+}
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse404 = {
+  data: void
+  status: 404
+}
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse409 = {
+  data: void
+  status: 409
+}
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponseSuccess = (postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse200) & {
+  headers: Headers;
+};
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponseError = (postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse400 | postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse403 | postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse404 | postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse409) & {
+  headers: Headers;
+};
+
+export type postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse = (postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponseSuccess | postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponseError)
+
+export const getPostApiVocabularyPracticeSessionsSessionIdKeyTargetResultsUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/vocabulary/practice-sessions/${sessionId}/key-target-results`
+}
+
+/**
+ * @summary Durably record one immutable Key target for its owning learner
+ */
+export const postApiVocabularyPracticeSessionsSessionIdKeyTargetResults = async (sessionId: string,
+    keyTargetResultInput: KeyTargetResultInput, options?: RequestInit): Promise<postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getPostApiVocabularyPracticeSessionsSessionIdKeyTargetResultsUrl(sessionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(keyTargetResultInput)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as postApiVocabularyPracticeSessionsSessionIdKeyTargetResultsResponse
 }
 
 

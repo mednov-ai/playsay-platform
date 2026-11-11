@@ -493,6 +493,7 @@ data class VocabularyKeyCompletionContextResponse(
     val assignmentId: UUID?,
     val lessonId: UUID?,
     val lastAcknowledgedPosition: Int,
+    val lastRecordedPosition: Int = 0,
 )
 
 data class VocabularyKeyReturnContextResponse(
@@ -511,9 +512,17 @@ data class VocabularyKeyAcknowledgementResponse(
     val revision: Long,
 )
 
+data class VocabularyKeyTargetResultRequest(
+    val targetId: UUID,
+    @field:Min(0) @field:Max(999) val errors: Int,
+    @field:Min(0) @field:Max(3_600_000) val durationMs: Long,
+)
+
+data class VocabularyKeyTargetResultResponse(val targetId: UUID)
+
 data class VocabularyKeyResultRequest(
     @field:NotBlank @field:Size(max = 128) val clientResultId: String,
-    @field:Size(min = 1, max = 100) val attempts: List<VocabularyKeyWordAttemptRequest>,
+    @field:Size(min = 1, max = 200) val attempts: List<VocabularyKeyWordAttemptRequest>,
 )
 
 data class VocabularyKeyWordAttemptRequest(

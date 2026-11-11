@@ -30,6 +30,13 @@ data class CreateCollaborationDocumentRequest(
     val scope: String = "INDIVIDUAL",
 )
 
+data class CreateParallelCollaborationDocumentRequest(
+    val materialId: UUID,
+    @field:Schema(maxLength = 255) val studentSubject: String,
+)
+
+data class CollaborationMaterialPolicyRequest(val subject: String)
+
 data class SaveCollaborationSnapshotRequest(
     val snapshot: JsonNode,
     @field:Schema(nullable = true)

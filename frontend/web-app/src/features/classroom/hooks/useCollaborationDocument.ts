@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createCurrentCollaborationDocument,
+  createParallelStudentCollaborationDocument,
   finalizeCollaborationDocument,
   saveCollaborationDocumentSnapshot,
   type CollaborationDocument,
@@ -16,11 +17,13 @@ export function useCollaborationDocument({
   lessonId,
   materialId,
   mode,
+  studentSubject,
 }: {
   enabled?: boolean;
   lessonId: string;
   materialId?: string | null;
   mode: CollaborationWorkspaceMode;
+  studentSubject?: string | null;
 }) {
   const { t } = useAppTranslation();
   const [document, setDocument] = useState<CollaborationDocument | null>(null);
@@ -33,7 +36,8 @@ export function useCollaborationDocument({
   const scope = collaborationScopeForMode(mode);
   const activeDocument = document?.scope === scope &&
     document.lessonId === lessonId &&
-    document.materialId === materialId
+    document.materialId === materialId &&
+    (!studentSubject || document.studentSubject === studentSubject)
     ? document
     : null;
 
@@ -50,11 +54,13 @@ export function useCollaborationDocument({
     setLoading(true);
     setError(null);
     try {
-      const nextDocument = await createCurrentCollaborationDocument(lessonId, {
-        documentKind: "MATERIAL_WORK",
-        materialId,
-        scope: scope as CollaborationDocumentScope,
-      });
+      const nextDocument = studentSubject
+        ? await createParallelStudentCollaborationDocument(lessonId, materialId, studentSubject)
+        : await createCurrentCollaborationDocument(lessonId, {
+            documentKind: "MATERIAL_WORK",
+            materialId,
+            scope: scope as CollaborationDocumentScope,
+          });
       if (requestGenerationRef.current !== requestGeneration) return null;
       if (invalidDocumentId && nextDocument.id === invalidDocumentId) {
         setError(t("classroom.collaboration.loadFailed"));
@@ -71,7 +77,7 @@ export function useCollaborationDocument({
     } finally {
       if (requestGenerationRef.current === requestGeneration) setLoading(false);
     }
-  }, [enabled, lessonId, materialId, scope, t]);
+  }, [enabled, lessonId, materialId, scope, studentSubject, t]);
 
   const refresh = useCallback(
     () => loadCurrentDocument(),

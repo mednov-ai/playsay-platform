@@ -6,6 +6,8 @@ The feature is guarded by gateway `playsay.whiteboard.enabled` (default `false`)
 
 One stable board belongs to each scheduled lesson context: `GROUP` for SHARED, or a roster student's UUID for PARALLEL. It has no material dependency and is not an assignable material. Creating/opening is idempotent under the lesson lock. Replacing the lesson material does not replace the board. PARALLEL managers must explicitly select a roster student; learners can only resolve their own context. Current roster, assigned teacher/delegation/admin authority, deletion intent, admission and server-authoritative lesson deadline govern live access. History uses a separate roster/management read policy and does not issue write tokens after completion.
 
+The student schedule includes a separate saved-board section backed by the authorized lesson library index. It opens the existing read-only snapshot dialog without requesting a live collaboration token. Opening a board rechecks its access; the current lesson list and its exclusion of completed lessons are unchanged.
+
 `lesson_whiteboard` stores background, learner permission, active surface, control revision and content epoch. A collaboration document has exactly one binding: ordinary material, `LESSON_GAME` with a GROUP game launch, or `LESSON_WHITEBOARD` without a material/game launch. The additive migration extends the existing game-binding constraint; it does not edit the applied game migration. Lesson/student/document foreign keys and the unique `(lesson_id, context_key)` constraint preserve lifecycle and context identity.
 
 ## HTTP and notification

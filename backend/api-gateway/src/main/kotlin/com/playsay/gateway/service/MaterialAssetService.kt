@@ -10,7 +10,6 @@ import com.playsay.gateway.entity.MaterialAssetEntity
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.utils.MetaData
-import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import org.springframework.http.CacheControl
@@ -75,7 +74,7 @@ class MaterialAssetService(
         return ResponseEntity.ok()
             .contentType(contentType)
             .contentLength(content.contentLength)
-            .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePrivate())
+            .cacheControl(CacheControl.noStore())
             .body(content.bytes)
     }
 
@@ -435,7 +434,7 @@ internal fun StoredMaterialAsset.toResponse(objectMapper: ObjectMapper): Materia
         storageKey = storageKey,
         externalUrl = externalUrl,
         contentUrl = (storageKey?.takeIf { key -> key.isNotBlank() } ?: if (kind == "HTML_GAME" && objectMapper.readTree(metadata).hasNonNull("gameRevisionId")) "game-library" else null)?.let {
-            "/api/materials/$materialId/assets/$id/content"
+            "/api/materials/$materialId/assets/$id/content?access=private-v1"
         },
         provider = provider,
         metadata = objectMapper.readTree(metadata),

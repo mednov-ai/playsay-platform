@@ -13,11 +13,16 @@ let api: http.Server;
 let child: ChildProcess;
 let port: number;
 let documents: Set<string>;
+let policyAllowed: boolean;
 const sockets: WebSocket[] = [];
 
 beforeEach(async () => {
   documents = new Set(["document-fixture"]);
+  policyAllowed = true;
   api = http.createServer((req, res) => {
+    if (req.url?.startsWith("/internal/collaboration-documents/")) {
+      res.writeHead(policyAllowed ? 204 : 403); res.end(); return;
+    }
     const id = req.url?.split("/")[5] ?? "";
     res.writeHead(documents.has(id) ? 200 : 404, { "content-type": "application/json" });
     res.end(JSON.stringify({ snapshot: null }));
@@ -75,6 +80,18 @@ describe("real collaboration admission and recovery protocol", () => {
     const metrics = await fetch(`http://127.0.0.1:${port}/metrics`).then(r => r.text());
     expect(metrics).toMatch(/playsay_collaboration_active_rooms 0/);
   });
+  it("disconnects a revoked material participant and rejects reuse of the existing token", async () => {
+    const socket = await connect(); await waitControl(socket, "hello");
+    const closed = once(socket, "close");
+    policyAllowed = false;
+    expect((await closed)[0]).toBe(1008);
+    const denied = await connect();
+    const response = await new Promise<number>((resolve, reject) => {
+      denied.once("unexpected-response", (_request, result) => { resolve(result.statusCode ?? 0); result.resume(); });
+      denied.once("error", reject);
+    });
+    expect(response).toBe(403);
+  }, 10_000);
   it("acknowledges negotiated probes and rejects a burst", async () => {
     const socket = await connect(); await waitControl(socket, "hello");
     const ack = waitControl(socket, "ack");

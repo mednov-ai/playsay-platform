@@ -74,6 +74,7 @@ export type LessonPresentationMode = "default" | "html-game-focus" | "image-focu
 
 export function LessonTaskCanvas({
   annotationSync,
+  readOnlyAnnotation,
   collaborationControls,
   lessonId,
   material,
@@ -93,6 +94,7 @@ export function LessonTaskCanvas({
   viewportSync,
 }: {
   annotationSync?: LiveAnnotationSync | null;
+  readOnlyAnnotation?: { elements: AnnotationElement[]; activePageId: string };
   canControlPages?: boolean;
   htmlGameSync?: MaterialHtmlGameSync;
   exerciseSync?: MaterialExerciseSync;
@@ -150,7 +152,10 @@ export function LessonTaskCanvas({
     updateSelectedColor,
     updateSelectedFontSize,
     updateSelectedStrokeWidth,
-  } = useLessonAnnotation({ initialPageId: firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id });
+  } = useLessonAnnotation({
+    controlledAnnotation: readOnlyAnnotation ? { key: "unallocated", elements: readOnlyAnnotation.elements, setElements: () => undefined } : undefined,
+    initialPageId: readOnlyAnnotation?.activePageId ?? firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id,
+  });
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const effectiveAnswers = exerciseSync?.answers ?? answers;
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
@@ -654,8 +659,8 @@ export function LessonTaskCanvas({
   }
 
   return (
-    <div className="playsay-task-board" data-presentation-mode={presentationMode}>
-      {presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
+    <div className="playsay-task-board" data-presentation-mode={presentationMode} data-read-only={readOnlyAnnotation ? "true" : undefined}>
+      {!readOnlyAnnotation && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
         <AnnotationToolbar
           annotationColor={annotationColor}
           annotationFontSize={annotationFontSize}
@@ -676,7 +681,7 @@ export function LessonTaskCanvas({
 
       <div className="playsay-task-page">
         <div className="playsay-task-document" ref={taskDocumentRef}>
-      {annotationSync?.status === "error" ? (
+      {annotationSync?.status === "error" || annotationSync?.status === "reconnecting" || annotationSync?.status === "disconnected" ? (
         <div className="playsay-task-collaboration-status" role="status">
           <span>{t("classroom.collaborationRecovery.unsaved")}</span>
           {annotationSync.retry ? <button type="button" className="playsay-ghost-button" onClick={annotationSync.retry}>{t("classroom.collaborationRecovery.retry")}</button> : null}
@@ -716,7 +721,7 @@ export function LessonTaskCanvas({
                     { presentationChanged: true },
                   ));
                 }}
-                onAnswerChange={updateAnswer}
+                onAnswerChange={readOnlyAnnotation ? () => undefined : updateAnswer}
                 onPresentationModeChange={(mode, blockId) => {
                   cancelLocalScrollRef.current();
                   setPresentationMode(mode);
@@ -775,6 +780,7 @@ export function LessonTaskCanvas({
             {presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
               <>
                 <AnnotationLayer
+              readOnly={Boolean(readOnlyAnnotation)}
               editingElementId={editingElementId}
               elements={pageAnnotationElements}
               onAddMindMapNode={addMindMapNode}
@@ -800,6 +806,7 @@ export function LessonTaskCanvas({
                 />
                 {annotationAnchors.map((anchor) => (
                   <AnnotationLayer
+                readOnly={Boolean(readOnlyAnnotation)}
                 anchorId={anchor.id}
                 anchorBounds={anchor.bounds}
                 editingElementId={editingElementId}
@@ -846,7 +853,7 @@ export function LessonTaskCanvas({
       </div>
 
       <footer className="playsay-task-footer">
-        {footerControls}
+        {!readOnlyAnnotation ? footerControls : null}
         <span className="playsay-task-teacher">{teacherName}</span>
       </footer>
     </div>

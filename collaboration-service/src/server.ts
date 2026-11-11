@@ -20,7 +20,7 @@ import {
 } from "./gameProtocol.js";
 import { CollaborationMetrics } from "./metrics.js";
 import { CollaborationHeartbeat } from "./heartbeat.js";
-import { InvalidCollaborationDocument, SnapshotCapacityError, SnapshotQueue } from "./snapshots.js";
+import { InvalidCollaborationDocument, SnapshotCapacityError, SnapshotQueue, materialPersistenceState } from "./snapshots.js";
 import type { CollaborationClaims } from "./rooms.js";
 import { assertRoomMatchesClaims } from "./rooms.js";
 import { disconnectLessonSubject } from "./disconnect.js";
@@ -41,6 +41,7 @@ import { assertGameLifecycleUpdate, encodeGameLifecycle, isHtmlGameStopMessage, 
 import { decodeProbe, encodeRecovery, messageRecovery } from "./recoveryProtocol.js";
 
 import { assertWhiteboardSync, loadWhiteboardPolicy, applyWhiteboardCamera, messageWhiteboard, messageWhiteboardPersistence } from "./whiteboardAuthorization.js";
+import { requireMaterialAccess } from "./materialAuthorization.js";
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -161,6 +162,10 @@ async function main(): Promise<void> {
       if (room.claims.documentId !== claims.documentId) return;
       if (outcome === "saved" && claims.documentKind === "LESSON_WHITEBOARD" && snapshot) {
         for (const ws of room.connections.keys()) if (ws.readyState === ws.OPEN) sendWhiteboardControl(ws, messageWhiteboardPersistence, { type: "persisted", version: 1, contentEpoch: claims.contentEpoch, stateVector: snapshot.stateVectorBase64, deleteSet: snapshot.deleteSetBase64 });
+      } else if (outcome === "saved" && claims.documentKind !== "LESSON_GAME" && snapshot) {
+        for (const ws of room.connections.keys()) {
+          sendMaterialPersistence(ws, claims.documentId, snapshot, backpressurePolicy, metrics);
+        }
       } else if (outcome === "document_invalid") {
         room.invalid = true;
         if (rooms.get(claims.yjsDocumentId)) rooms.delete(claims.yjsDocumentId);
@@ -202,6 +207,7 @@ async function main(): Promise<void> {
       .then(async (claims) => {
         assertRoomMatchesClaims(roomName, claims);
         if (claims.documentKind === "LESSON_WHITEBOARD") await loadWhiteboardPolicy(config, claims);
+        if (claims.documentKind !== "LESSON_WHITEBOARD" && claims.documentKind !== "LESSON_GAME") await requireMaterialAccess(config, claims);
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit("connection", ws, request, claims);
         });
@@ -261,6 +267,20 @@ async function main(): Promise<void> {
 
 function sendWhiteboardControl(ws: WebSocket, type: number, value: Record<string, unknown>): void {
   const encoder = encoding.createEncoder(); encoding.writeVarUint(encoder, type); encoding.writeVarString(encoder, JSON.stringify(value)); ws.send(encoding.toUint8Array(encoder));
+}
+
+function sendMaterialPersistence(
+  ws: WebSocket,
+  documentId: string,
+  snapshot: Record<string, unknown>,
+  policy: CollaborationBackpressurePolicy,
+  metrics: CollaborationMetrics,
+): void {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageWhiteboardPersistence);
+  encoding.writeVarString(encoder, JSON.stringify({ type: "material-persisted", version: 1, documentId,
+    stateVector: snapshot.stateVectorBase64, deleteSet: snapshot.deleteSetBase64 }));
+  sendWithBackpressure(ws, encoding.toUint8Array(encoder), "sync", policy, metrics);
 }
 
 function serviceTokenMatches(presented: string | string[] | undefined, expected: string): boolean {
@@ -456,6 +476,18 @@ function bindWebSocket(
     }, 5000);
     policyTimer.unref(); ws.once("close", () => clearInterval(policyTimer));
   }
+  if (room.claims.documentKind !== "LESSON_WHITEBOARD" && room.claims.documentKind !== "LESSON_GAME") {
+    let checking = false;
+    const policyTimer = setInterval(() => {
+      if (checking || ws.readyState !== ws.OPEN) return;
+      const claims = connectionClaims.get(ws); if (!claims) { ws.close(1008); return; }
+      checking = true;
+      void requireMaterialAccess(whiteboardConfig, claims)
+        .catch(() => ws.close(1008, "material access expired"))
+        .finally(() => { checking = false; });
+    }, 5_000);
+    policyTimer.unref(); ws.once("close", () => clearInterval(policyTimer));
+  }
   if (isYjsSocket(ws) && probeEnabled.has(ws)) {
     ws.send(encodeRecovery({ type: "hello", version: 1, liveness: true }));
   }
@@ -598,6 +630,10 @@ function handleMessage(
         backpressurePolicy,
         metrics,
       );
+    }
+    if (syncType === syncProtocol.messageYjsSyncStep2 && claims.documentKind !== "LESSON_WHITEBOARD" &&
+        claims.documentKind !== "LESSON_GAME" && !room.snapshots.hasPending(claims.documentId)) {
+      sendMaterialPersistence(ws, claims.documentId, materialPersistenceState(room.doc), backpressurePolicy, metrics);
     }
     return;
   }

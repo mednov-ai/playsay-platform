@@ -2,6 +2,8 @@ package com.playsay.gateway.realtime
 
 import com.playsay.gateway.service.ChatDeliveryService
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -11,8 +13,21 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
+import org.springframework.web.socket.WebSocketHandler
+import org.springframework.web.socket.server.support.DefaultHandshakeHandler
 
 class ChatRealtimeWebSocketHandlerTest {
+    @Test
+    fun `handshake selects only playsay and never echoes the credential`() {
+        val handler = ChatRealtimeWebSocketHandler(mock(ChatRealtimeHub::class.java), mock(ChatDeliveryService::class.java))
+        val handshake = object : DefaultHandshakeHandler() {
+            fun choose(protocols: List<String>, webSocketHandler: WebSocketHandler): String? =
+                selectProtocol(protocols, webSocketHandler)
+        }
+        assertEquals("playsay", handshake.choose(listOf("playsay", "synthetic-token"), handler))
+        assertNull(handshake.choose(listOf("synthetic-token"), handler))
+    }
+
     @Test
     fun `mixed role registers and recovers pending messages while pure admin is rejected`() {
         for (roles in listOf(listOf("ROLE_ADMIN", "ROLE_TEACHER"), listOf("ROLE_STUDENT"), listOf("ROLE_ADMIN"))) {

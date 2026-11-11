@@ -6,6 +6,8 @@ import com.playsay.vocabulary.dto.PracticeRating
 import com.playsay.vocabulary.dto.PracticeStatus
 import com.playsay.vocabulary.dto.SessionStatus
 import com.playsay.vocabulary.dto.VocabularyKeyResultRequest
+import com.playsay.vocabulary.dto.VocabularyKeyTargetResultRequest
+import com.playsay.vocabulary.dto.VocabularyKeyTargetResultResponse
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementResponse
 import com.playsay.vocabulary.dto.VocabularyKeyTargetType
@@ -65,15 +67,50 @@ class VocabularyKeyboardPracticeService(
         if (request.targetId != null && request.position > 0 && targets.getOrNull(request.position - 1)?.id != request.targetId) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Target does not match acknowledged position")
         }
-        if (request.position > session.currentItemPosition) {
-            session.currentItemPosition = request.position
+        if (request.position > session.keyAcknowledgedPosition) {
+            session.keyAcknowledgedPosition = request.position
             session.revision += 1
             session.updatedAt = Instant.now()
             if (session.startedAt == null) session.startedAt = session.updatedAt
             if (session.status == SessionStatus.NOT_STARTED) session.status = SessionStatus.IN_PROGRESS
             sessions.save(session)
         }
-        return VocabularyKeyAcknowledgementResponse(session.id, session.currentItemPosition, session.revision)
+        return VocabularyKeyAcknowledgementResponse(session.id, session.keyAcknowledgedPosition, session.revision)
+    }
+
+    @Transactional
+    fun recordOwnedTarget(
+        actorSubject: String,
+        sessionId: UUID,
+        request: VocabularyKeyTargetResultRequest,
+    ): VocabularyKeyTargetResultResponse {
+        val session = sessionEntityForUpdate(sessionId)
+        if (session.ownerSubject != actorSubject) throw ResponseStatusException(HttpStatus.FORBIDDEN)
+        if (request.errors !in 0..999 || request.durationMs !in 0..3_600_000) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        val snapshot = keySnapshots.findBySessionId(session.id)
+            ?: throw ResponseStatusException(HttpStatus.CONFLICT, "Key snapshot has not been materialized")
+        val target = keyTargets.findById(request.targetId).orElse(null)
+            ?.takeIf { it.snapshotId == snapshot.id }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (keyResults.existsByTargetId(target.id)) return VocabularyKeyTargetResultResponse(target.id)
+        val practice = practices.findById(session.practiceId).orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND) }
+        if (session.status == SessionStatus.CANCELLED || session.status == SessionStatus.COMPLETED ||
+            practice.status in keyboardTerminalPracticeStatuses
+        ) throw ResponseStatusException(HttpStatus.CONFLICT, "Vocabulary practice is already closed")
+        val sourceEntries: List<UUID> = objectMapper.readValue(target.sourceEntryIdsJson, uuidListType)
+        val sourceItems: List<UUID> = objectMapper.readValue(target.sourceItemIdsJson, uuidListType)
+        if (sourceEntries.isEmpty() || sourceItems.isEmpty()) throw ResponseStatusException(HttpStatus.CONFLICT)
+        recordKeyResult(sessionId, VocabularyKeyResultRequest(
+            clientResultId = "key-target:${session.id}:${target.id}",
+            attempts = listOf(VocabularyKeyWordAttemptRequest(
+                itemId = sourceItems.first(), entryId = sourceEntries.first(), errors = request.errors,
+                resultId = target.id, targetId = target.id, targetType = target.targetType,
+                durationMs = request.durationMs, position = target.position, typedText = target.text,
+                sourceEntryIds = sourceEntries, sourceItemIds = sourceItems,
+            )),
+        ))
+        if (!keyResults.existsByTargetId(target.id)) throw ResponseStatusException(HttpStatus.CONFLICT)
+        return VocabularyKeyTargetResultResponse(target.id)
     }
 
     @Transactional
@@ -117,7 +154,7 @@ class VocabularyKeyboardPracticeService(
         if (keyAttempt.sourceEntryIds.isNotEmpty() && keyAttempt.sourceEntryIds.toSet() != authoritativeEntryIds.toSet()) return false
         if (keyAttempt.sourceItemIds.isNotEmpty() && keyAttempt.sourceItemIds.toSet() != authoritativeItemIds.toSet()) return false
         val resultId = keyAttempt.resultId ?: UUID.nameUUIDFromBytes("$clientResultId:$targetId".toByteArray())
-        if (keyResults.existsById(resultId)) return false
+        if (keyResults.existsById(resultId) || keyResults.existsByTargetId(target.id)) return false
         val errors = keyAttempt.errors.coerceIn(0, 999)
         keyResults.save(
             VocabularyKeyResultEntity(
@@ -167,22 +204,28 @@ class VocabularyKeyboardPracticeService(
         }
         session.attemptCount += 1
         if (errors == 0) session.correctCount += 1
-        refreshCompletedItems(snapshot.id, sessionItems.values.toList(), now)
+        refreshCompletedItems(session.id, snapshot.id, sessionItems.values.toList(), now)
         return true
     }
 
     private fun refreshCompletedItems(
+        sessionId: UUID,
         snapshotId: UUID,
         sessionItems: List<VocabularyPracticeItemEntity>,
         now: Instant,
     ) {
         val snapshotTargets = keyTargets.findAllBySnapshotIdOrderByPositionAsc(snapshotId)
-        val completedTargetIds = snapshotTargets.filter { keyResults.existsByTargetId(it.id) }.mapTo(mutableSetOf()) { it.id }
-        sessionItems.forEach { item ->
-            val itemTargets = snapshotTargets.filter { target ->
-                objectMapper.readValue<List<UUID>>(target.sourceItemIdsJson, uuidListType).contains(item.id)
+        val completedTargetIds = keyResults.findAllBySessionIdOrderByPositionAsc(sessionId)
+            .asSequence().filter { it.snapshotId == snapshotId }.map { it.targetId }.toSet()
+        val targetsByItem = mutableMapOf<UUID, MutableSet<UUID>>()
+        snapshotTargets.forEach { target ->
+            objectMapper.readValue<List<UUID>>(target.sourceItemIdsJson, uuidListType).forEach { itemId ->
+                targetsByItem.getOrPut(itemId) { mutableSetOf() }.add(target.id)
             }
-            val completedCount = itemTargets.count { it.id in completedTargetIds }
+        }
+        sessionItems.forEach { item ->
+            val itemTargets = targetsByItem[item.id].orEmpty()
+            val completedCount = itemTargets.count { it in completedTargetIds }
             item.attemptCount = completedCount
             if (itemTargets.isNotEmpty() && completedCount == itemTargets.size) item.completedAt = now
             item.updatedAt = now

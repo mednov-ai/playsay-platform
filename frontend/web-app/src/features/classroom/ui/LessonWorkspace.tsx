@@ -32,6 +32,7 @@ import {
 import { LessonTaskCanvas, type LessonPresentationMode } from "./LessonTaskCanvas";
 import { MaterialSubmissionsMonitor } from "./MaterialSubmissionsMonitor";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+import { ParallelTeacherWorkspace } from "./ParallelTeacherWorkspace";
 import { TeacherLessonToolbar } from "./TeacherLessonToolbar";
 import { useAppTranslation } from "../../../shared/i18n";
 import { VocabularyLessonDialog } from "../../vocabulary/ui/VocabularyLessonDialog";
@@ -89,9 +90,7 @@ export function LessonWorkspace({
   } = useLessonMaterial({ onAssignMaterial, session });
   const canMonitorSubmissions = canAssignLessons(profile);
   const assignedParticipants = session.participants.filter((participant) => Boolean(participant.materialId));
-  const isParallelWork = session.workMode === "PARALLEL" &&
-    session.participants.length > 1 &&
-    assignedParticipants.length === session.participants.length;
+  const isParallelWork = session.workMode === "PARALLEL";
   const teacherWorkParticipants = isParallelWork ? assignedParticipants : session.participants;
   const teacherWorkParticipantKey = teacherWorkParticipants.map((participant) => participant.subject).join("|");
   const studentSharedPresenceEnabled = shouldEnableSharedMaterialPresence({
@@ -148,7 +147,7 @@ export function LessonWorkspace({
   const activeAssignedMaterial = canMonitorSubmissions && isParallelWork && activeParticipant?.materialId
     ? availableMaterials.find((item) => item.id === activeParticipant.materialId) ?? null
     : null;
-  const visibleMaterial = activeAssignedMaterial ?? material;
+  const visibleMaterial = canMonitorSubmissions && isParallelWork ? activeAssignedMaterial : material;
   const {
     saveMaterialAnswers,
     submission,
@@ -295,7 +294,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench" data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
+    <section className="playsay-workbench" data-work-mode={session.workMode} data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -391,7 +390,7 @@ export function LessonWorkspace({
       <div className="playsay-workbench-body">
 
         {assignmentMessage ? (
-          <div className="playsay-lesson-inline-message" role="alert">
+          <div className="playsay-lesson-inline-message" role="alert" tabIndex={0}>
             {assignmentMessage}
           </div>
         ) : null}
@@ -456,7 +455,24 @@ export function LessonWorkspace({
         ) : visibleMaterial ? (
           canMonitorSubmissions ? (
             teacherTaskVisible ? (
-              <LessonTaskCanvas
+              isParallelWork && activeParticipant ? <ParallelTeacherWorkspace
+                key={`${session.lessonId}:${visibleMaterial.id}:${activeParticipant.subject}:${profile?.subject}:${profile?.roles.includes("TEACHER")}`}
+                canViewUnallocated={profile?.roles.includes("TEACHER") ?? false}
+                displayName={displayName}
+                lessonId={session.lessonId}
+                material={visibleMaterial}
+                onSaveAnswers={(content) => void saveMaterialAnswers(content, activeParticipant.subject)}
+                onPresentationModeChange={onPresentationModeChange}
+                parallelWork
+                profileSubject={profile?.subject}
+                score={lessonScore}
+                studentSubject={activeParticipant.subject}
+                submission={activeStudentSubmission}
+                submissionMessage={submissionMessage}
+                submissionSaving={submissionSaving}
+                teacherName={session.teacherName ?? displayName}
+                teacherSubject={session.teacherSubject}
+              /> : <LessonTaskCanvas
                 canControlPages={!isParallelWork}
                 collaborationControls={null}
                 lessonId={session.lessonId}
@@ -489,26 +505,16 @@ export function LessonWorkspace({
                 </Button>
               </div>
             )
-          ) : isParallelWork ? (
-            <LessonTaskCanvas
-              lessonId={session.lessonId}
-              material={visibleMaterial}
-              onSaveAnswers={(content) => void saveMaterialAnswers(content)}
-              onPresentationModeChange={onPresentationModeChange}
-              score={lessonScore}
-              submission={submission}
-              submissionMessage={submissionMessage}
-              submissionSaving={submissionSaving}
-              teacherName={session.teacherName ?? displayName}
-            />
           ) : (
             <StudentLiveWorkspace
+              key={`${session.lessonId}:${visibleMaterial.id}:${profile?.subject ?? "student"}`}
               displayName={displayName}
               lessonId={session.lessonId}
               material={visibleMaterial}
               onSaveAnswers={(content) => void saveMaterialAnswers(content)}
               onPresentationModeChange={onPresentationModeChange}
               profileSubject={profile?.subject}
+              parallelWork={isParallelWork}
               score={lessonScore}
               sharedPresenceEnabled={studentSharedPresenceEnabled}
               submission={submission}

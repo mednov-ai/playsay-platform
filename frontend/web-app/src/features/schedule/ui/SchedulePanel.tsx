@@ -1,3 +1,4 @@
+import { StudentWhiteboardHistory } from "./StudentWhiteboardHistory";
 import { useEffect, useState } from "react";
 import { Archive, CalendarDays, CalendarPlus, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { classroomPath } from "../../../app/routes";
@@ -117,9 +118,11 @@ export function SchedulePanel({
   const renderLessonCard = (lesson: ScheduledLesson) => (
     <ScheduledLessonCard
       canManage={canManage}
+      canViewUnallocated={profile?.roles.includes("TEACHER") ?? false}
       disabled={disabled}
-      key={lesson.id}
+      key={`${lesson.id}:${profile?.subject ?? ""}`}
       lesson={lesson}
+      materials={materials}
       linkCopied={copiedLessonId === lesson.id}
       nowMs={nowMs}
       onCancel={() => onCancel(lesson)}
@@ -197,6 +200,8 @@ export function SchedulePanel({
                 {mainLessons.map(renderLessonCard)}
               </div>
             )}
+
+            {!canManage ? <StudentWhiteboardHistory key={profile.subject} /> : null}
 
             {archivedLessons.length > 0 ? (
               <details className="playsay-schedule-archive" data-schedule-archive="true">

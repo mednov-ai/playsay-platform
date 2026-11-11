@@ -250,6 +250,25 @@ beforeEach(() => {
 });
 
 describe("LessonTaskCanvas", () => {
+  it("renders historical annotations read-only without fetching or saving another layer", async () => {
+    const save = vi.fn();
+    const { container, queryByText } = render(createElement(LessonTaskCanvas, {
+      lessonId: "lesson-1", material, onSaveAnswers: save, score: null, submission: null,
+      submissionMessage: null, submissionSaving: false, teacherName: "Teacher",
+      readOnlyAnnotation: { activePageId: "page-1", elements: [{
+        color: "#ff5c00", createdAt: 1, id: "historic-stroke", kind: "stroke", pageId: "page-1",
+        points: [{ pageId: "page-1", x: 10, y: 20 }, { pageId: "page-1", x: 30, y: 40 }], strokeWidth: 8,
+      }] },
+    }));
+    const layer = await annotationLayer(container);
+    drawPointer(layer, { x: 5, y: 5 }, { x: 40, y: 40 });
+    expect(queryByText("classroom.actions.submit")).toBeNull();
+    expect(container.querySelector(".playsay-annotation-toolbar")).toBeNull();
+    expect(apiMocks.fetchAnnotation).not.toHaveBeenCalled();
+    expect(apiMocks.saveAnnotation).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("renders shared exercise answers and publishes edits to the collaboration document", () => {
     const setAnswer = vi.fn();
     const seedAnswers = vi.fn();

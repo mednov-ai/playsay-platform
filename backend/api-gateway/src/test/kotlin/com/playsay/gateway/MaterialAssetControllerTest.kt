@@ -455,9 +455,13 @@ class MaterialAssetControllerTest : MaterialControllerTestFixture() {
         assertEquals(1, first.pageManifest.size)
         assertEquals(1, materialAssetController.listAssets(teacher, material.id).count { it.kind == "DOCUMENT_DISPLAY" })
         assertFalse(materialAssetController.listAssets(teacher, material.id).any { it.kind == "DOCUMENT_SOURCE" })
-        assertEquals("application/pdf", materialAssetController.assetContent(student, material.id, first.displayAsset!!.id).headers.contentType?.toString())
+        val studentDisplay = materialAssetController.assetContent(student, material.id, first.displayAsset!!.id)
+        assertEquals("application/pdf", studentDisplay.headers.contentType?.toString())
+        assertEquals("no-store", studentDisplay.headers.cacheControl)
+        assertTrue(first.displayAsset!!.contentUrl!!.endsWith("/content?access=private-v1"))
 
         val source = materialAssetRepo.findByMaterialId(material.id).single { it.kind == "DOCUMENT_SOURCE" }
+        assertEquals("no-store", materialAssetController.assetContent(teacher, material.id, source.id).headers.cacheControl)
         val forbidden = assertFailsWith<ResponseStatusException> {
             materialAssetController.assetContent(student, material.id, source.id)
         }

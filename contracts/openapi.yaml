@@ -361,9 +361,9 @@ paths:
     get:
       tags:
       - Materials
-      summary: Get shared material annotation layer
-      description: Returns the shared drawing layer for the material attached to a
-        scheduled lesson.
+      summary: Get the authorized lesson material annotation layer
+      description: Returns the shared layer in SHARED or the authenticated student's
+        separate legacy layer in PARALLEL. Teacher access to the latter is denied.
       operationId: getScheduledLessonMaterialAnnotation
       parameters:
       - name: lessonId
@@ -388,9 +388,9 @@ paths:
     put:
       tags:
       - Materials
-      summary: Save shared material annotation layer
-      description: Creates or updates the shared drawing layer for the material attached
-        to a scheduled lesson.
+      summary: Save the authorized lesson material annotation layer
+      description: Saves the shared layer in SHARED or the authenticated student's
+        separate legacy layer in PARALLEL.
       operationId: saveScheduledLessonMaterialAnnotation
       parameters:
       - name: lessonId
@@ -418,6 +418,160 @@ paths:
           description: Missing or invalid bearer token
         "404":
           description: Scheduled lesson or material not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/unallocated-annotation-materials:
+    get:
+      tags:
+      - Materials
+      summary: List materials with unallocated annotations for the authorized teacher
+      description: Includes historical materials even after their lesson assignments are removed. Responses are private and not cacheable.
+      operationId: listUnallocatedAnnotationMaterials
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 0
+      responses:
+        "200":
+          description: A page of material identifiers with retained unallocated annotations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnallocatedAnnotationMaterialPage"
+        "400":
+          description: Invalid page
+        "403":
+          description: Teacher access denied
+        "404":
+          description: Parallel lesson not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/materials/{materialId}/students/{studentSubject}/parallel-annotations:
+    get:
+      tags:
+      - Materials
+      summary: Read an assigned student's separate older-client annotation layer
+      description: The authorized lesson manager may read the selected student's sanitized legacy layer. Responses are private and not cacheable.
+      operationId: getParallelStudentLegacyAnnotations
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: studentSubject
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Assigned student's legacy annotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAnnotationResponse"
+        "204":
+          description: No legacy annotation
+        "403":
+          description: Lesson management access denied
+        "404":
+          description: Parallel lesson or student assignment not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/materials/{materialId}/unallocated-annotations:
+    get:
+      tags:
+      - Materials
+      summary: Read historical annotations with no reliable student association
+      description: Only the authorized teacher may view the old lesson/material layer in a PARALLEL lesson.
+      operationId: getUnallocatedParallelMaterialAnnotations
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Historical unallocated annotation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialAnnotationResponse"
+        "204":
+          description: No historical annotation
+        "403":
+          description: Teacher access denied
+        "404":
+          description: Parallel lesson or historical material not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/materials/{materialId}/unallocated-annotation-snapshots:
+    get:
+      tags:
+      - Materials
+      summary: List retained unallocated snapshots from earlier client tabs
+      description: Only the authorized teacher may read snapshots that contain ambiguous historical annotations.
+      operationId: listUnallocatedParallelAnnotationSnapshots
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 0
+      responses:
+        "200":
+          description: Retained unallocated snapshots, without student attribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnallocatedAnnotationSnapshotPage"
+        "400":
+          description: Invalid page
+        "403":
+          description: Teacher access denied
+        "404":
+          description: Parallel lesson or historical material not found
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents/{documentId}/snapshot:
@@ -1957,6 +2111,40 @@ paths:
           description: Current user cannot finalize the document
         "404":
           description: Collaboration document not found
+      security:
+      - bearerAuth: []
+  /schedule/lessons/{lessonId}/collaboration-documents/parallel-current:
+    post:
+      tags:
+      - Collaboration
+      summary: Create or get an assigned student's individual material context
+      operationId: createParallelStudentCollaborationDocument
+      parameters:
+      - name: lessonId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateParallelCollaborationDocumentRequest"
+      responses:
+        "200":
+          description: Individual collaboration document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationDocumentResponse"
+        "400":
+          description: Invalid student subject
+        "403":
+          description: Lesson management denied
+        "404":
+          description: Student or assigned material not found
       security:
       - bearerAuth: []
   /schedule/lessons/{lessonId}/collaboration-documents/current:
@@ -7122,6 +7310,33 @@ components:
           $ref: "#/components/schemas/JsonNode"
       required:
       - content
+    UnallocatedAnnotationMaterialPage:
+      type: object
+      properties:
+        materialIds:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            format: uuid
+        hasNext:
+          type: boolean
+      required:
+      - materialIds
+      - hasNext
+    UnallocatedAnnotationSnapshotPage:
+      type: object
+      properties:
+        items:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/MaterialAnnotationResponse"
+        hasNext:
+          type: boolean
+      required:
+      - items
+      - hasNext
     MaterialAnnotationResponse:
       type: object
       properties:
@@ -8600,6 +8815,19 @@ components:
           type: boolean
       required:
       - submitted
+    CreateParallelCollaborationDocumentRequest:
+      type: object
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        studentSubject:
+          type: string
+          minLength: 1
+          maxLength: 255
+      required:
+      - materialId
+      - studentSubject
     CreateCollaborationDocumentRequest:
       type: object
       properties:

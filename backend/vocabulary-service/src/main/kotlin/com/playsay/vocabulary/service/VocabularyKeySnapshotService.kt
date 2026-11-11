@@ -72,7 +72,7 @@ class VocabularyKeySnapshotService(
             completionPolicyVersion = practice.completionPolicyVersion,
             assignmentId = practice.assignmentId,
             lessonId = practice.lessonId,
-            lastAcknowledgedPosition = session.currentItemPosition,
+            lastAcknowledgedPosition = session.keyAcknowledgedPosition,
         )
         val returnContext = allowlistedReturnContext(practice)
         val now = Instant.now()

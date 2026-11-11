@@ -72,6 +72,26 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
+  it("confirms only a persisted state that covers local additions and deletions", () => {
+    withWindowBase64(() => {
+      const runtime = createYjsWorkspaceRuntime({ color: "#ff5c00", participantName: "Teacher", onAnnotationChange: () => {}, onHtmlGameEffectsChange: () => {}, onHtmlGameInputsChange: () => {}, onHtmlGameSnapshotsChange: () => {}, onParticipantsChange: () => {}, onTextChange: () => {} });
+      const stroke: AnnotationElement = { id: "a", kind: "stroke", pageId: "page-1", color: "#ff5c00", strokeWidth: 8, createdAt: 1, points: [{ pageId: "page-1", x: 1, y: 2 }] };
+      runtime.setAnnotationElements([stroke]);
+      const server = new Y.Doc();
+      Y.applyUpdate(server, Buffer.from(String(runtime.snapshot().yjsUpdateBase64), "base64"));
+      const confirmation = () => {
+        const vector = Y.encodeStateVector(server);
+        return [Buffer.from(vector).toString("base64"), Buffer.from(Y.encodeStateAsUpdate(server, vector)).toString("base64")] as const;
+      };
+      expect(runtime.isPersisted(...confirmation())).toBe(true);
+      runtime.setAnnotationElements([]);
+      expect(runtime.isPersisted(...confirmation())).toBe(false);
+      Y.applyUpdate(server, Buffer.from(String(runtime.snapshot().yjsUpdateBase64), "base64"));
+      expect(runtime.isPersisted(...confirmation())).toBe(true);
+      runtime.destroy(); server.destroy();
+    });
+  });
+
   it("stores annotation strokes in the collaboration document", () => {
     const annotationChanges: AnnotationElement[][] = [];
     const runtime = createYjsWorkspaceRuntime({

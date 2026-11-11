@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="2026-11-11-001-parallel-material-annotations" author="codex">
+        <createTable tableName="lesson_material_parallel_annotation">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="UUID"><constraints nullable="false" referencedTableName="lesson" referencedColumnNames="id" foreignKeyName="fk_parallel_annotation_lesson" deleteCascade="true"/></column>
+            <column name="material_id" type="UUID"><constraints nullable="false" referencedTableName="lesson_material" referencedColumnNames="id" foreignKeyName="fk_parallel_annotation_material" deleteCascade="true"/></column>
+            <column name="student_user_id" type="UUID"><constraints nullable="false" referencedTableName="app_user" referencedColumnNames="id" foreignKeyName="fk_parallel_annotation_student" deleteCascade="true"/></column>
+            <column name="content" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_material_parallel_annotation" columnNames="lesson_id, material_id, student_user_id" constraintName="uq_parallel_annotation_context"/>
+        <createTable tableName="lesson_material_parallel_annotation_snapshot">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="lesson_id" type="UUID"><constraints nullable="false" referencedTableName="lesson" referencedColumnNames="id" foreignKeyName="fk_parallel_snapshot_lesson" deleteCascade="true"/></column>
+            <column name="material_id" type="UUID"><constraints nullable="false" referencedTableName="lesson_material" referencedColumnNames="id" foreignKeyName="fk_parallel_snapshot_material" deleteCascade="true"/></column>
+            <column name="content_hash" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="content" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="lesson_material_parallel_annotation_snapshot" columnNames="lesson_id, material_id, content_hash" constraintName="uq_parallel_snapshot_content"/>
+        <createIndex tableName="lesson_material_parallel_annotation_snapshot" indexName="ix_parallel_snapshot_history">
+            <column name="lesson_id"/><column name="material_id"/><column name="created_at"/><column name="id"/>
+        </createIndex>
+
+    </changeSet>
+</databaseChangeLog>

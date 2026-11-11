@@ -1,5 +1,6 @@
 import type { ChordSet, SubmitResult, VocabularyTargetResult } from "../../shared/types";
 import type { SessionResult } from "./typingStore";
+import { readVocabularyTargetJournal } from "./vocabularyResultJournal";
 
 export function buildTrainingSubmitPayload(result: SessionResult, activeSet: ChordSet | null): SubmitResult | null {
   const sourceChordSetId = activeSet && activeSet.id < 0 ? activeSet.sourceChordSetId : undefined;
@@ -10,7 +11,9 @@ export function buildTrainingSubmitPayload(result: SessionResult, activeSet: Cho
 
   const lessonKind = activeSet?.id === -1 ? "FOCUS" : "STANDARD";
   return {
-    clientResultId: result.clientResultId,
+    clientResultId: activeSet?.vocabularyContext
+      ? `keyboard-vocabulary-${activeSet.vocabularyContext.sessionId}`
+      : result.clientResultId,
     chordSetId,
     lessonKind,
     speedCpm: result.speedCpm,
@@ -33,26 +36,38 @@ export function buildTrainingSubmitPayload(result: SessionResult, activeSet: Cho
   };
 }
 
-export function buildVocabularyResults(result: SessionResult, activeSet: ChordSet | null): VocabularyTargetResult[] | undefined {
+export function buildVocabularyResults(result: SessionResult, activeSet: ChordSet | null, storage?: Storage | null): VocabularyTargetResult[] | undefined {
   const context = activeSet?.vocabularyContext;
   if (!context?.typedTargets || context.targets.length === 0) return undefined;
+  const queued = new Map(readVocabularyTargetJournal(context.sessionId, storage).map((entry) => [entry.targetId, entry]));
+  const queuedPrefix = (context.allTargets ?? []).slice(0, context.startPosition).flatMap((target) => {
+    const entry = queued.get(target.targetId);
+    if (!entry || entry.position !== target.position) return [];
+    return [{
+      resultId: target.targetId, targetId: target.targetId, targetType: target.type,
+      errors: entry.errors, durationMs: entry.durationMs, position: target.position,
+      typedText: target.text, sourceEntryIds: target.sourceEntryIds, sourceItemIds: target.sourceItemIds,
+    }];
+  });
   const remainingErrors = { ...result.perChord };
   const durationPerTarget = Math.max(0, Math.round(result.durationMs / context.targets.length));
-  return context.targets.map((target) => {
-    const errors = remainingErrors[target.text] ?? 0;
+  const currentResults = context.targets.map((target) => {
+    const pending = queued.get(target.targetId);
+    const errors = pending?.position === target.position ? pending.errors : remainingErrors[target.text] ?? 0;
     remainingErrors[target.text] = 0;
     return {
       resultId: target.targetId,
       targetId: target.targetId,
       targetType: target.type,
       errors,
-      durationMs: durationPerTarget,
+      durationMs: pending?.position === target.position ? pending.durationMs : durationPerTarget,
       position: target.position,
       typedText: target.text,
       sourceEntryIds: target.sourceEntryIds,
       sourceItemIds: target.sourceItemIds,
     };
   });
+  return [...queuedPrefix, ...currentResults];
 }
 
 function localTrainingDate(): string {

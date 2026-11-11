@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   enterScheduledLessonRoom: vi.fn(),
   fetchScheduledLesson: vi.fn(),
   extendScheduledLessonAccess: vi.fn(),
+  editScheduledLesson: vi.fn(),
 }));
 
 vi.mock("../../shared/api/playsay", async (importOriginal) => ({
@@ -20,6 +21,7 @@ vi.mock("../../shared/api/playsay", async (importOriginal) => ({
   enterScheduledLessonRoom: apiMocks.enterScheduledLessonRoom,
   fetchScheduledLesson: apiMocks.fetchScheduledLesson,
   extendScheduledLessonAccess: apiMocks.extendScheduledLessonAccess,
+  editScheduledLesson: apiMocks.editScheduledLesson,
 }));
 
 vi.mock("../../shared/i18n", () => ({
@@ -47,6 +49,24 @@ describe("useScheduleActions", () => {
       configurable: true,
       value: originalClipboard,
     });
+  });
+
+  it("does not send a general assignment in parallel mode", async () => {
+    const input = setup();
+    input.props.scheduledLessons = [{ ...input.lesson, workMode: "PARALLEL" }];
+    const { result } = renderHook(() => useScheduleActions(input.props));
+    await act(() => result.current.assignMaterialToScheduledLesson("lesson-1", "new-material"));
+    expect(apiMocks.editScheduledLesson).not.toHaveBeenCalled();
+    expect(input.props.setRoomMessage).toHaveBeenCalledWith("classroom.messages.parallelMaterialUnsupported");
+  });
+
+  it("reports a mismatching saved assignment instead of a false success", async () => {
+    const input = setup();
+    apiMocks.editScheduledLesson.mockResolvedValue({ ...input.lesson, materialId: null });
+    const { result } = renderHook(() => useScheduleActions(input.props));
+    await act(() => result.current.assignMaterialToScheduledLesson("lesson-1", "new-material"));
+    expect(input.props.setRoomMessage).toHaveBeenCalledWith("classroom.messages.materialAssignmentMismatch");
+    expect(input.props.setRoomMessage).not.toHaveBeenCalledWith("classroom.messages.materialAssigned");
   });
 
   it("opens pre-join without requesting a LiveKit token", async () => {

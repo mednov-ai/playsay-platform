@@ -3,6 +3,8 @@ package com.playsay.gateway.controller
 import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialAnnotationRequest
 import com.playsay.gateway.dto.MaterialAnnotationResponse
+import com.playsay.gateway.dto.UnallocatedAnnotationSnapshotPage
+import com.playsay.gateway.dto.UnallocatedAnnotationMaterialPage
 import com.playsay.gateway.dto.MaterialSubmissionRequest
 import com.playsay.gateway.dto.MaterialSubmissionResponse
 import com.playsay.gateway.service.LessonMaterialStore
@@ -13,12 +15,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import java.util.UUID
+import org.springframework.http.CacheControl
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
@@ -86,6 +91,68 @@ class ScheduledMaterialController(
         @PathVariable lessonId: UUID,
     ): List<MaterialSubmissionResponse> =
         store.listSubmissionsForScheduledLesson(authentication, lessonId)
+
+    @GetMapping("/schedule/lessons/{lessonId}/unallocated-annotation-materials", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(operationId = "listUnallocatedAnnotationMaterials", summary = "List materials with unallocated annotations for the authorized teacher", security = [SecurityRequirement(name = "bearerAuth")])
+    fun unallocatedAnnotationMaterials(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @RequestParam(defaultValue = "0") page: Int,
+    ): ResponseEntity<UnallocatedAnnotationMaterialPage> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore().cachePrivate())
+        .body(store.getUnallocatedMaterials(authentication, lessonId, page))
+
+    @GetMapping("/schedule/lessons/{lessonId}/materials/{materialId}/unallocated-annotations", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getUnallocatedParallelMaterialAnnotations",
+        summary = "Read unallocated historical parallel annotations as the authorized teacher",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Historical unallocated annotation"),
+        ApiResponse(responseCode = "204", description = "No historical annotation"),
+        ApiResponse(responseCode = "403", description = "Teacher access denied", content = [Content()]),
+        ApiResponse(responseCode = "404", description = "Parallel lesson or historical material not found", content = [Content()]),
+    ])
+    fun unallocatedParallelMaterialAnnotations(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @PathVariable materialId: UUID,
+    ): ResponseEntity<MaterialAnnotationResponse> =
+        store.getUnallocatedAnnotations(authentication, lessonId, materialId)
+            ?.let { ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(it) }
+            ?: ResponseEntity.noContent().cacheControl(CacheControl.noStore().cachePrivate()).build()
+
+    @GetMapping("/schedule/lessons/{lessonId}/materials/{materialId}/students/{studentSubject}/parallel-annotations", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "getParallelStudentLegacyAnnotations",
+        summary = "Read an assigned student's separate older-client annotation layer",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun parallelStudentAnnotations(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @PathVariable materialId: UUID,
+        @PathVariable studentSubject: String,
+    ): ResponseEntity<MaterialAnnotationResponse> =
+        store.getParallelStudentAnnotations(authentication, lessonId, materialId, studentSubject)
+            ?.let { ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(it) }
+            ?: ResponseEntity.noContent().cacheControl(CacheControl.noStore().cachePrivate()).build()
+
+    @GetMapping("/schedule/lessons/{lessonId}/materials/{materialId}/unallocated-annotation-snapshots", produces = [MediaType.APPLICATION_JSON_VALUE])
+    @Operation(
+        operationId = "listUnallocatedParallelAnnotationSnapshots",
+        summary = "Read unallocated snapshots retained from older clients as the authorized teacher",
+        security = [SecurityRequirement(name = "bearerAuth")],
+    )
+    fun unallocatedParallelAnnotationSnapshots(
+        authentication: JwtAuthenticationToken,
+        @PathVariable lessonId: UUID,
+        @PathVariable materialId: UUID,
+        @RequestParam(defaultValue = "0") page: Int,
+    ): ResponseEntity<UnallocatedAnnotationSnapshotPage> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore().cachePrivate())
+        .body(store.getUnallocatedAnnotationSnapshots(authentication, lessonId, materialId, page))
 
     @GetMapping("/schedule/lessons/{lessonId}/material-annotation", produces = [MediaType.APPLICATION_JSON_VALUE])
     @Operation(

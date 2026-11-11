@@ -1,10 +1,14 @@
 package com.playsay.gateway.repo
 
 import com.playsay.gateway.entity.LessonMaterialAnnotationEntity
+import com.playsay.gateway.entity.LessonMaterialParallelAnnotationEntity
+import com.playsay.gateway.entity.LessonMaterialParallelAnnotationSnapshotEntity
 import com.playsay.gateway.entity.LessonMaterialEntity
 import com.playsay.gateway.entity.MaterialAssetEntity
 import java.time.Instant
 import java.util.UUID
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Slice
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -213,4 +217,24 @@ interface MaterialAssetRepo : JpaRepository<MaterialAssetEntity, UUID> {
 
 interface LessonMaterialAnnotationRepo : JpaRepository<LessonMaterialAnnotationEntity, UUID> {
     fun findByLessonIdAndMaterialId(lessonId: UUID, materialId: UUID): LessonMaterialAnnotationEntity?
+    @Query("""
+        select material.id from LessonMaterialEntity material
+         where exists (select annotation.id from LessonMaterialAnnotationEntity annotation
+                       where annotation.lessonId = :lessonId and annotation.materialId = material.id)
+            or exists (select snapshot.id from LessonMaterialParallelAnnotationSnapshotEntity snapshot
+                       where snapshot.lessonId = :lessonId and snapshot.materialId = material.id)
+         order by material.id
+    """)
+    fun findUnallocatedMaterialIds(lessonId: UUID, pageable: Pageable): Slice<UUID>
+}
+
+interface LessonMaterialParallelAnnotationRepo : JpaRepository<LessonMaterialParallelAnnotationEntity, UUID> {
+    fun findByLessonIdAndMaterialIdAndStudentUserId(lessonId: UUID, materialId: UUID, studentUserId: UUID): LessonMaterialParallelAnnotationEntity?
+}
+
+interface LessonMaterialParallelAnnotationSnapshotRepo : JpaRepository<LessonMaterialParallelAnnotationSnapshotEntity, UUID> {
+    fun findByLessonIdAndMaterialIdOrderByCreatedAtAscIdAsc(lessonId: UUID, materialId: UUID, pageable: Pageable): Slice<LessonMaterialParallelAnnotationSnapshotEntity>
+    fun findTopByLessonIdAndMaterialIdOrderByCreatedAtDescIdDesc(lessonId: UUID, materialId: UUID): LessonMaterialParallelAnnotationSnapshotEntity?
+    fun existsByLessonIdAndMaterialIdAndContentHash(lessonId: UUID, materialId: UUID, contentHash: String): Boolean
+    fun existsByLessonIdAndMaterialId(lessonId: UUID, materialId: UUID): Boolean
 }

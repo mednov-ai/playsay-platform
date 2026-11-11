@@ -5,6 +5,7 @@ import com.playsay.vocabulary.dto.VocabularyPracticeSettingsRequest
 import com.playsay.vocabulary.dto.VocabularyPracticeStatusRequest
 import com.playsay.vocabulary.dto.VocabularyActivePracticeResponse
 import com.playsay.vocabulary.dto.VocabularyKeyAcknowledgementRequest
+import com.playsay.vocabulary.dto.VocabularyKeyTargetResultRequest
 import com.playsay.vocabulary.dto.VocabularySelectionRecipeRequest
 import com.playsay.vocabulary.service.VocabularyPracticeService
 import com.playsay.vocabulary.config.security.requireSubject
@@ -153,6 +154,13 @@ class VocabularyPracticeController(
         auth: JwtAuthenticationToken,
         @PathVariable sessionId: UUID,
     ) = practice.keySet(auth.token.requireSubject(), sessionId)
+
+    @PostMapping("/practice-sessions/{sessionId}/key-target-results")
+    fun recordKeyTarget(
+        auth: JwtAuthenticationToken,
+        @PathVariable sessionId: UUID,
+        @Valid @RequestBody request: VocabularyKeyTargetResultRequest,
+    ) = practice.recordOwnedKeyTarget(auth.token.requireSubject(), sessionId, request)
 
     @PatchMapping("/practice-sessions/{sessionId}/key-acknowledgement")
     fun acknowledgeKeyPosition(

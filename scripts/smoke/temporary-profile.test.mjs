@@ -40,6 +40,15 @@ test("failed write can be inspected and undone", async () => {
   assert.equal(state.profile().birthDate, "2010-01-01");
 });
 
+test("a synthetic birth date is cleared after the smoke when it was originally absent", async () => {
+  const state = fixture();
+  state.change({ birthDate: null });
+  await setTemporaryProfile({ ...state, token: "demo", overrides: { birthDate: "2000-01-01" }, registerRestore: (fn) => state.restores.push(fn) });
+  assert.equal(state.profile().birthDate, "2000-01-01");
+  await state.restores[0]();
+  assert.equal(state.profile().birthDate, null);
+});
+
 test("independent edit of a temporary field is preserved and reported", async () => {
   const state = fixture();
   await setTemporaryProfile({ ...state, token: "demo", overrides: { locale: "en" }, registerRestore: (fn) => state.restores.push(fn) });

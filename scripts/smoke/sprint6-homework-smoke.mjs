@@ -662,6 +662,9 @@ async function createCompletedLesson(token, materialId, participantSubjects) {
     status: "SCHEDULED",
     type: "GROUP",
   });
+  // Track the fixture before start/complete so failure cleanup can remove it.
+  created.completedLessonId = lesson.id;
+  summary.completedLessonId = lesson.id;
   await apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/start`, 200);
   return apiRequest(token, "POST", `/schedule/lessons/${lesson.id}/complete`, 200);
 }

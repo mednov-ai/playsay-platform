@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Pin, Save, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   createVocabularySelectionRecipe,
@@ -30,6 +30,10 @@ export function StudentPracticeComposer({ onStart }: { onStart: (session: Vocabu
   const [excludedEntryIds, setExcludedEntryIds] = useState<string[]>([]);
   const [recipeName, setRecipeName] = useState("");
   const [selectedRecipeId, setSelectedRecipeId] = useState("");
+  const [retryFocus, setRetryFocus] = useState<{ settings: object; succeeded: boolean } | null>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const startButton = useRef<HTMLButtonElement>(null);
+  const emptyResult = useRef<HTMLParagraphElement>(null);
 
   const settings = useMemo(() => ({
     delivery: "SELF" as const,
@@ -88,6 +92,28 @@ export function StudentPracticeComposer({ onStart }: { onStart: (session: Vocabu
   });
   const preview = previewQuery.data;
   const ownerPreview = preview?.owners[0];
+
+  useEffect(() => {
+    if (!retryFocus) return;
+    if (retryFocus.settings !== settings) {
+      setRetryFocus(null);
+      return;
+    }
+    if (previewQuery.isFetching || (retryFocus.succeeded ? !previewQuery.isSuccess : !previewQuery.isError)) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || active === retryButton.current) {
+      if (!retryFocus.succeeded) retryButton.current?.focus();
+      else if (ownerPreview?.selectedCount) startButton.current?.focus();
+      else emptyResult.current?.focus();
+    }
+    setRetryFocus(null);
+  }, [ownerPreview?.selectedCount, previewQuery.isError, previewQuery.isFetching, previewQuery.isSuccess, retryFocus, settings]);
+
+  async function retryPreview() {
+    const requestedSettings = settings;
+    const result = await previewQuery.refetch();
+    setRetryFocus({ settings: requestedSettings, succeeded: result.isSuccess });
+  }
 
   function toggleSource(source: SelectionSource) {
     setSelectedRecipeId("");
@@ -196,18 +222,24 @@ export function StudentPracticeComposer({ onStart }: { onStart: (session: Vocabu
             </article>
           ))}
         </div>
-      ) : previewQuery.isFetching ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" /> : (
-        <p className="text-center text-sm font-semibold text-muted-foreground">{t("vocabulary.selfComposer.empty")}</p>
+      ) : previewQuery.isFetching ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" /> : previewQuery.isError ? null : (
+        <p className="text-center text-sm font-semibold text-muted-foreground" ref={emptyResult} tabIndex={-1}>{t("vocabulary.selfComposer.empty")}</p>
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <input aria-label={t("vocabulary.selfComposer.recipeName")} className="playsay-input min-w-0 flex-1" onChange={(event) => setRecipeName(event.target.value)} placeholder={t("vocabulary.selfComposer.recipeName")} value={recipeName} />
         <Button disabled={!recipeName.trim() || saveRecipe.isPending} onClick={() => saveRecipe.mutate()} type="button" variant="outline"><Save className="h-4 w-4" />{t("vocabulary.selfComposer.save")}</Button>
       </div>
-      <Button disabled={!ownerPreview?.selectedCount || startPractice.isPending} onClick={() => startPractice.mutate()} type="button">
+      <Button disabled={!ownerPreview?.selectedCount || previewQuery.isFetching || previewQuery.isError || startPractice.isPending} onClick={() => startPractice.mutate()} ref={startButton} type="button">
         {startPractice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{t("vocabulary.today.start")}
       </Button>
-      {previewQuery.isError || saveRecipe.isError || startPractice.isError ? <p aria-live="assertive" className="text-sm font-bold text-destructive">{t("vocabulary.practice.errors.preview")}</p> : null}
+      {previewQuery.isError ? (
+        <div className="grid justify-items-start gap-2">
+          <p aria-live="assertive" className="text-sm font-bold text-destructive">{t("vocabulary.practice.errors.preview")}</p>
+          <Button className="min-h-11" disabled={previewQuery.isFetching} onClick={() => void retryPreview()} ref={retryButton} type="button" variant="outline">{t("vocabulary.practice.actions.retry")}</Button>
+        </div>
+      ) : null}
+      {saveRecipe.isError || startPractice.isError ? <p aria-live="assertive" className="text-sm font-bold text-destructive">{t("vocabulary.practice.errors.preview")}</p> : null}
     </section>
   );
 }

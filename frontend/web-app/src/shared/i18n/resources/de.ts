@@ -202,6 +202,7 @@ export const de = {
   },
   chat: {
     retry: "Erneut versuchen",
+    reconnecting: "Chat wird neu verbunden. Neue Nachrichten werden geprüft.",
     toolsAria: "Wichtige Werkzeuge",
     open: "Chat öffnen",
     title: "Nachrichten",

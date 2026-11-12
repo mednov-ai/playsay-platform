@@ -202,6 +202,7 @@ export const en = {
   },
   chat: {
     retry: "Retry",
+    reconnecting: "Reconnecting chat. Checking for new messages.",
     toolsAria: "Important tools",
     open: "Open chat",
     title: "Messages",

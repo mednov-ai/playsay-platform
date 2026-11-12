@@ -72,7 +72,9 @@ it("explains unavailable notifications and provides recovery", async () => {
   render(<GlobalToolsRail profile={profile} />);
   fireEvent.click(screen.getByRole("button", { name: "chat.open" }));
   await waitFor(() => expect(mocks.contacts).toHaveBeenCalled());
-  fireEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "chat.retry" }));
+  const notificationStatus = screen.getAllByRole("status").find((item) => item.textContent?.includes("chat.notifications.unavailable"));
+  expect(notificationStatus).toBeDefined();
+  fireEvent.click(within(notificationStatus!).getByRole("button", { name: "chat.retry" }));
   expect(mocks.push.refresh).toHaveBeenCalledOnce();
   expect(mocks.push.enable).not.toHaveBeenCalled();
 });

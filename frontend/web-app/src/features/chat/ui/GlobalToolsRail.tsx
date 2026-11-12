@@ -85,6 +85,7 @@ export function GlobalToolsRail({
   const [error, setError] = useState<string | null>(null);
   const [contactsFailed, setContactsFailed] = useState(false);
   const [conversationsFailed, setConversationsFailed] = useState(false);
+  const [chatReconnecting, setChatReconnecting] = useState(false);
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [diceNow, setDiceNow] = useState(() => Date.now());
   const [visibleDiceRoll, setVisibleDiceRoll] = useState<LessonDiceRoll | null>(null);
@@ -203,15 +204,65 @@ export function GlobalToolsRail({
     }
   }, [markVisibleConversationRead, t]);
 
+  const recoverVisibleMessages = useCallback(async () => {
+    const conversationId = activeConversationIdRef.current;
+    if (!openRef.current || !conversationId) return;
+    try {
+      const page = await fetchChatMessages(conversationId);
+      if (!openRef.current || activeConversationIdRef.current !== conversationId) return;
+      setMessagesByConversation((all) => {
+        const current = all[conversationId] ?? emptyMessages;
+        return { ...all, [conversationId]: {
+          ...current,
+          items: mergeMessages(current.items, page.items),
+          nextCursor: all[conversationId] ? current.nextCursor : page.nextCursor,
+        } };
+      });
+      void markVisibleConversationRead(conversationId, page.items);
+    } catch {
+      // Keep existing messages; the next reconnect attempt will retry.
+    }
+  }, [markVisibleConversationRead]);
+
   useEffect(() => {
     let stopped = false;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
 
+    function scheduleReconnect() {
+      if (stopped || reconnectTimer !== null) return;
+      setChatReconnecting(true);
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void refreshConversations().catch(() => undefined);
+        void recoverVisibleMessages();
+        void connect();
+      }, 2_000);
+    }
+
     async function connect() {
-      const nextSocket = await openChatSocket();
-      if (stopped || !nextSocket) return;
+      let nextSocket: WebSocket | null;
+      try {
+        nextSocket = await openChatSocket();
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      if (stopped) {
+        nextSocket?.close();
+        return;
+      }
+      if (!nextSocket) {
+        scheduleReconnect();
+        return;
+      }
       socket = nextSocket;
+      nextSocket.onopen = () => {
+        if (!stopped && socket === nextSocket) {
+          setChatReconnecting(false);
+          void recoverVisibleMessages();
+        }
+      };
       nextSocket.onmessage = (event) => {
         let realtime: ChatRealtimeMessage;
         try {
@@ -294,12 +345,9 @@ export function GlobalToolsRail({
       };
       nextSocket.onerror = () => nextSocket.close();
       nextSocket.onclose = () => {
-        if (stopped) return;
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = null;
-          void refreshConversations().catch(() => undefined);
-          void connect();
-        }, 2_000);
+        if (stopped || socket !== nextSocket) return;
+        socket = null;
+        scheduleReconnect();
       };
     }
 
@@ -309,7 +357,7 @@ export function GlobalToolsRail({
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [markVisibleConversationRead, profile.subject, refreshConversations, t]);
+  }, [markVisibleConversationRead, profile.subject, recoverVisibleMessages, refreshConversations, t]);
 
   useEffect(() => {
     function reconcileFromServiceWorker(event: MessageEvent) {
@@ -621,6 +669,7 @@ export function GlobalToolsRail({
             </button>
           </header>
 
+          {chatReconnecting ? <p className="playsay-chat-notification-status" role="status">{t("chat.reconnecting")}</p> : null}
           {error ? <p className="playsay-chat-error" role="alert">{error}</p> : null}
           {contactsFailed || conversationsFailed ? (
             <div className="playsay-chat-error" role="alert">

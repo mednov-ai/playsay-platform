@@ -8,6 +8,10 @@ Uploading during a lesson uses the same private-draft material flow as the libra
 
 Document upload errors and recovery instructions remain visible and keyboard-focusable in the open lesson activity panel, including narrow screens. When the panel is closed, the message remains available in the lesson workspace.
 
+On narrow screens the activity panel is not clipped by the lesson workspace: teachers can scroll to its labels, fields and actions, with room for the bottom device safe area.
+
+On narrow screens the open activity panel behaves as a labelled modal: keyboard focus enters the panel, Tab stays within it, and Escape closes it and restores the previous focus. An open child menu handles Escape first. The panel is not modal on desktop and is suspended while the whiteboard, a covered library game, or external-activity focus hides it.
+
 Validation limits are 64 MiB, 50 visible pages/slides, 10,000 PPTX ZIP entries and 256 MiB expanded PPTX content. PDF display bytes remove actions, forms, embedded files, JavaScript and annotations. PPTX display bytes reject external relationships and active/OLE/executable/media payloads and remove hidden slides, notes and comments. Visible content, including visible answer keys, is intentionally shared.
 
 The standard internal PowerPoint `printerSettings` part is accepted only with the matching presentation relationship and content type, and is removed from the display derivative. Other binary parts remain rejected. Package relationship and content-type namespaces are normalized for the static viewer without changing their namespace meaning.

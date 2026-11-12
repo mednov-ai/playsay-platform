@@ -1,6 +1,6 @@
 import { CategorizedMaterialSelect } from "../../materials/ui/CategorizedMaterialSelect";
 import { BookOpen, Check, ChevronRight, CircleHelp, Home, Pause, Play, Square, Users, Wifi, WifiOff, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   createVocabularyHomeworkAssignment,
@@ -65,6 +65,68 @@ export function LessonActivityRail({
   const [continuedHome, setContinuedHome] = useState(false);
   const [closing, setClosing] = useState(false);
   const [deliveryError, setDeliveryError] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined"
+    && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 64rem)").matches);
+  const railRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 64rem)");
+    const update = () => setNarrow(query.matches);
+    update();
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+    query.addListener(update);
+    return () => query.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !narrow || !railRef.current) return;
+    const rail = railRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus({ preventScroll: true });
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.key === "Escape") {
+        // An open child menu owns the first Escape and restores focus to its trigger.
+        if (rail.querySelector('[role="menu"], [role="dialog"], [role="alertdialog"], dialog[open]')) return;
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = [...rail.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), summary:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => {
+        if (element.tabIndex < 0 || !element.getClientRects().length || getComputedStyle(element).visibility === "hidden"
+          || element.closest('[inert], [aria-hidden="true"]')) return false;
+        for (let parent = element.parentElement; parent && parent !== rail; parent = parent.parentElement) {
+          if (parent instanceof HTMLDetailsElement && !parent.open && !parent.querySelector(":scope > summary")?.contains(element)) return false;
+        }
+        return true;
+      });
+      const first = controls[0] ?? rail;
+      const last = controls[controls.length - 1] ?? rail;
+      if (!rail.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [open, narrow]);
+
   const selectedSession = practice?.sessions.find((session) => session.ownerSubject === selectedStudentSubject)
     ?? practice?.sessions[0]
     ?? null;
@@ -152,11 +214,11 @@ export function LessonActivityRail({
 
   return (
     <>
-      {open ? <button aria-label={t("common.actions.close")} className="playsay-activity-rail-backdrop" onClick={onClose} type="button" /> : null}
-      <aside aria-label={t("classroom.activityRail.aria")} className="playsay-activity-rail" data-open={open ? "true" : "false"}>
+      {open ? <button aria-hidden="true" className="playsay-activity-rail-backdrop" onClick={onClose} tabIndex={-1} type="button" /> : null}
+      <aside aria-label={t("classroom.activityRail.aria")} aria-modal={narrow && open ? true : undefined} className="playsay-activity-rail" data-open={open ? "true" : "false"} ref={railRef} role={narrow && open ? "dialog" : undefined} tabIndex={narrow && open ? -1 : undefined}>
         <header className="flex items-center justify-between gap-2 border-b border-border p-3">
           <strong>{practice ? t("vocabulary.live.supervision") : t("classroom.activityRail.title")}</strong>
-          <Button aria-label={t("common.actions.close")} className="h-9 w-9 px-0" onClick={onClose} type="button" variant="outline"><X className="h-4 w-4" /></Button>
+          <Button aria-label={t("common.actions.close")} className="h-9 w-9 px-0" onClick={onClose} ref={closeRef} type="button" variant="outline"><X className="h-4 w-4" /></Button>
         </header>
         {open && assignmentMessage ? (
           <div className="playsay-lesson-inline-message m-3" role="alert" tabIndex={0}>{assignmentMessage}</div>

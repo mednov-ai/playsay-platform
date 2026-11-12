@@ -2179,6 +2179,13 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 }
 
 @media (max-width: 64rem) {
+  /* The fixed activity sheet must not be clipped by the lesson workbench. */
+  .playsay-classroom-shell:has(.playsay-activity-rail[data-open="true"]),
+  .playsay-classroom-primary:has(.playsay-activity-rail[data-open="true"]),
+  .playsay-workbench:has(.playsay-activity-rail[data-open="true"]) {
+    overflow: visible;
+  }
+
   .playsay-activity-rail-backdrop {
     position: fixed;
     z-index: 79;
@@ -2214,11 +2221,18 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
     border-top: 1px solid hsl(var(--border));
     border-left: 0;
     border-radius: 1.25rem 1.25rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     transform: translateY(100%);
   }
 
   .playsay-activity-rail[data-open="true"] {
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playsay-activity-rail {
+    transition: none;
   }
 }
 

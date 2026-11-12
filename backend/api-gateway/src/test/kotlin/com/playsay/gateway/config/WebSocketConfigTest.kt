@@ -14,11 +14,49 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.jwt.JwtException
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.server.support.OriginHandshakeInterceptor
 
 class WebSocketConfigTest {
+    @Test
+    fun `both websocket endpoints report rejected handshakes as forbidden`() {
+        val decoder = mock(JwtDecoder::class.java)
+        `when`(decoder.decode("invalid-token")).thenThrow(JwtException("invalid"))
+        `when`(decoder.decode("blank-subject")).thenReturn(
+            Jwt.withTokenValue("blank-subject").header("alg", "none").claim("test", "value").build(),
+        )
+        val interceptor = LessonWebSocketAuthInterceptor(
+            decoder,
+            JwtAuthenticationConverter(),
+            WebSocketOriginPolicy("https://online.honey.school"),
+        )
+        val invalidRequests = listOf(
+            "https://invalid.example" to "playsay, invalid-token",
+            "https://online.honey.school" to "invalid-token",
+            "https://online.honey.school" to "playsay",
+            "https://online.honey.school" to "playsay, invalid-token",
+            "https://online.honey.school" to "playsay, blank-subject",
+        )
+        for (path in listOf("/ws/chat", "/ws/lessons")) {
+            for ((origin, protocols) in invalidRequests) {
+                val request = MockHttpServletRequest("GET", path).apply {
+                    addHeader(HttpHeaders.ORIGIN, origin)
+                    addHeader("Sec-WebSocket-Protocol", protocols)
+                }
+                val response = MockHttpServletResponse()
+                val attributes = mutableMapOf<String, Any>()
+                assertFalse(interceptor.beforeHandshake(
+                    ServletServerHttpRequest(request), ServletServerHttpResponse(response),
+                    mock(WebSocketHandler::class.java), attributes,
+                ))
+                assertEquals(403, response.status)
+                assertTrue(attributes.isEmpty())
+            }
+        }
+    }
+
     @Test
     fun `websocket handshake requires a nonblank token subject`() {
         val decoder = mock(JwtDecoder::class.java)

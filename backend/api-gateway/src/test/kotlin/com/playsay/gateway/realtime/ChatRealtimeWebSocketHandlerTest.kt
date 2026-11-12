@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.WebSocketHandler
+import org.springframework.web.socket.handler.TextWebSocketHandler
 import org.springframework.web.socket.server.support.DefaultHandshakeHandler
 
 class ChatRealtimeWebSocketHandlerTest {
@@ -24,6 +25,9 @@ class ChatRealtimeWebSocketHandlerTest {
             fun choose(protocols: List<String>, webSocketHandler: WebSocketHandler): String? =
                 selectProtocol(protocols, webSocketHandler)
         }
+        // Control reproduces the pre-fix handler shape: Spring cannot select a
+        // subprotocol when the handler does not declare support for one.
+        assertNull(handshake.choose(listOf("playsay", "synthetic-token"), object : TextWebSocketHandler() {}))
         assertEquals("playsay", handshake.choose(listOf("playsay", "synthetic-token"), handler))
         assertNull(handshake.choose(listOf("synthetic-token"), handler))
     }

@@ -15,6 +15,7 @@ import { PersonalPracticeComposer, type PersonalPracticeOwner } from "../../voca
 import { TeacherAddMaterialMenu } from "./TeacherLessonToolbar";
 
 export function LessonActivityRail({
+  assignmentMessage,
   assigningMaterial,
   currentMaterialId,
   lessonId,
@@ -36,6 +37,7 @@ export function LessonActivityRail({
   uploadingImagePage,
   uploadingDocumentPage,
 }: {
+  assignmentMessage?: string | null;
   assigningMaterial: boolean;
   currentMaterialId: string | null;
   lessonId: string;
@@ -156,6 +158,9 @@ export function LessonActivityRail({
           <strong>{practice ? t("vocabulary.live.supervision") : t("classroom.activityRail.title")}</strong>
           <Button aria-label={t("common.actions.close")} className="h-9 w-9 px-0" onClick={onClose} type="button" variant="outline"><X className="h-4 w-4" /></Button>
         </header>
+        {open && assignmentMessage ? (
+          <div className="playsay-lesson-inline-message m-3" role="alert" tabIndex={0}>{assignmentMessage}</div>
+        ) : null}
 
         {practice ? (
           <div className="grid gap-3 overflow-y-auto p-3">

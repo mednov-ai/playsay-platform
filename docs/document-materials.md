@@ -6,6 +6,8 @@ PDF/PPTX viewing is a separate material flow from worksheet preparation. Workshe
 
 Uploading during a lesson uses the same private-draft material flow as the library. A ready document is added to the teacher's material selector while the current lesson material remains active. The teacher must explicitly assign the ready material through the existing lesson-material assignment contract.
 
+Document upload errors and recovery instructions remain visible and keyboard-focusable in the open lesson activity panel, including narrow screens. When the panel is closed, the message remains available in the lesson workspace.
+
 Validation limits are 64 MiB, 50 visible pages/slides, 10,000 PPTX ZIP entries and 256 MiB expanded PPTX content. PDF display bytes remove actions, forms, embedded files, JavaScript and annotations. PPTX display bytes reject external relationships and active/OLE/executable/media payloads and remove hidden slides, notes and comments. Visible content, including visible answer keys, is intentionally shared.
 
 The standard internal PowerPoint `printerSettings` part is accepted only with the matching presentation relationship and content type, and is removed from the display derivative. Other binary parts remain rejected. Package relationship and content-type namespaces are normalized for the static viewer without changing their namespace meaning.

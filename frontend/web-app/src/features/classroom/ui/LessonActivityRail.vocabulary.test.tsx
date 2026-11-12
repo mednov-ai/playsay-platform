@@ -30,6 +30,25 @@ afterEach(() => {
 });
 
 describe("LessonActivityRail vocabulary delivery", () => {
+  it("keeps a document error accessible inside the open activity panel", () => {
+    const panel = (open: boolean) => <LessonActivityRail
+      assignmentMessage="The document is unsafe. Check it and try again."
+      assigningMaterial={false} currentMaterialId={null} lessonId="lesson-1" materials={[]}
+      onAssignMaterial={vi.fn()} onClose={vi.fn()} onPracticeChange={vi.fn()}
+      onSelectMaterial={vi.fn()} onSelectStudent={vi.fn()} open={open} owners={[]} practice={null}
+      selectedMaterialId="" selectedStudentSubject={null}
+      uploadingHtmlGamePage={false} uploadingImagePage={false} uploadingDocumentPage={false}
+    />;
+    const { rerender } = render(panel(true));
+    const alert = screen.getByRole("alert");
+    expect(alert.closest(".playsay-activity-rail")).not.toBeNull();
+    expect(alert).toHaveAttribute("tabindex", "0");
+    alert.focus();
+    expect(alert).toHaveFocus();
+    rerender(panel(false));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it.each(["hint", "pause"])("keeps failed %s commands recoverable without leaking technical errors", async (command) => {
     const practice = livePractice();
     const changed = vi.fn();

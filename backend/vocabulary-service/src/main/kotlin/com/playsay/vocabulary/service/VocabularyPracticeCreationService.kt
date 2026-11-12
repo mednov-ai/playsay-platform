@@ -43,7 +43,9 @@ class VocabularyPracticeCreationService(
             planService.requireForPublication(actorSubject, it.planId, it.revision)
         }
         val planRequest = resolvedPlan.payload.request
-        if (request.planId != null) requireCompatibleRepeatedSettings(request, planRequest)
+        val plannedOwners = resolvedPlan.payload.owners.map { it.ownerSubject }
+        requirePublicationScope(requiredDelivery, planRequest.delivery, actorSubject, plannedOwners)
+        if (request.planId != null) requireCompatibleRepeatedSettings(request, planRequest, actorSubject, plannedOwners)
         resolvedPlan.entity.publishedPracticeId?.let { publishedPracticeId ->
             val existing = practices.findById(publishedPracticeId).orElseThrow {
                 ResponseStatusException(HttpStatus.CONFLICT, "The published vocabulary practice is unavailable.")
@@ -58,9 +60,6 @@ class VocabularyPracticeCreationService(
         )
         val delivery = effectiveRequest.delivery
         val lessonId = effectiveRequest.lessonId
-        if (requiredDelivery != null && delivery != requiredDelivery) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Vocabulary practice plan delivery does not match the publish endpoint.")
-        }
         if (delivery == PracticeDelivery.LIVE && lessonId == null) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "lessonId is required for live vocabulary practice.")
         }
@@ -85,16 +84,35 @@ class VocabularyPracticeCreationService(
         return queryService.responseForActor(actorSubject, refreshedPractice, response)
     }
 
+    private fun requirePublicationScope(
+        requiredDelivery: PracticeDelivery?,
+        planDelivery: PracticeDelivery,
+        actorSubject: String,
+        plannedOwners: List<String>,
+    ) {
+        if (requiredDelivery != null && planDelivery != requiredDelivery) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Vocabulary practice plan delivery does not match the publish endpoint.")
+        }
+        if (requiredDelivery == PracticeDelivery.SELF && plannedOwners != listOf(actorSubject)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "A self practice plan must belong to the current user.")
+        }
+    }
+
     private fun requireCompatibleRepeatedSettings(
         request: VocabularyPracticeSettingsRequest,
         frozen: VocabularyPracticeSettingsRequest,
+        actorSubject: String,
+        plannedOwners: List<String>,
     ) {
         val defaults = VocabularyPracticeSettingsRequest()
         val conflicts = buildList {
             fun repeated(name: String, supplied: Any?, default: Any?, expected: Any?) {
                 if (supplied != default && supplied != expected) add(name)
             }
-            repeated("ownerSubjects", request.ownerSubjects, defaults.ownerSubjects, frozen.ownerSubjects)
+            val implicitSelfOwner = frozen.delivery == PracticeDelivery.SELF && frozen.ownerSubjects.isEmpty() &&
+                request.delivery == PracticeDelivery.SELF && request.ownerSubjects == listOf(actorSubject) &&
+                plannedOwners == listOf(actorSubject)
+            if (!implicitSelfOwner) repeated("ownerSubjects", request.ownerSubjects, defaults.ownerSubjects, frozen.ownerSubjects)
             repeated("delivery", request.delivery, defaults.delivery, frozen.delivery)
             repeated("mode", request.mode, defaults.mode, frozen.mode)
             repeated("wordLimit", request.wordLimit, defaults.wordLimit, frozen.wordLimit)

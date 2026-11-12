@@ -21,11 +21,14 @@ This document records the compatibility baseline for the adaptive vocabulary cha
 |---|---|---|
 | Entry and memory | Add sense/content revision IDs, favorite/media override, memory reason, policy version, and evidence watermark | Keep all current entry and skill fields readable. New fields are optional until all generated clients are deployed. Existing entry UUIDs remain stable. |
 | Selection and planning | Add recipe CRUD, richer preview filters/reasons, eligibility watermark, deterministic seed, budget, and plan policy revisions | Keep current preview/create/self paths and `planId`/`planRevision`. Current `wordLimit`, pin, and exclude settings map to an equivalent recipe. |
+
 | Sessions and attempts | Add acknowledged position, correction/retry metadata, evaluator version, and immutable evidence identity | Keep current session/item/attempt fields. Accept existing attempt requests; new clients send additional optional evidence fields. Existing materialized sessions stay on their pinned legacy policy. |
 | Homework | Add frozen completion policy, thresholds, meaningful activity, review state, and detailed progress evidence | Existing assignments default to legacy complete-session semantics. New fields are nullable/additive in gateway responses and optional/defaulted in internal requests during rolling upgrade. |
 | Realtime | Add new persisted progress/control event variants and optional policy/progress fields | Do not alter existing event meanings. Add schema variants explicitly; consumers must ignore unknown event types and reload persisted state after reconnect. |
 | Honey School Key | Add typed targets and `WHOLE_WORDS`, `CHARACTER_NGRAMS`, `MIXED` modes with source attribution | Extend the existing `practiceContext`; current full-word payloads map to `WHOLE_WORDS`. Accept legacy result payloads while new result fields remain optional during rollout. N-gram results never imply full-word recall. |
 | Media | Add vocabulary-specific sense, generation, review, and authorized delivery paths | Do not overload or change the existing YouTube contract. Media references are opaque; raw storage keys and credentials never enter public responses. |
+
+A generic SELF preview with no explicit owners resolves to the current user. Its `planId` and `planRevision` can be published through the SELF endpoint without changing the frozen selection; that endpoint rejects a plan belonging to a different owner.
 
 ## Rolling-upgrade order
 

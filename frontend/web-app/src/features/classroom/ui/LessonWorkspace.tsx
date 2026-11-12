@@ -109,6 +109,7 @@ export function LessonWorkspace({
     && typeof window.matchMedia === "function"
     && window.matchMedia("(min-width: 1024px)").matches
   ));
+  const messageInActivityRail = canMonitorSubmissions && vocabularyFeatures.personalPracticeV2 && activityRailOpen;
 
   async function startVocabularyPractice() {
     if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
@@ -389,7 +390,7 @@ export function LessonWorkspace({
       <div className="playsay-workbench-layout" hidden={whiteboard.active || coveredByLibraryGame} inert={whiteboard.active || coveredByLibraryGame}>
       <div className="playsay-workbench-body">
 
-        {assignmentMessage ? (
+        {assignmentMessage && !messageInActivityRail ? (
           <div className="playsay-lesson-inline-message" role="alert" tabIndex={0}>
             {assignmentMessage}
           </div>
@@ -552,6 +553,7 @@ export function LessonWorkspace({
       </div>
       {canMonitorSubmissions && vocabularyFeatures.personalPracticeV2 ? (
         <LessonActivityRail
+          assignmentMessage={assignmentMessage}
           assigningMaterial={assigningMaterial}
           currentMaterialId={session.materialId}
           lessonId={session.lessonId}

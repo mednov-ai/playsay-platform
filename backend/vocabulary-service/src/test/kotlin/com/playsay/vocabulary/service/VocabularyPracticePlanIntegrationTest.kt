@@ -41,6 +41,68 @@ class VocabularyPracticePlanIntegrationTest @Autowired constructor(
     private val practice: VocabularyPracticeService,
 ) {
     @Test
+    fun `self publication accepts generic preview with implicit current owner`() {
+        jdbc.execute(
+            """
+                create table if not exists app_user (
+                    id uuid primary key, keycloak_subject varchar(255) not null, username varchar(255),
+                    display_name varchar(120), locale varchar(16), roles varchar(255), managed_by_teacher_user_id uuid
+                )
+            """.trimIndent(),
+        )
+        val owner = "implicit-self-${UUID.randomUUID()}"
+        jdbc.update(
+            "insert into app_user(id, keycloak_subject, username, display_name) values (?, ?, ?, ?)",
+            UUID.randomUUID(), owner, "self", "Self learner",
+        )
+        entries.save(VocabularyEntryEntity(ownerSubject = owner, sourceText = "garden", normalizedSource = "garden",
+            translation = "сад", createdBySubject = owner))
+
+        val preview = practice.preview(owner, VocabularyPracticeSettingsRequest(wordLimit = 1))
+        val request = VocabularyPracticeSettingsRequest(planId = preview.planId, planRevision = preview.revision)
+        val published = practice.selfPractice(owner, request)
+        val repeated = practice.selfPractice(owner, request)
+
+        assertEquals(owner, preview.owners.single().ownerSubject)
+        assertEquals(owner, published.sessions.single().ownerSubject)
+        assertEquals(published.id, repeated.id)
+        assertThrows(ResponseStatusException::class.java) { practice.selfPractice("other-owner", request) }
+        val wrongEndpoint = assertThrows(ResponseStatusException::class.java) { practice.createLive(owner, request) }
+        assertEquals(409, wrongEndpoint.statusCode.value())
+    }
+
+    @Test
+    fun `self publication rejects a preview owned by a managed learner`() {
+        jdbc.execute(
+            """create table if not exists app_user (
+                id uuid primary key, keycloak_subject varchar(255) not null, username varchar(255),
+                display_name varchar(120), locale varchar(16), roles varchar(255), managed_by_teacher_user_id uuid
+            )""".trimIndent(),
+        )
+        jdbc.execute(
+            """create table if not exists teacher_delegation (
+                id uuid primary key, primary_teacher_user_id uuid, delegate_teacher_user_id uuid,
+                source_kind varchar(32), revoked_at timestamp, starts_at timestamp, ends_at timestamp
+            )""".trimIndent(),
+        )
+        jdbc.execute("create table if not exists teacher_delegation_student (delegation_id uuid, student_user_id uuid)")
+        val teacherId = UUID.randomUUID()
+        val teacher = "teacher-${UUID.randomUUID()}"
+        val learner = "learner-${UUID.randomUUID()}"
+        jdbc.update("insert into app_user(id, keycloak_subject, username, display_name) values (?, ?, ?, ?)",
+            teacherId, teacher, "teacher", "Teacher")
+        jdbc.update("insert into app_user(id, keycloak_subject, username, display_name, managed_by_teacher_user_id) values (?, ?, ?, ?, ?)",
+            UUID.randomUUID(), learner, "learner", "Learner", teacherId)
+        entries.save(VocabularyEntryEntity(ownerSubject = learner, sourceText = "garden", normalizedSource = "garden",
+            translation = "сад", createdBySubject = learner))
+        val preview = practice.preview(teacher, VocabularyPracticeSettingsRequest(ownerSubjects = listOf(learner), wordLimit = 1))
+        val error = assertThrows(ResponseStatusException::class.java) {
+            practice.selfPractice(teacher, VocabularyPracticeSettingsRequest(planId = preview.planId, planRevision = preview.revision))
+        }
+        assertEquals(409, error.statusCode.value())
+    }
+
+    @Test
     fun `published session copies the exact preview snapshot`() {
         jdbc.execute(
             """

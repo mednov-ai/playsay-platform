@@ -10,6 +10,7 @@ import {
   compareAnnotationElements,
   deleteMindMapSubtree,
   eraseAnnotationElementsAt,
+  isPptxSlideAnnotationId,
   isStrokeStyledElement,
   layoutMindMap,
   mindMapNodeLimit,
@@ -38,6 +39,7 @@ type LiveAnnotationSync = {
   elements: AnnotationElement[];
   ready: boolean;
   redo?: () => void;
+  separateHistory?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   undo?: () => void;
 };
@@ -61,7 +63,7 @@ export type AnnotationReanchorBounds = {
 };
 
 type ActiveInteraction =
-  | { acceptUnanchored?: boolean; anchorId?: string; erased: AnnotationStroke[]; mode: "erase" }
+  | { acceptUnanchored?: boolean; anchorId?: string; erased: AnnotationStroke[]; mode: "erase"; pptxSlide?: boolean }
   | { before: AnnotationElement; id: string; mode: "create" }
   | {
       before: AnnotationElement;
@@ -291,7 +293,7 @@ export function useLessonAnnotation({
     });
   }
 
-  function beginAnnotation(event: PointerEvent<SVGSVGElement>, anchorId?: string, acceptUnanchored = false) {
+  function beginAnnotation(event: PointerEvent<SVGSVGElement>, anchorId?: string, acceptUnanchored = false, pptxSlide = false) {
     if (event.button !== 0 || annotationTool === "pointer") {
       if (annotationTool === "pointer" && event.target === event.currentTarget) {
         setSelectedElementId(null);
@@ -301,7 +303,7 @@ export function useLessonAnnotation({
     }
 
     event.preventDefault();
-    const point = svgPointFromEvent(event, activePageId, anchorId);
+    const point = annotationPointFromEvent(event, activePageId, anchorId, pptxSlide);
     if (annotationTool === "mindMap") {
       createMindMapRoot(point);
       return;
@@ -313,9 +315,11 @@ export function useLessonAnnotation({
 
     capturePointer(event);
     if (annotationTool === "eraser") {
+      liveAnnotationRef.current?.separateHistory?.();
       activeInteractionRef.current = {
         ...(acceptUnanchored ? { acceptUnanchored } : {}),
         ...(anchorId ? { anchorId } : {}),
+        ...(pptxSlide ? { pptxSlide: true } : {}),
         erased: [],
         mode: "erase",
       };
@@ -340,7 +344,7 @@ export function useLessonAnnotation({
     event.preventDefault();
     const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
     pendingInteractionPointRef.current = {
-      ...svgPointFromEvent(event, activePageId, anchorId),
+      ...annotationPointFromEvent(event, activePageId, anchorId, interaction.mode === "erase" && Boolean(interaction.pptxSlide)),
       ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
     };
     if (pointerFrameRef.current === null) {
@@ -430,7 +434,7 @@ export function useLessonAnnotation({
     }
     const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
     pendingInteractionPointRef.current = {
-      ...svgPointFromEvent(event, activePageId, anchorId),
+      ...annotationPointFromEvent(event, activePageId, anchorId, interaction.mode === "erase" && Boolean(interaction.pptxSlide)),
       ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
     };
     cancelPointerFrame();
@@ -440,6 +444,7 @@ export function useLessonAnnotation({
 
     if (interaction.mode === "erase") {
       recordHistory(interaction.erased, []);
+      liveAnnotationRef.current?.separateHistory?.();
       return;
     }
     const currentElement = elementsRef.current.find((element) => element.id === interaction.id);
@@ -709,7 +714,7 @@ export function useLessonAnnotation({
       ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       color: annotationColor,
       createdAt: Date.now(),
-      id: annotationElementId(tool),
+      id: annotationElementId(tool, Boolean(point.pptxSlide)),
       pageId: point.pageId,
     };
     if (tool === "pen") {
@@ -753,7 +758,7 @@ export function useLessonAnnotation({
       fill: tool === "stickyNote" ? "#fff0a8" : "transparent",
       fontSize: tool === "stickyNote" ? 30 : defaultAnnotationFontSize,
       height,
-      id: annotationElementId(tool),
+      id: annotationElementId(tool, Boolean(point.pptxSlide)),
       kind: tool,
       pageId: point.pageId,
       text: "",
@@ -770,7 +775,7 @@ export function useLessonAnnotation({
   }
 
   function createMindMapRoot(point: AnnotationPoint) {
-    const id = annotationElementId("mindMap");
+    const id = annotationElementId("mindMap", Boolean(point.pptxSlide));
     const element = resizeMindMapNodeForText({
       ...(point.anchorId ? { anchorId: point.anchorId } : {}),
       color: "#ffffff",
@@ -817,7 +822,7 @@ export function useLessonAnnotation({
     const side = actualParent.parentId === null
       ? preferredSide ?? (siblings.filter((node) => node.side === "right").length <= siblings.filter((node) => node.side === "left").length ? "right" : "left")
       : actualParent.side === "left" ? "left" : "right";
-    const id = annotationElementId("mindMap");
+    const id = annotationElementId("mindMap", isPptxSlideAnnotationId(selected.id));
     const node: AnnotationMindMapNode = {
       ...(selected.anchorId ? { anchorId: selected.anchorId } : {}),
       color: annotationColor,
@@ -1090,8 +1095,27 @@ function normalizeCreatedElement(element: AnnotationElement): AnnotationElement 
   return element;
 }
 
-function annotationElementId(tool: AnnotationTool): string {
-  return `${tool}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+function annotationPointFromEvent(
+  event: PointerEvent<SVGSVGElement>, pageId: string, anchorId?: string, pptxSlide = false,
+): AnnotationPoint {
+  const point = svgPointFromEvent(event, pageId, anchorId);
+  if (!pptxSlide) return point;
+  const layers = event.currentTarget.parentElement?.querySelectorAll<SVGSVGElement>('svg[data-annotation-geometry="pptx-legacy"]') ?? [];
+  const legacy = Array.from(layers).find((layer) => layer.dataset.anchorId === anchorId);
+  const rect = legacy?.getBoundingClientRect();
+  const inside = rect && rect.width > 0 && rect.height > 0 && event.clientX >= rect.left && event.clientX <= rect.right
+    && event.clientY >= rect.top && event.clientY <= rect.bottom;
+  return {
+    ...point, pptxSlide: true,
+    ...(inside ? { legacyPosition: {
+      x: Math.max(0, Math.min(1000, ((event.clientX - rect.left) / rect.width) * 1000)),
+      y: Math.max(0, Math.min(1000, ((event.clientY - rect.top) / rect.height) * 1000)),
+    } } : {}),
+  };
+}
+
+function annotationElementId(tool: AnnotationTool, pptxSlide = false): string {
+  return `${pptxSlide ? "pptx-slide-v1-" : ""}${tool}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function requestPointerFrame(callback: FrameRequestCallback): number {

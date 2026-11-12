@@ -359,6 +359,9 @@ export function createYjsWorkspaceRuntime({
     redoAnnotation() {
       annotationUndoManager.redo();
     },
+    separateAnnotationHistory() {
+      annotationUndoManager.stopCapturing();
+    },
     handleSocketMessage(data) {
       handleMessage(ydoc, awareness, socket, data, applyEphemeralMessage, receiveGameLifecycle);
     },

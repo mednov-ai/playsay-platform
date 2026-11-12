@@ -9,6 +9,7 @@ import {
 import { useLessonAnnotation } from "../hooks/useLessonAnnotation";
 import {
   annotationElementsForPage,
+  isPptxSlideAnnotationId,
   type AnnotationContent,
   type AnnotationElement,
 } from "../model/annotation";
@@ -144,15 +145,22 @@ export function ControlledAnnotationCanvas({
           score={score}
           showScoreBadge={false}
         />
-        {activePageHasImage ? anchors.map((anchor, index) => (
+        {activePageHasImage ? anchors.map((anchor) => (
           <AnnotationLayer
+            annotationGeometry={anchor.geometry}
             anchorId={anchor.id}
             anchorBounds={anchor.bounds}
             editingElementId={readOnly ? null : editingElementId}
-            elements={pageElements.filter((element) => element.anchorId === anchor.id || (!element.anchorId && index === 0))}
-            key={anchor.id}
+            elements={pageElements.filter((element) => {
+              const belongs = element.anchorId === anchor.id || (!element.anchorId && anchors[0]?.id === anchor.id);
+              if (!belongs) return false;
+              if (anchor.geometry === "pptx-slide") return isPptxSlideAnnotationId(element.id);
+              if (anchor.geometry === "pptx-legacy") return !isPptxSlideAnnotationId(element.id);
+              return true;
+            })}
+            key={`${anchor.id}:${anchor.geometry ?? "default"}`}
             onAddMindMapNode={addMindMapNode}
-            onBegin={(event) => beginAnnotation(event, anchor.id, index === 0)}
+            onBegin={(event) => beginAnnotation(event, anchor.id, anchors[0]?.id === anchor.id, anchor.geometry === "pptx-slide")}
             onDeleteSelected={deleteSelectedElement}
             onDeselect={() => setSelectedElementId(null)}
             onEditText={beginTextEditing}
@@ -169,6 +177,7 @@ export function ControlledAnnotationCanvas({
             onUndo={undo}
             readOnly={readOnly}
             selectedElementId={readOnly ? null : selectedElementId}
+            surfaceInteractive={anchor.geometry !== "pptx-legacy"}
             tool={readOnly ? "pointer" : annotationTool}
           />
         )) : null}

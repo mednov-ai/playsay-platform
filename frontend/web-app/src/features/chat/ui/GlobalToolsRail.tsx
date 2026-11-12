@@ -85,6 +85,7 @@ export function GlobalToolsRail({
   const [error, setError] = useState<string | null>(null);
   const [contactsFailed, setContactsFailed] = useState(false);
   const [conversationsFailed, setConversationsFailed] = useState(false);
+  const [chatReconnecting, setChatReconnecting] = useState(false);
   const [toast, setToast] = useState<ChatToast | null>(null);
   const [diceNow, setDiceNow] = useState(() => Date.now());
   const [visibleDiceRoll, setVisibleDiceRoll] = useState<LessonDiceRoll | null>(null);
@@ -100,8 +101,18 @@ export function GlobalToolsRail({
   const conversationsRef = useRef(conversations);
   const recoveryInFlightRef = useRef<Promise<ChatConversation[]> | null>(null);
   const recoveryPendingRef = useRef(false);
+  const messageRecoveryRef = useRef(new Map<string, Promise<void>>());
+  const recoveryControllersRef = useRef(new Set<AbortController>());
+  const chatScopeRef = useRef(0);
   const initialChatTargetRef = useRef(readPendingChatTarget());
   const chatPush = useChatPushSubscription(profile.subject, i18n.language);
+
+  useEffect(() => () => {
+    chatScopeRef.current += 1;
+    recoveryControllersRef.current.forEach((controller) => controller.abort());
+    recoveryControllersRef.current.clear();
+    messageRecoveryRef.current.clear();
+  }, [profile.subject]);
 
   useEffect(() => {
     openRef.current = chatOpen;
@@ -203,15 +214,87 @@ export function GlobalToolsRail({
     }
   }, [markVisibleConversationRead, t]);
 
+  const recoverVisibleMessages = useCallback((): Promise<void> => {
+    const conversationId = activeConversationIdRef.current;
+    if (!openRef.current || !conversationId) return Promise.resolve();
+    const existing = messageRecoveryRef.current.get(conversationId);
+    if (existing) return existing;
+    const controller = new AbortController();
+    const scope = chatScopeRef.current;
+    recoveryControllersRef.current.add(controller);
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    const task = (async () => {
+      try {
+        const page = await fetchChatMessages(conversationId, null, controller.signal);
+        if (scope !== chatScopeRef.current || !openRef.current || activeConversationIdRef.current !== conversationId) return;
+        setMessagesByConversation((all) => {
+          const current = all[conversationId] ?? emptyMessages;
+          return { ...all, [conversationId]: {
+            ...current,
+            items: mergeMessages(current.items, page.items),
+            nextCursor: all[conversationId] ? current.nextCursor : page.nextCursor,
+          } };
+        });
+        void markVisibleConversationRead(conversationId, page.items);
+      } catch {
+        // Keep existing messages; the next reconnect attempt will retry.
+      } finally {
+        window.clearTimeout(timeout);
+        recoveryControllersRef.current.delete(controller);
+      }
+    })();
+    messageRecoveryRef.current.set(conversationId, task);
+    void task.then(() => {
+      if (messageRecoveryRef.current.get(conversationId) === task) messageRecoveryRef.current.delete(conversationId);
+    });
+    return task;
+  }, [markVisibleConversationRead]);
+
   useEffect(() => {
     let stopped = false;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
 
+    function scheduleReconnect() {
+      if (stopped || reconnectTimer !== null) return;
+      setChatReconnecting(true);
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        void refreshConversations().catch(() => undefined);
+        void recoverVisibleMessages();
+        void connect();
+      }, 2_000);
+    }
+
     async function connect() {
-      const nextSocket = await openChatSocket();
-      if (stopped || !nextSocket) return;
+      let nextSocket: WebSocket | null;
+      try {
+        nextSocket = await openChatSocket();
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      if (stopped) {
+        nextSocket?.close();
+        return;
+      }
+      if (!nextSocket) {
+        scheduleReconnect();
+        return;
+      }
       socket = nextSocket;
+      nextSocket.onopen = () => {
+        if (!stopped && socket === nextSocket) {
+          setChatReconnecting(false);
+          const conversationId = activeConversationIdRef.current;
+          const pending = conversationId ? messageRecoveryRef.current.get(conversationId) : undefined;
+          if (pending) {
+            void pending.then(() => {
+              if (!stopped && socket === nextSocket && activeConversationIdRef.current === conversationId) void recoverVisibleMessages();
+            });
+          } else void recoverVisibleMessages();
+        }
+      };
       nextSocket.onmessage = (event) => {
         let realtime: ChatRealtimeMessage;
         try {
@@ -294,12 +377,9 @@ export function GlobalToolsRail({
       };
       nextSocket.onerror = () => nextSocket.close();
       nextSocket.onclose = () => {
-        if (stopped) return;
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = null;
-          void refreshConversations().catch(() => undefined);
-          void connect();
-        }, 2_000);
+        if (stopped || socket !== nextSocket) return;
+        socket = null;
+        scheduleReconnect();
       };
     }
 
@@ -309,7 +389,7 @@ export function GlobalToolsRail({
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [markVisibleConversationRead, profile.subject, refreshConversations, t]);
+  }, [markVisibleConversationRead, profile.subject, recoverVisibleMessages, refreshConversations, t]);
 
   useEffect(() => {
     function reconcileFromServiceWorker(event: MessageEvent) {
@@ -621,6 +701,7 @@ export function GlobalToolsRail({
             </button>
           </header>
 
+          {chatReconnecting ? <p className="playsay-chat-notification-status" role="status">{t("chat.reconnecting")}</p> : null}
           {error ? <p className="playsay-chat-error" role="alert">{error}</p> : null}
           {contactsFailed || conversationsFailed ? (
             <div className="playsay-chat-error" role="alert">

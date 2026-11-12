@@ -110,6 +110,17 @@ describe("annotation model", () => {
     expect(result.erased.map((element) => element.id)).toEqual(["stroke-1"]);
   });
 
+  it("erases slide-relative and legacy strokes at their respective visible coordinates", () => {
+    const legacy = stroke({ id: "legacy", anchorId: "doc:rev:0", points: [{ pageId: "page-1", x: 100, y: 100 }] });
+    const slide = stroke({ id: "pptx-slide-v1-pen-1", anchorId: "doc:rev:0", points: [{ pageId: "page-1", x: 500, y: 500 }] });
+    const point = { anchorId: "doc:rev:0", pageId: "page-1", pptxSlide: true, x: 500, y: 500 };
+    expect(eraseAnnotationElementsAt([legacy, slide], { ...point, legacyPosition: { x: 100, y: 100 } }).erased.map(e => e.id)).toEqual(["legacy", slide.id]);
+    expect(eraseAnnotationElementsAt([legacy, slide], point).elements.map(e => e.id)).toEqual(["legacy"]);
+    const content = annotationContentFromJson(annotationContentFromElements([legacy, slide], "page-1"));
+    expect(content.elements.map(e => e.id)).toEqual(["legacy", slide.id]);
+    expect(content.schemaVersion).toBe(7);
+  });
+
   it("does not erase shapes or strokes from another page", () => {
     const otherPageStroke = stroke({ pageId: "page-2", points: [{ pageId: "page-2", x: 20, y: 20 }] });
     const rectangle: AnnotationElement = {

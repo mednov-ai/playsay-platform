@@ -27,6 +27,39 @@ function pointer(x: number, y: number): PointerEvent<SVGSVGElement> {
   return { button: 0, clientX: x, clientY: y, currentTarget: svg, target: svg, pointerId: 1, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent<SVGSVGElement>;
 }
 
+describe("PPTX slide coordinate identity", () => {
+  it("separates eraser gestures from nearby live annotation history", () => {
+    const separateHistory = vi.fn();
+    const { result } = renderHook(() => {
+      const [elements, setElements] = useState<AnnotationElement[]>([]);
+      return useLessonAnnotation({ lessonId: "lesson", initialPageId: "page-1", liveAnnotation: { elements, setElements, ready: true, separateHistory } });
+    });
+    act(() => result.current.setAnnotationTool("eraser"));
+    act(() => result.current.beginAnnotation(pointer(300, 400), "doc:rev:0", false, true));
+    act(() => result.current.endAnnotation(pointer(300, 400)));
+    expect(separateHistory).toHaveBeenCalledTimes(2);
+  });
+
+  for (const tool of ["pen", "rectangle", "text", "stickyNote", "mindMap"] as const) {
+    it(`marks new ${tool} elements without changing the shared anchor`, () => {
+      const { result } = renderHook(() => {
+        const [elements, setElements] = useState<AnnotationElement[]>([]);
+        return useLessonAnnotation({ lessonId: "lesson", initialPageId: "page-1", controlledAnnotation: { key: "student", elements, setElements } });
+      });
+      act(() => result.current.setAnnotationTool(tool));
+      act(() => result.current.beginAnnotation(pointer(300, 400), "doc:rev:0", false, true));
+      const element = result.current.annotationElements[0];
+      expect(element.id).toMatch(/^pptx-slide-v1-/);
+      expect(element.anchorId).toBe("doc:rev:0");
+      if (tool === "mindMap") {
+        act(() => result.current.addMindMapNode(element.id, "child"));
+        expect(result.current.annotationElements).toHaveLength(2);
+        expect(result.current.annotationElements.every(child => child.id.startsWith("pptx-slide-v1-"))).toBe(true);
+      }
+    });
+  }
+});
+
 describe("concurrent Text gestures", () => {
   for (const mode of ["move", "resize"] as const) {
     for (const initialText of ["", "Before"]) {

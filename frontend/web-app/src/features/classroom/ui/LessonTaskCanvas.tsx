@@ -31,7 +31,8 @@ import {
   type MaterialVideoSync,
 } from "../../materials";
 import { imageAnnotationGeometry, isOverAnnotationImage } from "../model/imageAnnotationGeometry";
-import { annotationElementsForPage, type AnnotationElement } from "../model/annotation";
+import { pptxAnnotationBaseline, pptxAnnotationGeometry, pptxSlideAnnotationGeometry, type PptxAnnotationBaseline } from "../model/pptxAnnotationGeometry";
+import { annotationElementsForPage, isPptxSlideAnnotationId, type AnnotationElement } from "../model/annotation";
 import type { CollaborationCursor, CollaborationParticipant } from "../hooks/useYjsWorkspace";
 import { useAppTranslation } from "../../../shared/i18n";
 import { PresenceCursorLayer } from "./PresenceCursorLayer";
@@ -53,6 +54,7 @@ type LiveAnnotationSync = {
   reconnectCount?: number;
   retry?: () => void;
   redo?: () => void;
+  separateHistory?: () => void;
   setElements: (updater: (current: AnnotationElement[]) => AnnotationElement[]) => void;
   undo?: () => void;
   updateCursor: (cursor: CollaborationCursor | null) => void;
@@ -852,15 +854,20 @@ export function LessonTaskCanvas({
                 {annotationAnchors.map((anchor) => (
                   <AnnotationLayer
                 readOnly={Boolean(readOnlyAnnotation)}
+                annotationGeometry={anchor.geometry}
                 anchorId={anchor.id}
                 anchorBounds={anchor.bounds}
                 editingElementId={editingElementId}
-                elements={visibleAnnotationElements.filter((element) => (
-                  element.anchorId === anchor.id || (!element.anchorId && legacyAnchorId === anchor.id)
-                ))}
-                key={anchor.id}
+                elements={visibleAnnotationElements.filter((element) => {
+                  const belongs = element.anchorId === anchor.id || (!element.anchorId && legacyAnchorId === anchor.id);
+                  if (!belongs) return false;
+                  if (anchor.geometry === "pptx-slide") return isPptxSlideAnnotationId(element.id);
+                  if (anchor.geometry === "pptx-legacy") return !isPptxSlideAnnotationId(element.id);
+                  return true;
+                })}
+                key={`${anchor.id}:${anchor.geometry ?? "default"}`}
                 onAddMindMapNode={addMindMapNode}
-                onBegin={(event) => beginAnnotation(event, anchor.id, legacyAnchorId === anchor.id)}
+                onBegin={(event) => beginAnnotation(event, anchor.id, legacyAnchorId === anchor.id, anchor.geometry === "pptx-slide")}
                 onDeleteSelected={deleteSelectedElement}
                 onDeselect={() => setSelectedElementId(null)}
                 onEditText={beginTextEditing}
@@ -876,6 +883,7 @@ export function LessonTaskCanvas({
                 onTextChange={updateAnnotationText}
                 onUndo={undo}
                 selectedElementId={selectedElementId}
+                surfaceInteractive={anchor.geometry !== "pptx-legacy"}
                 tool={annotationTool}
                   />
                 ))}
@@ -883,7 +891,7 @@ export function LessonTaskCanvas({
                   <div className="playsay-mind-map-limit" role="status">{t("classroom.annotation.mindMapLimit")}</div>
                 ) : null}
                 <PresenceCursorLayer participants={annotationSync?.participants ?? []} />
-                {annotationAnchors.map((anchor) => (
+                {annotationAnchors.filter((anchor) => anchor.geometry !== "pptx-slide").map((anchor) => (
                   <PresenceCursorLayer
                 anchorBounds={anchor.bounds}
                 anchorId={anchor.id}
@@ -945,6 +953,7 @@ const scrollIntentKeys = new Set([
 export type AnnotationAnchor = {
   bounds: AnnotationLayerBounds;
   focused: boolean;
+  geometry?: "pptx-legacy" | "pptx-slide";
   visibleBounds?: AnnotationLayerBounds;
   id: string;
 };
@@ -955,6 +964,7 @@ export function useAnnotationAnchors(
   presentationMode: LessonPresentationMode,
 ): AnnotationAnchor[] {
   const [anchors, setAnchors] = useState<AnnotationAnchor[]>([]);
+  const pptxBaselinesRef = useRef(new Map<string, PptxAnnotationBaseline>());
 
   useLayoutEffect(() => {
     const currentSurface = surfaceRef.current;
@@ -968,7 +978,9 @@ export function useAnnotationAnchors(
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver(() => scheduleMeasure());
+    const slideStyleObserver = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => scheduleMeasure());
     let observedElements = new Set<Element>();
+    let observedSlides = new Set<Element>();
     let measurementFrame: number | null = null;
 
     function scheduleMeasure() {
@@ -994,7 +1006,19 @@ export function useAnnotationAnchors(
     function measure() {
       const surfaceRect = surfaceElement.getBoundingClientRect();
       const candidates = Array.from(surfaceElement.querySelectorAll<HTMLElement>("[data-playsay-annotation-anchor-id]"));
-      const nextObservedElements = new Set<Element>([surfaceElement, ...candidates]);
+      const pptxSlides = new Map<HTMLElement, HTMLElement>();
+      candidates.forEach((element) => {
+        if (!element.matches(".playsay-document-viewer[data-format='PPTX'] .playsay-document-stage")) return;
+        const slides = element.querySelectorAll<HTMLElement>(".playsay-pptx-static-viewer [data-pptx-viewport] [aria-roledescription='slide']");
+        if (slides.length === 1) pptxSlides.set(element, slides[0]);
+      });
+      const nextSlides = new Set<Element>(pptxSlides.values());
+      if (nextSlides.size !== observedSlides.size || [...nextSlides].some((slide) => !observedSlides.has(slide))) {
+        slideStyleObserver?.disconnect();
+        nextSlides.forEach((slide) => slideStyleObserver?.observe(slide, { attributes: true, attributeFilter: ["style"] }));
+        observedSlides = nextSlides;
+      }
+      const nextObservedElements = new Set<Element>([surfaceElement, ...candidates, ...nextSlides]);
       observedElements.forEach((element) => {
         if (!nextObservedElements.has(element)) resizeObserver?.unobserve(element);
       });
@@ -1009,8 +1033,30 @@ export function useAnnotationAnchors(
         if (presentationMode === "image-focus" && !focused) return;
         const style = getComputedStyle(element);
         if (style.visibility === "hidden" || style.display === "none") return;
-        const geometry = element instanceof HTMLImageElement ? imageAnnotationGeometry(element) : null;
+        let geometry = element instanceof HTMLImageElement ? imageAnnotationGeometry(element) : null;
         if (element instanceof HTMLImageElement && !geometry) return;
+        const pptxStage = element.matches(".playsay-document-viewer[data-format='PPTX'] .playsay-document-stage");
+        const slide = pptxSlides.get(element);
+        const viewport = slide?.closest<HTMLElement>("[data-pptx-viewport]");
+        const zoom = Number(element.dataset.playsayDocumentZoom);
+        let slideGeometry: ReturnType<typeof pptxSlideAnnotationGeometry> = null;
+        if (id && slide && viewport && Number.isFinite(zoom) && zoom > 0) {
+          const stageRect = element.getBoundingClientRect();
+          const slideRect = slide.getBoundingClientRect();
+          if (stageRect.width > 0 && stageRect.height > 0 && slideRect.width > 0 && slideRect.height > 0) {
+            slideGeometry = pptxSlideAnnotationGeometry(stageRect, viewport.getBoundingClientRect(), slideRect);
+            const baseId = id.slice(0, id.lastIndexOf(":"));
+            const key = `${baseId}|${focused ? "focus" : "panel"}`;
+            const alternateKey = `${baseId}|${focused ? "panel" : "focus"}`;
+            if (Math.abs(zoom - 1) < 0.000001) {
+              pptxBaselinesRef.current.set(key, pptxAnnotationBaseline(stageRect, slideRect, {
+                left: viewport.scrollLeft, top: viewport.scrollTop,
+              }));
+            }
+            const baseline = pptxBaselinesRef.current.get(key) ?? pptxBaselinesRef.current.get(alternateKey);
+            if (baseline) geometry = pptxAnnotationGeometry(baseline, stageRect, slideRect);
+          }
+        }
         const rect = geometry?.bounds ?? element.getBoundingClientRect();
         if (!id || rect.width <= 0 || rect.height <= 0) return;
         const relativeBounds = (bounds: AnnotationLayerBounds): AnnotationLayerBounds => ({
@@ -1028,12 +1074,24 @@ export function useAnnotationAnchors(
           }),
           ...(geometry ? { visibleBounds: relativeBounds(geometry.visibleBounds) } : {}),
           focused,
+          ...(pptxStage ? { geometry: "pptx-legacy" as const } : {}),
           id,
         };
-        const current = byId.get(id);
-        if (!current || focused || !current.focused) byId.set(id, candidate);
+        const legacyKey = `${id}:${candidate.geometry ?? "default"}`;
+        const current = byId.get(legacyKey);
+        if (!current || focused || !current.focused) byId.set(legacyKey, candidate);
+        if (slideGeometry) {
+          const slideKey = `${id}:pptx-slide`;
+          const priorSlide = byId.get(slideKey);
+          if (!priorSlide || focused || !priorSlide.focused) byId.set(slideKey, {
+            bounds: relativeBounds(slideGeometry.bounds),
+            visibleBounds: relativeBounds(slideGeometry.visibleBounds),
+            focused, geometry: "pptx-slide", id,
+          });
+        }
       });
-      const nextAnchors = [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
+      const nextAnchors = [...byId.values()].sort((left, right) => left.id.localeCompare(right.id)
+        || (left.geometry ?? "").localeCompare(right.geometry ?? ""));
       setAnchors((current) => sameAnnotationAnchors(current, nextAnchors) ? current : nextAnchors);
     }
 
@@ -1042,7 +1100,7 @@ export function useAnnotationAnchors(
       : new MutationObserver(scheduleMeasure);
     mutationObserver?.observe(surfaceElement, {
       childList: true, subtree: true, attributes: true,
-      attributeFilter: ["src", "class", "data-active", "data-playsay-annotation-anchor-id"],
+      attributeFilter: ["src", "class", "data-active", "data-playsay-annotation-anchor-id", "data-playsay-document-zoom"],
     });
     surfaceElement.addEventListener("load", scheduleMeasure, true);
     surfaceElement.addEventListener("error", scheduleMeasure, true);
@@ -1059,6 +1117,7 @@ export function useAnnotationAnchors(
         window.cancelAnimationFrame(measurementFrame);
       }
       mutationObserver?.disconnect();
+      slideStyleObserver?.disconnect();
       resizeObserver?.disconnect();
     };
   }, [pageId, presentationMode, surfaceRef]);
@@ -1074,6 +1133,7 @@ function sameAnnotationAnchors(
     const candidate = next[index];
     return candidate !== undefined &&
       anchor.id === candidate.id &&
+      anchor.geometry === candidate.geometry &&
       anchor.focused === candidate.focused &&
       anchor.bounds.height === candidate.bounds.height &&
       anchor.bounds.left === candidate.bounds.left &&

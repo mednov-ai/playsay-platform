@@ -196,6 +196,21 @@ describe("yjs workspace runtime annotations", () => {
     runtime.destroy();
   });
 
+  it("undoes a quick erase without also undoing the preceding stroke", () => {
+    const changes: AnnotationElement[][] = [];
+    const runtime = createYjsWorkspaceRuntime({ color: "#ff5c00", participantName: "Student", onAnnotationChange: value => changes.push(value), onHtmlGameEffectsChange: () => {}, onHtmlGameInputsChange: () => {}, onHtmlGameSnapshotsChange: () => {}, onParticipantsChange: () => {}, onTextChange: () => {} });
+    const stroke: AnnotationElement = { id: "pptx-slide-v1-pen-1", kind: "stroke", pageId: "material", color: "#ff5c00", strokeWidth: 8, createdAt: 1, points: [{ pageId: "material", x: 100, y: 100 }] };
+    runtime.setAnnotationElements([stroke]);
+    runtime.separateAnnotationHistory();
+    runtime.setAnnotationElements([]);
+    runtime.separateAnnotationHistory();
+    runtime.undoAnnotation();
+    expect(changes.at(-1)).toEqual([stroke]);
+    runtime.redoAnnotation();
+    expect(changes.at(-1)).toEqual([]);
+    runtime.destroy();
+  });
+
   it("restores text and annotations from the Yjs snapshot after reconnect", () => {
     withWindowBase64(() => {
       const stroke: AnnotationElement = {

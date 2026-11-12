@@ -12,6 +12,7 @@ import {
 } from "../model/annotation";
 
 export const AnnotationLayer = memo(function AnnotationLayer({
+  annotationGeometry,
   anchorId,
   anchorBounds,
   editingElementId,
@@ -34,10 +35,12 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onUndo,
   readOnly = false,
   selectedElementId,
+  surfaceInteractive = true,
   tool,
   viewport,
 }: {
   viewport?: { x: number; y: number; width: number; height: number };
+  annotationGeometry?: "pptx-legacy" | "pptx-slide";
   anchorId?: string;
   anchorBounds?: AnnotationLayerBounds | null;
   editingElementId: string | null;
@@ -64,6 +67,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
   onUndo: () => void;
   readOnly?: boolean;
   selectedElementId: string | null;
+  surfaceInteractive?: boolean;
   tool: AnnotationTool;
 }) {
   const { t } = useAppTranslation();
@@ -115,15 +119,17 @@ export const AnnotationLayer = memo(function AnnotationLayer({
       <svg
         aria-label={t("classroom.annotation.layer")}
         className="playsay-annotation-layer"
+        data-annotation-geometry={annotationGeometry}
         data-anchor-id={anchorId}
         data-anchor-pending={anchorPending ? "true" : "false"}
         data-anchored={anchored ? "true" : "false"}
         data-editing={editingElementId ? "true" : "false"}
         data-read-only={readOnly ? "true" : "false"}
+        data-surface-interactive={surfaceInteractive ? "true" : "false"}
         data-tool={tool}
         onPointerCancel={readOnly ? undefined : onEnd}
         onKeyDown={handleKeyboard}
-        tabIndex={readOnly ? -1 : 0}
+        tabIndex={readOnly || !surfaceInteractive ? -1 : 0}
         onPointerDown={readOnly ? undefined : (event) => {
           if (!isEditableTarget(event.target)) event.currentTarget.focus({ preventScroll: true });
           onBegin(event);

@@ -76,6 +76,7 @@ export type YjsWorkspaceRuntime = {
     options?: { heartbeat?: boolean },
   ) => void;
   redoAnnotation: () => void;
+  separateAnnotationHistory: () => void;
   undoAnnotation: () => void;
   updateHtmlGameAuthority: (blockId: string, runId: string | null) => void;
   snapshot: () => LessonMaterialJson;

@@ -480,6 +480,7 @@ export function useYjsWorkspace({
 
   const undoAnnotation = useCallback(() => runtimeRef.current?.undoAnnotation(), []);
   const redoAnnotation = useCallback(() => runtimeRef.current?.redoAnnotation(), []);
+  const separateAnnotationHistory = useCallback(() => runtimeRef.current?.separateAnnotationHistory(), []);
 
   const snapshot = useCallback((): LessonMaterialJson | null => {
     const runtime = runtimeRef.current;
@@ -624,6 +625,7 @@ export function useYjsWorkspace({
     workspaceClientId,
     setAnnotationElements,
     redoAnnotation,
+    separateAnnotationHistory,
     snapshot,
     status,
     setMaterialViewport,

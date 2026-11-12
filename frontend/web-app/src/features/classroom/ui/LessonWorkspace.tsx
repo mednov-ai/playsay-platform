@@ -201,6 +201,7 @@ export function LessonWorkspace({
       reconnectCount: teacherAnnotationWorkspace.reconnectCount,
       retry: teacherAnnotationWorkspace.retryConnection,
       redo: teacherAnnotationWorkspace.redoAnnotation,
+      separateHistory: teacherAnnotationWorkspace.separateAnnotationHistory,
       elements: teacherAnnotationWorkspace.annotationElements,
       setElements: teacherAnnotationWorkspace.setAnnotationElements,
       status: teacherAnnotationWorkspace.status,
@@ -218,6 +219,7 @@ export function LessonWorkspace({
     teacherAnnotationWorkspace.setAnnotationElements,
     teacherAnnotationWorkspace.status,
     teacherAnnotationWorkspace.redoAnnotation,
+    teacherAnnotationWorkspace.separateAnnotationHistory,
     teacherAnnotationWorkspace.undoAnnotation,
     teacherAnnotationWorkspace.updateCursor,
   ]);

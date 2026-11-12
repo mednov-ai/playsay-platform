@@ -72,6 +72,20 @@ type MaterialViewportSync = {
 
 export type LessonPresentationMode = "default" | "html-game-focus" | "image-focus" | "external-activity-focus" | "document-focus";
 
+function mobilePptxStage(node: HTMLElement, viewport: MaterialViewportState): HTMLElement | null {
+  const stages = Array.from(node.querySelectorAll<HTMLElement>(".playsay-document-viewer[data-format='PPTX'] .playsay-document-stage"));
+  if (viewport.documentBlockId && viewport.documentRevision) {
+    const anchor = `${viewport.documentBlockId}:${viewport.documentRevision}:`;
+    return stages.find((stage) => stage.dataset.playsayAnnotationAnchorId?.startsWith(anchor)) ?? null;
+  }
+  return stages.length === 1 ? stages[0] : null;
+}
+
+function revealStageTop(node: HTMLElement, stage: HTMLElement, top: number): number {
+  const stageTop = node.scrollTop + stage.getBoundingClientRect().top - node.getBoundingClientRect().top;
+  return Math.min(top, Math.max(0, stageTop));
+}
+
 export function LessonTaskCanvas({
   annotationSync,
   readOnlyAnnotation,
@@ -168,6 +182,8 @@ export function LessonTaskCanvas({
   const annotationToolBeforeGameRef = useRef<typeof annotationTool | null>(null);
   const applyingRemoteViewportRef = useRef(false);
   const appliedRemoteViewportRef = useRef<MaterialViewportState | null>(null);
+  const appliedDocumentPresentationRef = useRef<string | null>(null);
+  const mobileDocumentRevealRef = useRef<MaterialViewportState | null>(null);
   const expectedRemoteScrollRef = useRef<{
     left: number;
     node: HTMLElement;
@@ -385,6 +401,7 @@ export function LessonTaskCanvas({
     const markScrollIntent = (duration = 500) => {
       localScrollActiveRef.current = true;
       applyingRemoteViewportRef.current = false;
+      mobileDocumentRevealRef.current = null;
       scheduleSettle();
       scrollIntentRef.current.node = node;
       scrollIntentRef.current.expiresAt = performance.now() + duration;
@@ -465,7 +482,10 @@ export function LessonTaskCanvas({
               return;
             }
             const left = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
-            const top = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+            let top = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+            const revealViewport = mobileDocumentRevealRef.current;
+            const stage = revealViewport && window.innerWidth <= 640 ? mobilePptxStage(node, revealViewport) : null;
+            if (stage) top = revealStageTop(node, stage, top);
             if (Math.abs(node.scrollLeft - left) <= 1 && Math.abs(node.scrollTop - top) <= 1) return;
             applyingRemoteViewportRef.current = true;
             expectedRemoteScrollRef.current = { left, node, top };
@@ -523,6 +543,16 @@ export function LessonTaskCanvas({
     const samePresentation = viewport.pageId === activePageId
       && viewport.presentationMode === presentationMode
       && (viewport.focusedBlockId ?? null) === focusedBlockId;
+    const documentPresentation = viewport.documentBlockId && viewport.documentRevision && viewport.documentPageIndex !== undefined
+      ? JSON.stringify([viewport.materialId, viewport.pageId, viewport.documentBlockId, viewport.documentRevision, viewport.documentPageIndex])
+      : null;
+    const previousViewport = appliedRemoteViewportRef.current;
+    const changedSurface = !previousViewport || previousViewport.materialId !== viewport.materialId
+      || previousViewport.pageId !== viewport.pageId || previousViewport.presentationMode !== viewport.presentationMode
+      || previousViewport.focusedBlockId !== viewport.focusedBlockId;
+    const revealMobileDocument = window.innerWidth <= 640 && viewport.scrollContainer === "document"
+      && (changedSurface || (documentPresentation !== null
+        && (documentPresentation !== appliedDocumentPresentationRef.current || mobileDocumentRevealRef.current !== null)));
     if (samePresentation && localScrollActiveRef.current) return;
     if (!samePresentation) cancelLocalScrollRef.current();
     let cancelled = false;
@@ -542,12 +572,27 @@ export function LessonTaskCanvas({
         : taskDocumentRef.current;
       if (node) {
         const left = viewport.x * Math.max(0, node.scrollWidth - node.clientWidth);
-        const top = viewport.y * Math.max(0, node.scrollHeight - node.clientHeight);
+        const maxTop = Math.max(0, node.scrollHeight - node.clientHeight);
+        let top = viewport.y * maxTop;
+        let stage: HTMLElement | null = null;
+        if (revealMobileDocument) {
+          stage = mobilePptxStage(node, viewport);
+          if (!stage && documentPresentation && !node.querySelector(".playsay-document-viewer") && attemptsRemaining > 0) {
+            attemptsRemaining -= 1;
+            window.requestAnimationFrame(applyWhenReady);
+            return;
+          }
+          if (stage) top = revealStageTop(node, stage, top);
+        }
         expectedRemoteScrollRef.current = { left, node, top };
         node.scrollLeft = left;
         node.scrollTop = top;
-        lastNormalizedViewportRef.current = viewport;
+        // Retain the locally adjusted position across responsive resizes; later
+        // shared scroll revisions still follow the published normalized value.
+        lastNormalizedViewportRef.current = top === viewport.y * maxTop ? viewport : { ...viewport, y: maxTop ? top / maxTop : 0 };
         appliedRemoteViewportRef.current = viewport;
+        mobileDocumentRevealRef.current = stage ? viewport : null;
+        if (documentPresentation) appliedDocumentPresentationRef.current = documentPresentation;
         window.requestAnimationFrame(() => {
           if (!cancelled) applyingRemoteViewportRef.current = false;
         });

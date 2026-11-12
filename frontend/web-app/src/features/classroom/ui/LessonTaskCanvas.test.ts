@@ -12,6 +12,7 @@ import type {
 } from "../../materials/model/materialDocument";
 import { LessonTaskCanvas } from "./LessonTaskCanvas";
 import { StudentLiveWorkspace } from "./StudentLiveWorkspace";
+import type { MaterialViewportState } from "../model/materialViewport";
 
 vi.mock("../hooks/useCollaborationDocument", () => {
   const state = { document: null, invalidateDocument: () => undefined };
@@ -951,6 +952,102 @@ describe("LessonTaskCanvas", () => {
       expect(node.scrollTop).toBe(150);
       view.unmount();
     } finally { globalThis.ResizeObserver = OriginalObserver; }
+  });
+
+  it("reveals a new shared PPTX slide on mobile without preventing later shared scrolling", async () => {
+    const callbacks = new Set<ResizeObserverCallback>();
+    const originalObserver = globalThis.ResizeObserver;
+    const originalWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
+    globalThis.ResizeObserver = class {
+      constructor(private callback: ResizeObserverCallback) { callbacks.add(callback); }
+      observe() {}
+      unobserve() {}
+      disconnect() { callbacks.delete(this.callback); }
+    } as unknown as typeof ResizeObserver;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 320 });
+    try {
+      const publish = vi.fn();
+      const props = {
+        lessonId: "mobile-pptx", material, onSaveAnswers: () => undefined,
+        score: null, submission: null, submissionMessage: null, submissionSaving: false,
+        teacherName: "Teacher", viewportSync: { clientId: 7, publish, ready: true, state: null },
+      };
+      const view = render(createElement(LessonTaskCanvas, props));
+      const node = view.container.querySelector<HTMLElement>(".playsay-task-document")!;
+      Object.defineProperty(node, "clientHeight", { configurable: true, value: 200 });
+      Object.defineProperty(node, "scrollHeight", { configurable: true, value: 800 });
+      const viewer = document.createElement("div");
+      viewer.className = "playsay-document-viewer";
+      viewer.dataset.format = "PPTX";
+      const stage = document.createElement("div");
+      stage.className = "playsay-document-stage";
+      stage.dataset.playsayAnnotationAnchorId = "document-1:revision-1:0";
+      viewer.append(stage);
+      node.append(viewer);
+      let stageOffset = 240;
+      vi.spyOn(node, "getBoundingClientRect").mockImplementation(() => ({ top: 100 } as DOMRect));
+      vi.spyOn(stage, "getBoundingClientRect").mockImplementation(() => ({ top: 100 + stageOffset - node.scrollTop } as DOMRect));
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      publish.mockClear();
+      const remote = {
+        materialId: material.id, pageId: "page-1", presentationMode: "default" as const,
+        scrollContainer: "document" as const, x: 0, y: 1, revision: 1, presentationRevision: 1, sourceClientId: 9,
+        documentBlockId: "document-1", documentRevision: "revision-1", documentPageIndex: 0,
+      };
+      const follow = (state: MaterialViewportState) => view.rerender(createElement(LessonTaskCanvas, {
+        ...props, viewportSync: { ...props.viewportSync, state },
+      }));
+      follow(remote);
+      await waitFor(() => expect(node.scrollTop).toBe(240));
+
+      stageOffset = 300;
+      Object.defineProperty(node, "scrollHeight", { configurable: true, value: 1000 });
+      act(() => callbacks.forEach((callback) => callback([], {} as ResizeObserver)));
+      await waitFor(() => expect(node.scrollTop).toBe(300));
+      fireEvent.scroll(node);
+      expect(publish).not.toHaveBeenCalled();
+
+      // The document viewer may publish the same page again after its renderer settles.
+      follow({ ...remote, revision: 2, presentationRevision: 2 });
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      expect(node.scrollTop).toBe(300);
+      const { documentBlockId: _block, documentRevision: _documentRevision, documentPageIndex: _page, ...scrollRemote } = remote;
+      follow({ ...scrollRemote, revision: 3, presentationRevision: 2 });
+      await waitFor(() => expect(node.scrollTop).toBe(800));
+      follow({ ...remote, revision: 4, presentationRevision: 3, documentPageIndex: 1 });
+      await waitFor(() => expect(node.scrollTop).toBe(300));
+      follow({ ...remote, revision: 5, presentationRevision: 4, documentPageIndex: 1 });
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      expect(node.scrollTop).toBe(300);
+      fireEvent.wheel(node, { deltaY: 100 });
+      node.scrollTop = 650;
+      fireEvent.scroll(node);
+      await waitFor(() => expect(publish).toHaveBeenCalled());
+      await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 250)); });
+      publish.mockClear();
+      act(() => callbacks.forEach((callback) => callback([], {} as ResizeObserver)));
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      expect(node.scrollTop).toBe(650);
+      follow({ ...remote, revision: 6, presentationRevision: 5, documentPageIndex: 1 });
+      await waitFor(() => expect(node.scrollTop).toBe(800));
+      expect(publish).not.toHaveBeenCalled();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+      follow({ ...remote, revision: 7, presentationRevision: 6, documentPageIndex: 2, y: 0.5 });
+      await waitFor(() => expect(node.scrollTop).toBe(400));
+      follow({ ...remote, revision: 8, presentationRevision: 7, documentPageIndex: 3 });
+      await waitFor(() => expect(node.scrollTop).toBe(800));
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 320 });
+      const replacement = { ...material, id: "material-2" };
+      view.rerender(createElement(LessonTaskCanvas, {
+        ...props, material: replacement,
+        viewportSync: { ...props.viewportSync, state: { ...scrollRemote, materialId: replacement.id, revision: 9, presentationRevision: 8 } },
+      }));
+      await waitFor(() => expect(node.scrollTop).toBe(300));
+      view.unmount();
+    } finally {
+      globalThis.ResizeObserver = originalObserver;
+      if (originalWidth) Object.defineProperty(window, "innerWidth", originalWidth);
+    }
   });
 
   it("defers remote scrolling through inertia and flushes the final local position", async () => {

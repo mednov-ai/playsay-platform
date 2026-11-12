@@ -18,6 +18,10 @@ Material blocks use `type=document`, `documentAssetId`, `documentFormat`, `docum
 
 The teacher publishes document focus, revision, page/spread and placement through an authorized command on the existing lesson viewport. The API token carries a fail-closed viewport publication claim; collaboration-service assigns the canonical revision, persists accepted state in the Yjs snapshot and rejects learner commands or direct learner Yjs mutations of `materialViewport`. Learner cursor, answer and permitted annotation updates remain writable. Zoom and pan remain local. Annotation anchors include block, immutable revision and page identity. Panel/expanded switches retain viewer state, and only one focused primary activity occupies the workspace.
 
+New PPTX annotations use slide-relative coordinates, so their position follows the slide across local zoom, pan and viewport sizes. Existing annotations keep their original stage-relative coordinates and remain available; their original slide-relative position cannot be reconstructed when the author's viewport was not recorded. Both use the existing page anchor and schema. Older open clients continue to display exchanged elements with their earlier stage-relative placement; reload those clients for accurate placement of newly created slide-relative annotations.
+
+The eraser resolves each stroke against its own coordinate space. A live erase is a separate undo step from the preceding gesture, including when the actions are close together.
+
 On screens up to 640 CSS pixels wide, initial entry and a teacher-controlled PPTX slide change keep the start of the selected slide stage in view even when the teacher's normalized scroll position would place it above the learner's viewport. A later deliberate scroll continues to use the existing shared viewport synchronization. Desktop behavior and document authority do not change.
 
 The library reader and the teacher's standalone play preview permit local PDF page and spread navigation. They do not publish lesson viewport commands. A learner in a shared lesson still follows the teacher-controlled viewport.

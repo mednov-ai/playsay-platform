@@ -3166,6 +3166,10 @@
   pointer-events: none;
 }
 
+.playsay-annotation-layer[data-surface-interactive="false"] {
+  pointer-events: none;
+}
+
 .playsay-annotation-layer[data-read-only="true"],
 .playsay-annotation-layer[data-read-only="true"] .playsay-annotation-element {
   pointer-events: none;

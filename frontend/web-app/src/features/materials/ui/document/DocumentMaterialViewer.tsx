@@ -117,6 +117,7 @@ export function DocumentMaterialViewer({
         className="playsay-document-stage"
         data-playsay-annotation-anchor="true"
         data-playsay-annotation-anchor-id={`${block.id}:${block.documentRevision ?? "unknown"}:${visiblePageIndexes.join("+")}`}
+        data-playsay-document-zoom={state.zoom}
       >
         {!src ? (
           <div className="playsay-document-message">{t("materials.document.unavailable")}</div>

@@ -21,10 +21,16 @@ export const annotationFontSizePresets = [14, 18, 24, 32] as const satisfies rea
 export type AnnotationPoint = {
   acceptUnanchored?: boolean;
   anchorId?: string;
+  legacyPosition?: { x: number; y: number };
   pageId: string;
+  pptxSlide?: boolean;
   x: number;
   y: number;
 };
+
+export function isPptxSlideAnnotationId(id: string): boolean {
+  return id.startsWith("pptx-slide-v1-");
+}
 
 type AnnotationElementBase = {
   anchorId?: string;
@@ -152,7 +158,10 @@ export function eraseAnnotationElementsAt(
     ) {
       return true;
     }
-    const hit = distanceToStroke(point, element) <= eraserRadius + element.strokeWidth / 2;
+    const eraserPoint = point.pptxSlide && !isPptxSlideAnnotationId(element.id)
+      ? point.legacyPosition ? { ...point, ...point.legacyPosition } : null
+      : point;
+    const hit = eraserPoint !== null && distanceToStroke(eraserPoint, element) <= eraserRadius + element.strokeWidth / 2;
     if (hit) {
       erased.push(element);
     }

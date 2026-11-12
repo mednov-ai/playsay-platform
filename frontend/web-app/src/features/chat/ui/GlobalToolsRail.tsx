@@ -101,8 +101,18 @@ export function GlobalToolsRail({
   const conversationsRef = useRef(conversations);
   const recoveryInFlightRef = useRef<Promise<ChatConversation[]> | null>(null);
   const recoveryPendingRef = useRef(false);
+  const messageRecoveryRef = useRef(new Map<string, Promise<void>>());
+  const recoveryControllersRef = useRef(new Set<AbortController>());
+  const chatScopeRef = useRef(0);
   const initialChatTargetRef = useRef(readPendingChatTarget());
   const chatPush = useChatPushSubscription(profile.subject, i18n.language);
+
+  useEffect(() => () => {
+    chatScopeRef.current += 1;
+    recoveryControllersRef.current.forEach((controller) => controller.abort());
+    recoveryControllersRef.current.clear();
+    messageRecoveryRef.current.clear();
+  }, [profile.subject]);
 
   useEffect(() => {
     openRef.current = chatOpen;
@@ -204,24 +214,40 @@ export function GlobalToolsRail({
     }
   }, [markVisibleConversationRead, t]);
 
-  const recoverVisibleMessages = useCallback(async () => {
+  const recoverVisibleMessages = useCallback((): Promise<void> => {
     const conversationId = activeConversationIdRef.current;
-    if (!openRef.current || !conversationId) return;
-    try {
-      const page = await fetchChatMessages(conversationId);
-      if (!openRef.current || activeConversationIdRef.current !== conversationId) return;
-      setMessagesByConversation((all) => {
-        const current = all[conversationId] ?? emptyMessages;
-        return { ...all, [conversationId]: {
-          ...current,
-          items: mergeMessages(current.items, page.items),
-          nextCursor: all[conversationId] ? current.nextCursor : page.nextCursor,
-        } };
-      });
-      void markVisibleConversationRead(conversationId, page.items);
-    } catch {
-      // Keep existing messages; the next reconnect attempt will retry.
-    }
+    if (!openRef.current || !conversationId) return Promise.resolve();
+    const existing = messageRecoveryRef.current.get(conversationId);
+    if (existing) return existing;
+    const controller = new AbortController();
+    const scope = chatScopeRef.current;
+    recoveryControllersRef.current.add(controller);
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    const task = (async () => {
+      try {
+        const page = await fetchChatMessages(conversationId, null, controller.signal);
+        if (scope !== chatScopeRef.current || !openRef.current || activeConversationIdRef.current !== conversationId) return;
+        setMessagesByConversation((all) => {
+          const current = all[conversationId] ?? emptyMessages;
+          return { ...all, [conversationId]: {
+            ...current,
+            items: mergeMessages(current.items, page.items),
+            nextCursor: all[conversationId] ? current.nextCursor : page.nextCursor,
+          } };
+        });
+        void markVisibleConversationRead(conversationId, page.items);
+      } catch {
+        // Keep existing messages; the next reconnect attempt will retry.
+      } finally {
+        window.clearTimeout(timeout);
+        recoveryControllersRef.current.delete(controller);
+      }
+    })();
+    messageRecoveryRef.current.set(conversationId, task);
+    void task.then(() => {
+      if (messageRecoveryRef.current.get(conversationId) === task) messageRecoveryRef.current.delete(conversationId);
+    });
+    return task;
   }, [markVisibleConversationRead]);
 
   useEffect(() => {
@@ -260,7 +286,13 @@ export function GlobalToolsRail({
       nextSocket.onopen = () => {
         if (!stopped && socket === nextSocket) {
           setChatReconnecting(false);
-          void recoverVisibleMessages();
+          const conversationId = activeConversationIdRef.current;
+          const pending = conversationId ? messageRecoveryRef.current.get(conversationId) : undefined;
+          if (pending) {
+            void pending.then(() => {
+              if (!stopped && socket === nextSocket && activeConversationIdRef.current === conversationId) void recoverVisibleMessages();
+            });
+          } else void recoverVisibleMessages();
         }
       };
       nextSocket.onmessage = (event) => {

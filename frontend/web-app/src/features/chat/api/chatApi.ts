@@ -91,12 +91,12 @@ export function createChatConversation(participantSubject: string): Promise<Chat
   );
 }
 
-export function fetchChatMessages(conversationId: string, cursor?: string | null): Promise<ChatMessagePage> {
+export function fetchChatMessages(conversationId: string, cursor?: string | null, signal?: AbortSignal): Promise<ChatMessagePage> {
   const params = new URLSearchParams({ limit: "50" });
   if (cursor) params.set("cursor", cursor);
   return apiJson(
     `/api/chat/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`,
-    { method: "GET" },
+    { method: "GET", ...(signal ? { signal } : {}) },
     authConfig,
   );
 }

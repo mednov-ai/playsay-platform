@@ -36,7 +36,7 @@ beforeEach(() => {
     return socket;
   });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 it("recovers missed messages in the open conversation while reconnecting without duplication", async () => {
   render(<GlobalToolsRail profile={profile} />);
@@ -99,4 +99,62 @@ it("closes a socket that is created after the component is unmounted", async () 
   const socket = { close: vi.fn() };
   await act(async () => { finish(socket); await pending; });
   expect(socket.close).toHaveBeenCalledOnce();
+});
+
+it("keeps one recovery request in flight and rechecks after the socket opens", async () => {
+  let finish!: (value: { items: typeof missed[]; nextCursor: null }) => void;
+  const pending = new Promise<{ items: typeof missed[]; nextCursor: null }>(resolve => { finish = resolve; });
+  mocks.messages.mockResolvedValueOnce({ items: [oldMessage], nextCursor: null }).mockReturnValueOnce(pending)
+    .mockResolvedValue({ items: [oldMessage, missed], nextCursor: null });
+  render(<GlobalToolsRail profile={profile} />);
+  fireEvent.click(screen.getByRole("button", { name: "chat.open" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Synthetic Student/ }));
+  await screen.findByText("Earlier message");
+  act(() => sockets[0].onopen?.());
+  await waitFor(() => expect(mocks.messages).toHaveBeenCalledTimes(2));
+  act(() => sockets[0].onclose?.());
+  await waitFor(() => expect(sockets[1]?.onopen).toBeTypeOf("function"), { timeout: 4_000 });
+  act(() => sockets[1].onopen?.());
+  expect(mocks.messages).toHaveBeenCalledTimes(2);
+  await act(async () => { finish({ items: [oldMessage], nextCursor: null }); await pending; });
+  await screen.findByText("Message received while offline");
+  expect(mocks.messages).toHaveBeenCalledTimes(3);
+});
+
+it("aborts and ignores recovery after unmount", async () => {
+  let finish!: (value: { items: typeof missed[]; nextCursor: null }) => void;
+  const pending = new Promise<{ items: typeof missed[]; nextCursor: null }>(resolve => { finish = resolve; });
+  mocks.messages.mockResolvedValueOnce({ items: [oldMessage], nextCursor: null }).mockReturnValueOnce(pending);
+  const view = render(<GlobalToolsRail profile={profile} />);
+  fireEvent.click(screen.getByRole("button", { name: "chat.open" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Synthetic Student/ }));
+  await screen.findByText("Earlier message");
+  act(() => sockets[0].onopen?.());
+  await waitFor(() => expect(mocks.messages).toHaveBeenCalledTimes(2));
+  const signal = mocks.messages.mock.calls[1][2] as AbortSignal;
+  view.unmount();
+  expect(signal.aborted).toBe(true);
+  await act(async () => { finish({ items: [missed], nextCursor: null }); await pending; });
+  expect(mocks.read).not.toHaveBeenCalled();
+});
+
+it("times out a stalled recovery so the next reconnect can retry", async () => {
+  let requestSignal: AbortSignal | undefined;
+  mocks.messages.mockResolvedValueOnce({ items: [oldMessage], nextCursor: null }).mockImplementationOnce((_id, _cursor, signal: AbortSignal) => {
+    requestSignal = signal;
+    return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("timeout")), { once: true }));
+  }).mockResolvedValue({ items: [oldMessage, missed], nextCursor: null });
+  render(<GlobalToolsRail profile={profile} />);
+  fireEvent.click(screen.getByRole("button", { name: "chat.open" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Synthetic Student/ }));
+  await screen.findByText("Earlier message");
+  vi.useFakeTimers();
+  act(() => sockets[0].onopen?.());
+  expect(requestSignal?.aborted).toBe(false);
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  expect(requestSignal?.aborted).toBe(true);
+  act(() => sockets[0].onclose?.());
+  await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+  expect(mocks.messages).toHaveBeenCalledTimes(3);
+  expect(screen.getByText("Message received while offline")).toBeDefined();
 });

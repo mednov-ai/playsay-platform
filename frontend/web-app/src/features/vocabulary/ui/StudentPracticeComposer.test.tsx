@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StudentPracticeComposer } from "./StudentPracticeComposer";
 
@@ -108,8 +108,13 @@ it("re-resolves a saved dynamic recipe and reports an empty selection accessibly
   expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeDisabled();
 });
 
-it("announces preview errors without removing the composer controls", async () => {
-  preview.mockRejectedValue(new Error("offline"));
+it("distinguishes a failed preview from an empty result and retries it", async () => {
+  preview.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({
+    estimatedMinutes: 3,
+    owners: [{ estimatedItemCount: 2, selectedCount: 1, selection: [{ entry, reason: "DUE_TODAY" }] }],
+    planId: "plan-recovered",
+    revision: 1,
+  });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <StudentPracticeComposer onStart={vi.fn()} />
@@ -117,7 +122,95 @@ it("announces preview errors without removing the composer controls", async () =
   );
 
   expect(await screen.findByText("vocabulary.practice.errors.preview")).toHaveAttribute("aria-live", "assertive");
+  expect(screen.queryByText("vocabulary.selfComposer.empty")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "vocabulary.selfComposer.source.DUE" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.retry" }));
+  expect(await screen.findByText("steady")).toBeInTheDocument();
+  expect(screen.queryByText("vocabulary.practice.errors.preview")).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toHaveFocus());
+  expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeEnabled();
+});
+
+it("moves focus to the empty result when retry succeeds without words", async () => {
+  preview.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({
+    estimatedMinutes: 0,
+    owners: [{ estimatedItemCount: 0, selectedCount: 0, selection: [] }],
+    planId: "plan-empty",
+    revision: 1,
+  });
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <StudentPracticeComposer onStart={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("vocabulary.practice.errors.preview");
+  fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.retry" }));
+  const empty = await screen.findByText("vocabulary.selfComposer.empty");
+  await waitFor(() => expect(empty).toHaveFocus());
+  expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeDisabled();
+});
+
+it("returns focus to retry when the retry fails", async () => {
+  preview.mockRejectedValue(new Error("offline"));
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <StudentPracticeComposer onStart={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("vocabulary.practice.errors.preview");
+  const retry = screen.getByRole("button", { name: "vocabulary.practice.actions.retry" });
+  fireEvent.click(retry);
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(retry).toHaveFocus());
+});
+
+it("does not move focus if the user leaves retry while it is running", async () => {
+  let resolvePreview!: (value: unknown) => void;
+  preview.mockRejectedValueOnce(new Error("offline"))
+    .mockImplementationOnce(() => new Promise(resolve => { resolvePreview = resolve; }));
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <StudentPracticeComposer onStart={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("vocabulary.practice.errors.preview");
+  fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.retry" }));
+  const input = screen.getByLabelText("vocabulary.selfComposer.recipeName");
+  input.focus();
+  await act(async () => resolvePreview({
+    estimatedMinutes: 3,
+    owners: [{ estimatedItemCount: 2, selectedCount: 1, selection: [{ entry, reason: "DUE_TODAY" }] }],
+    planId: "plan-recovered",
+    revision: 1,
+  }));
+  await screen.findByText("steady");
+  expect(input).toHaveFocus();
+});
+
+it("does not start an old preview after a refresh fails", async () => {
+  const result = {
+    estimatedMinutes: 3,
+    owners: [{ estimatedItemCount: 2, selectedCount: 1, selection: [{ entry, reason: "DUE_TODAY" }] }],
+    planId: "plan-cached",
+    revision: 1,
+  };
+  preview.mockResolvedValueOnce(result).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(result);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <StudentPracticeComposer onStart={vi.fn()} />
+    </QueryClientProvider>,
+  );
+
+  await screen.findByText("steady");
+  await act(async () => { await client.invalidateQueries({ queryKey: ["vocabulary-self-preview"] }); });
+  expect(await screen.findByText("vocabulary.practice.errors.preview")).toBeInTheDocument();
+  expect(screen.getByText("steady")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "vocabulary.practice.actions.retry" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "vocabulary.today.start" })).toBeEnabled());
+  expect(screen.queryByText("vocabulary.practice.errors.preview")).not.toBeInTheDocument();
 });
 
 const entry = {

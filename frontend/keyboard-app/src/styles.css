@@ -3128,6 +3128,12 @@ input {
   color: var(--danger);
 }
 
+@media (max-width: 1500px) {
+  .side-panel {
+    grid-template-columns: minmax(150px, 0.9fr) 96px minmax(154px, 0.9fr) minmax(260px, 1.45fr) minmax(124px, 0.65fr);
+  }
+}
+
 @media (max-width: 1100px) {
   .side-panel {
     grid-template-columns: minmax(130px, 0.9fr) 86px minmax(146px, 0.9fr) minmax(220px, 1.35fr) minmax(118px, 0.7fr);
@@ -3138,9 +3144,9 @@ input {
   }
 }
 
-@media (max-width: 1500px) {
+@media (max-width: 820px) {
   .side-panel {
-    grid-template-columns: minmax(150px, 0.9fr) 96px minmax(154px, 0.9fr) minmax(260px, 1.45fr) minmax(124px, 0.65fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

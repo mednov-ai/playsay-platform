@@ -7,6 +7,7 @@ import com.playsay.gateway.realtime.authenticationAttribute
 import java.net.URI
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.http.server.ServerHttpRequest
 import org.springframework.http.server.ServerHttpResponse
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -91,29 +92,34 @@ class LessonWebSocketAuthInterceptor(
         attributes: MutableMap<String, Any>,
     ): Boolean {
         if (!webSocketOriginPolicy.allows(request.headers.origin)) {
-            return false
+            return reject(response)
         }
         val protocols = request.headers["Sec-WebSocket-Protocol"]
             .orEmpty()
             .flatMap { header -> header.split(",") }
             .map { protocol -> protocol.trim() }
         if (PLAY_SAY_WEBSOCKET_PROTOCOL !in protocols) {
-            return false
+            return reject(response)
         }
 
         val token = protocols.firstOrNull { protocol -> protocol.isNotEmpty() && protocol != PLAY_SAY_WEBSOCKET_PROTOCOL }
-            ?: return false
+            ?: return reject(response)
 
         return try {
             val jwt = jwtDecoder.decode(token)
-            if (jwt.subject.isNullOrBlank()) return false
+            if (jwt.subject.isNullOrBlank()) return reject(response)
             val authentication = jwtAuthenticationConverter.convert(jwt) as? JwtAuthenticationToken
-                ?: return false
+                ?: return reject(response)
             attributes[authenticationAttribute] = authentication
             true
         } catch (caught: JwtException) {
-            false
+            reject(response)
         }
+    }
+
+    private fun reject(response: ServerHttpResponse): Boolean {
+        response.setStatusCode(HttpStatus.FORBIDDEN)
+        return false
     }
 
     override fun afterHandshake(

@@ -107,9 +107,8 @@ export function LessonWorkspace({
     vocabularyFeatures.personalPracticeV2
     && typeof window !== "undefined"
     && typeof window.matchMedia === "function"
-    && window.matchMedia("(min-width: 1024px)").matches
+    && !window.matchMedia("(max-width: 64rem)").matches
   ));
-  const messageInActivityRail = canMonitorSubmissions && vocabularyFeatures.personalPracticeV2 && activityRailOpen;
 
   async function startVocabularyPractice() {
     if (!canMonitorSubmissions || startingVocabularyPractice || session.participants.length === 0) return;
@@ -170,6 +169,9 @@ export function LessonWorkspace({
   const healthSubjects = assignedParticipants.map((participant) => participant.subject);
   const healthSubjectKey = healthSubjects.join("|");
   const whiteboard = useLessonWhiteboard(session.lessonId, canMonitorSubmissions && session.workMode === "PARALLEL" ? activeParticipant?.subject ?? null : null);
+  const activityRailVisible = activityRailOpen && !whiteboard.active && !coveredByLibraryGame
+    && presentationMode !== "external-activity-focus";
+  const messageInActivityRail = canMonitorSubmissions && vocabularyFeatures.personalPracticeV2 && activityRailVisible;
   useEffect(() => {
     onWhiteboardActiveChange?.(whiteboard.active);
     return () => onWhiteboardActiveChange?.(false);
@@ -302,7 +304,7 @@ export function LessonWorkspace({
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
             <Button
-              aria-expanded={activityRailOpen}
+              aria-expanded={activityRailVisible}
               aria-label={t("classroom.activityRail.open")}
               onClick={() => setActivityRailOpen((current) => !current)}
               type="button"
@@ -571,7 +573,7 @@ export function LessonWorkspace({
           onUploadHtmlGamePage={isParallelWork ? undefined : (file) => void uploadHtmlGamePage(file)}
           onUploadImagePage={isParallelWork ? undefined : (file) => void uploadImagePage(file)}
           onUploadDocumentPage={documentMaterialsEnabled() ? (file) => void uploadDocumentPage(file) : undefined}
-          open={activityRailOpen}
+          open={activityRailVisible}
           owners={session.participants.map((participant) => ({
             name: participant.displayName ?? participant.username ?? participant.subject,
             presence: session.participantPresence[participant.subject] === "ONLINE" ? "PRESENT" : "ABSENT",

@@ -27,9 +27,37 @@ afterEach(() => {
   createVocabularyHomeworkAssignment.mockReset();
   updateVocabularyPracticeStatus.mockReset();
   giveVocabularyPracticeHint.mockReset();
+  vi.unstubAllGlobals();
 });
 
 describe("LessonActivityRail vocabulary delivery", () => {
+  it("focuses the mobile panel, closes on Escape, and restores the trigger", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })));
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    const onClose = vi.fn();
+    const panel = (open: boolean) => <LessonActivityRail
+      assigningMaterial={false} currentMaterialId={null} lessonId="lesson-1" materials={[]}
+      onAssignMaterial={vi.fn()} onClose={onClose} onPracticeChange={vi.fn()}
+      onSelectMaterial={vi.fn()} onSelectStudent={vi.fn()} open={open} owners={[]} practice={null}
+      selectedMaterialId="" selectedStudentSubject={null}
+      uploadingHtmlGamePage={false} uploadingImagePage={false} uploadingDocumentPage={false}
+    />;
+    const { rerender } = render(panel(true));
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "common.actions.close" })).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(panel(false));
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
   it("keeps a document error accessible inside the open activity panel", () => {
     const panel = (open: boolean) => <LessonActivityRail
       assignmentMessage="The document is unsafe. Check it and try again."

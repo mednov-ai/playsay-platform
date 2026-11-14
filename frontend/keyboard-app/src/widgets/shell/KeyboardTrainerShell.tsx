@@ -1082,6 +1082,8 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
     ],
   );
   const activeSetTitle = chordSet ? formatTrainingSetTitle(chordSet) : loading ? t("auth.loading") : t("trainer.noSet");
+  const selectedSetId = chordSet && sets.some((set) => set.id === chordSet.id && set.practiceKind !== "CODE" && set.practiceKind !== "CODE_COMBO")
+    ? String(chordSet.id) : "";
   const vocabularyContext = chordSet?.vocabularyContext;
   const hasEmptyVocabularyResume = Boolean(vocabularyContext && vocabularyContext.targets.length === 0 && !sessionResult);
   const isVocabularyPractice = chordSet?.practiceKind === "VOCABULARY";
@@ -1692,10 +1694,11 @@ export function KeyboardTrainerShell({ me, authError, themeMode, onThemeChange, 
             <label className="field field--set">
               <span>{t("trainer.set")}</span>
               <select
-                value={chordSet && chordSet.id > 0 ? String(chordSet.id) : ""}
+                value={selectedSetId}
                 onChange={(event) => selectSet(event.target.value)}
                 disabled={sets.length === 0 || advancedSettingsLocked}
               >
+                <option value="" disabled hidden>{activeSetTitle}</option>
                 {sets
                   .filter((set) => set.practiceKind !== "CODE" && set.practiceKind !== "CODE_COMBO")
                   .map((set) => (

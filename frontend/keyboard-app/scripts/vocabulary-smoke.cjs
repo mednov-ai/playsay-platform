@@ -26,6 +26,7 @@ function progress() {
 async function installApi(page, delivery, mode) {
   let resultCalls = 0;
   let acknowledgement = 0;
+  const recordedTargets = [];
   await page.route("**/api/me", (route) => route.fulfill({ json: { subject: "student-1", username: "student", roles: ["STUDENT"] } }));
   await page.route("**/api/training/claim-anonymous", (route) => route.fulfill({ json: { claimedResults: 0, progress: progress() } }));
   await page.route("**/api/training/progress", (route) => route.fulfill({ json: progress() }));
@@ -48,9 +49,14 @@ async function installApi(page, delivery, mode) {
             { targetId: "41111111-1111-4111-a111-111111111111", position: 0, type: "WHOLE_WORD", text: "rain", sourceEntryIds: ["31111111-1111-4111-a111-111111111111"], sourceItemIds: ["21111111-1111-4111-a111-111111111111"], offsets: [] },
             { targetId: "51111111-1111-4111-a111-111111111111", position: 1, type: "CHARACTER_NGRAM", text: "rai", sourceEntryIds: ["31111111-1111-4111-a111-111111111111"], sourceItemIds: ["21111111-1111-4111-a111-111111111111"], offsets: [] },
           ],
-    completionContext: { delivery, completionPolicy: delivery === "HOMEWORK" ? "MEANINGFUL_ACTIVITY" : "COMPLETE_SESSION", completionPolicyVersion: "v1", assignmentId: delivery === "HOMEWORK" ? "61111111-1111-4111-a111-111111111111" : undefined, lessonId: delivery === "LIVE" ? "71111111-1111-4111-a111-111111111111" : undefined, lastAcknowledgedPosition: acknowledgement },
+    completionContext: { delivery, completionPolicy: delivery === "HOMEWORK" ? "MEANINGFUL_ACTIVITY" : "COMPLETE_SESSION", completionPolicyVersion: "v1", assignmentId: delivery === "HOMEWORK" ? "61111111-1111-4111-a111-111111111111" : undefined, lessonId: delivery === "LIVE" ? "71111111-1111-4111-a111-111111111111" : undefined, lastAcknowledgedPosition: acknowledgement, lastRecordedPosition: 0 },
     returnContext: { target: delivery === "HOMEWORK" ? "HONEY_SCHOOL_HOMEWORK" : delivery === "LIVE" ? "HONEY_SCHOOL_LESSON" : "HONEY_SCHOOL_VOCABULARY", path: "/" },
   } }));
+  await page.route("**/api/vocabulary/practice-sessions/*/key-target-results", async (route) => {
+    const { targetId } = route.request().postDataJSON();
+    recordedTargets.push(targetId);
+    await route.fulfill({ json: { targetId } });
+  });
   await page.route("**/api/vocabulary/practice-sessions/*/key-acknowledgement", async (route) => {
     acknowledgement = Math.max(acknowledgement, route.request().postDataJSON().position);
     await route.fulfill({ json: { sessionId, lastAcknowledgedPosition: acknowledgement, revision: acknowledgement } });
@@ -64,7 +70,7 @@ async function installApi(page, delivery, mode) {
       techniqueAdvice: { primaryAdvice: "", drillSuggestion: "", tone: "STEADY", source: "RULES" },
     } });
   });
-  return { resultCalls: () => resultCalls, acknowledgement: () => acknowledgement };
+  return { resultCalls: () => resultCalls, recordedTargets: () => recordedTargets };
 }
 
 async function typeAll(page) {
@@ -99,17 +105,23 @@ async function typeAll(page) {
       const api = await installApi(page, delivery, mode);
       await page.emulateMedia({ reducedMotion: viewport.width < 500 ? "reduce" : "no-preference", colorScheme: locale === "de" ? "dark" : "light" });
       await page.goto(`${baseUrl}/?vocabularySessionId=${sessionId}&returnTo=${encodeURIComponent("https://online.honey.school/")}`, { waitUntil: "domcontentloaded" });
-      await page.locator(".intro-play-button").click();
       await page.locator(".vocabulary-context").waitFor({ state: "visible" });
+      await page.waitForFunction(() => {
+        const picker = document.querySelector(".field--set select");
+        return picker?.value === "-900" && picker.selectedOptions[0]?.textContent === "Unit 4 · Weather";
+      }, null, { timeout: 10_000 });
       await page.getByText(localeCopy[locale], { exact: false }).waitFor({ state: "visible" });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
       if (overflow) throw new Error(`${locale} ${viewport.width}px vocabulary view overflows`);
       if (locale === "en" && viewport.width === 1440) {
-        await page.keyboard.press("Space");
+        await page.locator(".session-play-button").click();
+        await page.locator(".practice-overlay--countdown").waitFor({ state: "hidden", timeout: 10_000 });
         await typeAll(page);
         await page.getByText("does not by itself mean", { exact: false }).first().waitFor({ state: "visible" });
         await page.waitForTimeout(800);
-        if (api.acknowledgement() !== 2 || api.resultCalls() !== 1) throw new Error(`Vocabulary acknowledgement/result callback was not exactly once: ack=${api.acknowledgement()} result=${api.resultCalls()}`);
+        if (api.recordedTargets().length !== 2 || new Set(api.recordedTargets()).size !== 2 || api.resultCalls() !== 1) {
+          throw new Error(`Vocabulary target/result delivery was not exactly once: targets=${api.recordedTargets().length} result=${api.resultCalls()}`);
+        }
         const returnHref = await page.locator('.practice-overlay--finished a[href="https://online.honey.school/"]').getAttribute("href");
         if (!returnHref) throw new Error("Authorized return control is missing");
       }

@@ -1,3 +1,7 @@
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS patched-jre
+COPY gradle/prepare-temurin-jre.sh /prepare-temurin-jre.sh
+RUN sh /prepare-temurin-jre.sh
+
 FROM eclipse-temurin:25.0.5_8-jre@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0
 # Compatible Ubuntu security patch; fail closed if the fixed package is absent.
 # The application starts Java directly; the inherited Rockcraft supervisor is unused.
@@ -9,7 +13,9 @@ RUN apt-get update \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' perl-base)" ge 5.40.1-7ubuntu0.4 \
     && rm -f /usr/bin/pebble \
     && test ! -e /usr/bin/pebble \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /opt/java/openjdk
+COPY --from=patched-jre /opt/temurin/ /opt/java/openjdk/
+RUN java -version && grep -Fx 'IMPLEMENTOR_VERSION="Temurin-25.0.5.1+2"' /opt/java/openjdk/release
 WORKDIR /app
 RUN addgroup --system playsay && adduser --system --ingroup playsay playsay
 COPY api-gateway/build/libs/*.jar /app/app.jar

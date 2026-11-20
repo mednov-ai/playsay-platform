@@ -7,8 +7,8 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <keycloak.version>26.8.1</keycloak.version>
-    <quarkus.version>3.40.1</quarkus.version>
+    <keycloak.version>26.8.2</keycloak.version>
+    <quarkus.version>3.40.1.1</quarkus.version>
     <netty.version>4.1.139.Final</netty.version>
     <vertx.version>4.5.35</vertx.version>
     <kc.home.dir>${project.build.directory}/kc</kc.home.dir>

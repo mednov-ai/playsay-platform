@@ -676,6 +676,418 @@
       "evidence": "docs/security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary",
       "owner": "Project owner",
       "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:compileClasspath",
+        "playsay-backend-build-logic:precompiledScriptPluginAccessorsGenerationClasspath",
+        "playsay-backend-build-logic:runtimeClasspath",
+        "playsay-backend-build-logic:testCompileClasspath",
+        "playsay-backend-build-logic:testRuntimeClasspath"
+      ],
+      "packageUrl": "pkg:maven/io.spring.gradle/dependency-management-plugin@1.1.7",
+      "sha256": "9e885eec4fc0b7152a7bba1664004085c6663a3c93b0a62463be7308b005be4c",
+      "file": "dependency-management-plugin-1.1.7.jar",
+      "cves": [
+        "CVE-2016-9878",
+        "CVE-2018-11040",
+        "CVE-2018-1270",
+        "CVE-2022-22965",
+        "CVE-2024-22259",
+        "CVE-2026-47884",
+        "CVE-2026-47886",
+        "CVE-2026-47891",
+        "CVE-2026-47893",
+        "CVE-2026-59282",
+        "CVE-2026-59283"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:kotlinBuildToolsApiClasspath",
+        "playsay-backend-build-logic:kotlinCompilerClasspath",
+        "playsay-backend-build-logic:kotlinKlibCommonizerClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@1.6.10",
+      "sha256": "3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203",
+      "file": "kotlin-reflect-1.6.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:runtimeClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.1.21",
+      "sha256": "bcd75a36ca4ad8e06117214ed807f8dea2fe61a71e07f91ca14f4335024b8463",
+      "file": "kotlin-reflect-2.1.21.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:runtimeClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.1.21",
+      "sha256": "263bdc679e1f62012db7b091796279b6d71cf36f4797a98ff1ace05835f201c8",
+      "file": "kotlin-stdlib-2.1.21.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:precompiledScriptPluginAccessorsGenerationClasspath",
+        "playsay-backend-build-logic:runtimeClasspath",
+        "playsay-backend-build-logic:testRuntimeClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7@1.8.0",
+      "sha256": "4c889d1d9803f5f2eb6c1592a6b7e62369ac7660c9eee15aba16fec059163666",
+      "file": "kotlin-stdlib-jdk7-1.8.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-direct",
+      "build": "playsay-backend-build-logic",
+      "project": ":",
+      "projectReferences": [
+        "playsay-backend-build-logic:precompiledScriptPluginAccessorsGenerationClasspath",
+        "playsay-backend-build-logic:runtimeClasspath",
+        "playsay-backend-build-logic:testRuntimeClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@1.8.0",
+      "sha256": "05b62804441b0c9a1920b6b7d5cf7329a4e24b6258478e32b1f046ca01900946",
+      "file": "kotlin-stdlib-jdk8-1.8.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-api@2.4.0",
+      "sha256": "66917335497f9ab75a36c34b3d90bad2bc8dc256c34b2413ecd0c9467fcf597d",
+      "file": "kotlin-build-tools-api-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":email-service",
+        ":integration-support",
+        ":keyboard-service",
+        ":media-service",
+        ":openai-support",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-cri-impl@2.4.0",
+      "sha256": "5168b866945f6ac1ffcb6d4c88cf582497249469c2e4a4eafc0bcd35b5a264a9",
+      "file": "kotlin-build-tools-cri-impl-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":email-service",
+        ":integration-support",
+        ":keyboard-service",
+        ":media-service",
+        ":openai-support",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-build-tools-impl@2.4.0",
+      "sha256": "076c0a7f84d303f1e390774410c8678b8b584faa3f642435f93d2e4e81dabe7c",
+      "file": "kotlin-build-tools-impl-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-embeddable@2.4.0",
+      "sha256": "c2b25e8c1c93ec416ba4327f5e31eaec0f0c8847241b9353e294b8db9dce564f",
+      "file": "kotlin-compiler-embeddable-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":ai-tutor-service",
+        ":api-gateway",
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":email-service",
+        ":integration-support",
+        ":keyboard-service",
+        ":media-service",
+        ":openai-support",
+        ":payment-service",
+        ":registration-service",
+        ":vocabulary-service",
+        ":worksheet-import-service"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-compiler-runner@2.4.0",
+      "sha256": "ad9608152740e92d94a278b4ff2ca82c4bf5ff8ef219220e3c07aeb554638cee",
+      "file": "kotlin-compiler-runner-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-client@2.4.0",
+      "sha256": "f546f0b3699c4984f320dd03080de05cad61064208ba8f37df0d3f8f4a7fd14a",
+      "file": "kotlin-daemon-client-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-daemon-embeddable@2.4.0",
+      "sha256": "383093af5e078435b60043d19bfa83eb6191be0f4d13a28fb1c8a0f3ab24fe66",
+      "file": "kotlin-daemon-embeddable-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath",
+        "kotlinBuildToolsApiClasspath",
+        "kotlinCompilerClasspath",
+        "kotlinKlibCommonizerClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-reflect@1.6.10",
+      "sha256": "3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203",
+      "file": "kotlin-reflect-1.6.10.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-script-runtime@2.4.0",
+      "sha256": "196e8ecbf63daf477e34e67c2f871ee232ae7bf8b377432d876d1bbf9d273de3",
+      "file": "kotlin-script-runtime-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
+    },
+    {
+      "kind": "build-only-kotlin",
+      "build": "playsay-backend",
+      "projects": [
+        ":architecture-testkit",
+        ":contracts:email-internal-contract",
+        ":contracts:media-internal-contract",
+        ":contracts:payment-internal-contract",
+        ":contracts:registration-internal-contract",
+        ":contracts:worksheet-import-internal-contract",
+        ":integration-support",
+        ":openai-support"
+      ],
+      "configurations": [
+        "kotlinAbiValidationCompatClasspath"
+      ],
+      "packageUrl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.4.0",
+      "sha256": "ccb14ff83fabcb11458b798dbc9824748ccdffeec79c9aba789e6ed1cda86b1c",
+      "file": "kotlin-stdlib-2.4.0.jar",
+      "cves": [
+        "CVE-2026-53914"
+      ],
+      "evidence": "docs/dependency-security.md#kotlin-compiler-and-gradle-plugin-runtime-boundary",
+      "owner": "Project owner",
+      "approvedOn": "2026-10-14"
     }
   ]
 }

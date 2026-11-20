@@ -46,7 +46,7 @@ tasks.withType<BootJar>().configureEach {
         val document = JsonSlurper().parse(runtimeScopePolicy) as Map<*, *>
         val blocked = (document["rules"] as List<*>).mapNotNull { value ->
             val rule = value as? Map<*, *> ?: return@mapNotNull null
-            (rule["sha256"] as? String)?.takeIf { rule["kind"] in setOf("build-only-direct", "build-only-detekt") }
+            (rule["sha256"] as? String)?.takeIf { rule["kind"] in setOf("build-only-direct", "build-only-detekt", "build-only-kotlin") }
         }.toSet()
         check(blocked.isNotEmpty()) { "Missing build-only runtime-boundary evidence" }
         ZipFile(archiveFile.get().asFile).use { archive ->

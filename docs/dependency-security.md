@@ -76,3 +76,9 @@ policy; the scanner enforces this before publication and the runtime-scope
 tests verify the boundary logic. The current
 [stack-upgrade evidence](security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary)
 retains the candidate-specific inventories and explains the limits.
+
+## Kotlin compiler and Gradle plugin runtime boundary
+
+Jenkins gateway builds 248 and 249 reported 83 blocking rows in backend and 16 in build-logic on 2026-11-20. They reference 15 distinct artifacts. The gateway archive contained 188 nested libraries. None matched those artifacts by name or SHA-256. The nine runtime classpaths in the gateway build also contained none of the reported hashes. A separate inventory of all backend modules identified the projects and Kotlin compiler configurations in the policy.
+
+For each new build, the gate verifies the advisory, exact Maven package and file hash, and the complete set of configuration references for each project. Kotlin ABI validation and compiler tools can appear in the explicitly listed tool configurations. The dependency-management plugin and its build dependencies have separate references in the Gradle plugin build. The gate compares every selected server runtime by both coordinate and hash. Keycloak also checks its server dependencies. A production classpath match, an incomplete inventory, or a new reference keeps the finding blocking. The Boot JAR and Keycloak image builds verify the package hashes again. Raw advisories remain in the scan reports.

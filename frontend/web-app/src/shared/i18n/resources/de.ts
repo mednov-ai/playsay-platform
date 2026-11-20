@@ -1776,6 +1776,9 @@ export const de = {
       lesson: "Stunde",
     },
     annotation: {
+      materialChanged: "Das Material wurde gewechselt. Ihre Änderungen sind in diesem Tab gespeichert.",
+      recoverDraft: "Meine Änderungen wiederherstellen",
+      recoverFailed: "Die Wiederherstellung ist fehlgeschlagen. Ihr Entwurf ist weiterhin in diesem Tab verfügbar.",
       toolbar: "Aufgabenwerkzeuge",
       pointer: "Zeiger",
       pen: "Stift",

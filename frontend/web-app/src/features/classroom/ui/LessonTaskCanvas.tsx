@@ -89,6 +89,7 @@ function revealStageTop(node: HTMLElement, stage: HTMLElement, top: number): num
 }
 
 export function LessonTaskCanvas({
+  actorSubject,
   annotationSync,
   readOnlyAnnotation,
   collaborationControls,
@@ -109,6 +110,7 @@ export function LessonTaskCanvas({
   onPresentationModeChange,
   viewportSync,
 }: {
+  actorSubject?: string | null;
   annotationSync?: LiveAnnotationSync | null;
   readOnlyAnnotation?: { elements: AnnotationElement[]; activePageId: string };
   canControlPages?: boolean;
@@ -137,6 +139,8 @@ export function LessonTaskCanvas({
   const firstPageId = document?.pages[0]?.id ?? null;
   const {
     activePageId,
+    conflictDraftAvailable,
+    recoverConflictDraft,
     addMindMapNode,
     annotationColor,
     annotationElements,
@@ -169,9 +173,12 @@ export function LessonTaskCanvas({
     updateSelectedFontSize,
     updateSelectedStrokeWidth,
   } = useLessonAnnotation({
+    actorSubject,
     controlledAnnotation: readOnlyAnnotation ? { key: "unallocated", elements: readOnlyAnnotation.elements, setElements: () => undefined } : undefined,
     initialPageId: readOnlyAnnotation?.activePageId ?? firstPageId, lessonId, liveAnnotation: annotationSync, materialId: material?.id,
   });
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [answers, setAnswers] = useState<MaterialAnswerState>({});
   const effectiveAnswers = exerciseSync?.answers ?? answers;
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
@@ -707,6 +714,16 @@ export function LessonTaskCanvas({
 
   return (
     <div className="playsay-task-board" data-presentation-mode={presentationMode} data-read-only={readOnlyAnnotation ? "true" : undefined}>
+      {conflictDraftAvailable && !readOnlyAnnotation ? (
+        <div className="playsay-annotation-recovery">
+          <span role="status" aria-live="polite" aria-atomic="true">{t(recoveryFailed ? "classroom.annotation.recoverFailed" : "classroom.annotation.materialChanged")}</span>
+          <Button type="button" variant="outline" disabled={recovering || (annotationSync != null && !annotationSync.ready)} onClick={async () => {
+            setRecovering(true);
+            setRecoveryFailed(false);
+            try { await recoverConflictDraft(); } catch { setRecoveryFailed(true); } finally { setRecovering(false); }
+          }}>{t("classroom.annotation.recoverDraft")}</Button>
+        </div>
+      ) : null}
       {!readOnlyAnnotation && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
         <AnnotationToolbar
           annotationColor={annotationColor}

@@ -299,6 +299,7 @@ data class MaterialSubmissionResponse(
 
 data class MaterialAnnotationRequest(
     val content: JsonNode,
+    val expectedMaterialId: UUID? = null,
 )
 
 data class UnallocatedAnnotationSnapshotPage(@field:ArraySchema(maxItems = 5) val items: List<MaterialAnnotationResponse>, val hasNext: Boolean)

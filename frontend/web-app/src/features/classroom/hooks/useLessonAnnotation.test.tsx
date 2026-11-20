@@ -2,6 +2,7 @@
 import { useState, type PointerEvent } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AnnotationHandoff } from "./annotationHandoff";
 import { useLessonAnnotation } from "./useLessonAnnotation";
 import type { AnnotationElement } from "../model/annotation";
 const api = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn() }));
@@ -9,12 +10,15 @@ vi.mock("../../../shared/api/playsay", () => ({
   fetchScheduledLessonMaterialAnnotation: api.fetch,
   saveScheduledLessonMaterialAnnotation: api.save,
 }));
+import { ApiError } from "../../../shared/api/errors";
+import { clearConflictDrafts } from "./annotationConflictDrafts";
+
 const original: AnnotationElement = {
   id: "text-1", kind: "text", text: "Before", pageId: "page-1", anchorId: "jpeg-1",
   x: 10, y: 10, width: 72, height: 56, fontSize: 18, color: "#ff5c00",
   fill: "transparent", autoHeight: true, autoWidth: true, createdAt: 1,
 };
-const response = (text: string) => ({ content: { schemaVersion: 7, activePageId: "page-1", elements: [{ ...original, text }] } });
+const response = (text: string, materialId = "material-1") => ({ materialId, content: { schemaVersion: 7, activePageId: "page-1", elements: [{ ...original, text }] } });
 beforeEach(() => { vi.useFakeTimers(); api.fetch.mockReset().mockResolvedValue(response("Before")); api.save.mockReset().mockResolvedValue({}); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -108,7 +112,7 @@ describe("local to live handoff", () => {
     api.fetch.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
     const { result, rerender } = renderHook(({ live }) => {
       const [elements, setElements] = useState<AnnotationElement[]>([{ ...original, id: "other", text: "Student note" }]);
-      return useLessonAnnotation({ lessonId: "lesson", materialId: "material", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready: true } : null });
+      return useLessonAnnotation({ lessonId: "lesson", materialId: "material-1", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready: true } : null });
     }, { initialProps: { live: false } });
     act(() => result.current.setAnnotationTool("text"));
     act(() => result.current.beginAnnotation(pointer(100, 150), "jpeg-1"));
@@ -151,7 +155,7 @@ describe("handoff field and context isolation", () => {
   it("merges only edited fields into the current live element once", async () => {
     const { result, rerender } = renderHook(({ live, ready }) => {
       const [elements, setElements] = useState<AnnotationElement[]>([{ ...original, x: 400, color: "#123456" }]);
-      return { ...useLessonAnnotation({ lessonId: "lesson", materialId: "material", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready } : null }), remote: setElements };
+      return { ...useLessonAnnotation({ lessonId: "lesson", materialId: "material-1", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready } : null }), remote: setElements };
     }, { initialProps: { live: false, ready: false } });
     await act(async () => {});
     act(() => result.current.beginTextEditing(original.id));
@@ -174,7 +178,7 @@ describe("handoff field and context isolation", () => {
   it("does not restore a live element observed deleted before handoff readiness", async () => {
     const { result, rerender } = renderHook(({ live, ready }) => {
       const [elements, setElements] = useState<AnnotationElement[]>([original]);
-      return { ...useLessonAnnotation({ lessonId: "lesson", materialId: "material", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready } : null }), remote: setElements };
+      return { ...useLessonAnnotation({ lessonId: "lesson", materialId: "material-1", initialPageId: "page-1", liveAnnotation: live ? { elements, setElements, ready } : null }), remote: setElements };
     }, { initialProps: { live: false, ready: false } });
     await act(async () => {});
     act(() => result.current.updateAnnotationText(original.id, "Pending local edit"));
@@ -200,10 +204,10 @@ describe("handoff field and context isolation", () => {
   });
 
   it("drops queued REST writes when another material replaces the canvas in the same lesson", async () => {
-    const { result, rerender } = renderHook(({ materialId }) => useLessonAnnotation({ lessonId: "lesson", materialId, initialPageId: "page-1" }), { initialProps: { materialId: "first" } });
+    const { result, rerender } = renderHook(({ materialId }) => useLessonAnnotation({ lessonId: "lesson", materialId, initialPageId: "page-1" }), { initialProps: { materialId: "material-1" } });
     await act(async () => {});
     act(() => result.current.updateAnnotationText(original.id, "First material only"));
-    api.fetch.mockResolvedValueOnce(response("Second material"));
+    api.fetch.mockResolvedValueOnce(response("Second material", "second"));
     rerender({ materialId: "second" });
     await act(async () => { vi.advanceTimersByTime(500); });
     expect(api.save).not.toHaveBeenCalled();
@@ -257,7 +261,7 @@ describe("Text edit boundaries", () => {
 
 describe("fallback persistence", () => {
   it("persists deletion of the final element on the default page", async () => {
-    api.fetch.mockResolvedValue({ content: { activePageId: "material", elements: [{ ...original, pageId: "material" }] } });
+    api.fetch.mockResolvedValue({ materialId: "material-1", content: { activePageId: "material", elements: [{ ...original, pageId: "material" }] } });
     const { result } = renderHook(() => useLessonAnnotation({ lessonId: "lesson-1", materialId: "material-1" }));
     await act(async () => {});
     act(() => result.current.setSelectedElementId("text-1"));
@@ -310,4 +314,69 @@ describe("fallback persistence", () => {
     expect(result.current.annotationElements[0]).toMatchObject({ text: "Second lesson" });
     expect(api.save.mock.calls.some((call) => call[0] === "lesson-2")).toBe(false);
   });
+});
+
+it("retains a late conflict under its original actor and material until explicit recovery", async () => {
+  let rejectSave!: (error: Error) => void;
+  let assigned = "a";
+  api.fetch.mockImplementation(async () => ({ ...response("Saved"), materialId: assigned }));
+  api.save.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectSave = reject; }));
+  const { result, rerender } = renderHook(({ materialId }) => useLessonAnnotation({
+    actorSubject: "student", lessonId: "lesson", materialId,
+  }), { initialProps: { materialId: "a" } });
+  await act(async () => {});
+  act(() => result.current.updateAnnotationText(original.id, "My edit"));
+  await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+  expect(api.save).toHaveBeenCalledWith("lesson", expect.objectContaining({ expectedMaterialId: "a" }));
+  assigned = "b";
+  rerender({ materialId: "b" });
+  await act(async () => {
+    rejectSave(new ApiError(409, "ANNOTATION_MATERIAL_CHANGED", "changed"));
+    await vi.advanceTimersByTimeAsync(4000);
+  });
+  expect(api.save).toHaveBeenCalledTimes(1);
+  expect(result.current.conflictDraftAvailable).toBe(false);
+  assigned = "a";
+  rerender({ materialId: "a" });
+  await act(async () => {});
+  expect(result.current.conflictDraftAvailable).toBe(true);
+  await act(async () => { await result.current.recoverConflictDraft(); });
+  expect(api.save).toHaveBeenCalledTimes(2);
+  expect(result.current.annotationElements[0]).toMatchObject({ text: "My edit" });
+  expect(result.current.conflictDraftAvailable).toBe(false);
+  act(clearConflictDrafts);
+});
+
+it("discards queued writes on identity change and ignores conflicts received after logout", async () => {
+  let reject!: (error: Error) => void;
+  api.save.mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+  const { result, rerender } = renderHook(({ actor }) => useLessonAnnotation({
+    actorSubject: actor, lessonId: "lesson", materialId: "material-1",
+  }), { initialProps: { actor: "teacher-a" } });
+  await act(async () => {});
+  act(() => result.current.updateAnnotationText(original.id, "Old identity"));
+  await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+  act(() => result.current.updateAnnotationText(original.id, "Pending at logout"));
+  act(clearConflictDrafts);
+  rerender({ actor: "teacher-b" });
+  await act(async () => {
+    reject(new ApiError(409, "ANNOTATION_MATERIAL_CHANGED", "changed"));
+    await vi.advanceTimersByTimeAsync(4000);
+  });
+  expect(result.current.conflictDraftAvailable).toBe(false);
+  expect(api.save).toHaveBeenCalledTimes(1);
+  rerender({ actor: "teacher-a" });
+  await act(async () => {});
+  expect(result.current.conflictDraftAvailable).toBe(false);
+});
+
+it("consumes the handoff once and preserves additions and deletions in the current document", () => {
+  const removed = { ...original, id: "removed" };
+  const added = { ...original, id: "added" };
+  const handoff = new AnnotationHandoff([original, removed], [{ ...original, text: "Latest" }, removed], [original, removed]);
+  const apply = handoff.take()!;
+  expect(apply([original, added]).map(e => [e.id, e.kind === "text" && e.text]).sort()).toEqual([
+    ["added", "Before"], ["text-1", "Latest"],
+  ]);
+  expect(handoff.take()).toBeNull();
 });

@@ -169,6 +169,45 @@ class LessonWhiteboardServiceTest @Autowired constructor(
         assertEquals(4, index.list(teacher, MaterialLibraryQuery(category = "ALL", query = "Find result", limit = 2)).total)
     }
 
+    @Test fun `library pages follow the same roster and delegation decisions as board reads`() {
+        val (lesson, teacher, students) = fixture("PARALLEL")
+        val candidates = students.map { service.ensure(teacher, lesson.id, it.token.requireSubject()) }
+        val delegate = user("TEACHER")
+        val outsider = auth(user("TEACHER"))
+        val admin = auth(user("ADMIN"))
+        val jdbc = org.springframework.jdbc.core.JdbcTemplate(dataSource)
+        val grant = UUID.randomUUID()
+        val now = Instant.now()
+        jdbc.update("""insert into teacher_delegation(id,primary_teacher_user_id,delegate_teacher_user_id,starts_at,
+            ends_at,source_kind,created_by_user_id,created_at) values (?,?,?,?,?,'MANUAL',?,?)""",
+            grant, lesson.teacherUserId, delegate.id, now.minusSeconds(5), now.plusSeconds(500), lesson.teacherUserId, now)
+        for (student in students) {
+            val id = users.findByKeycloakSubject(student.token.requireSubject())!!.id
+            jdbc.update("insert into teacher_delegation_student(id,delegation_id,student_user_id,created_at) values (?,?,?,?)",
+                UUID.randomUUID(), grant, id, now)
+        }
+        fun checkViewer(actor: JwtAuthenticationToken, expected: Set<UUID>) {
+            val actual = candidates.filter { runCatching { service.get(actor, lesson.id, it.id) }.isSuccess }.map { it.id }.toSet()
+            assertEquals(expected, actual)
+            val query = MaterialLibraryQuery(category = "LESSON", kind = "LESSON_WHITEBOARD", limit = 200)
+            val page = index.list(actor, query)
+            assertEquals(actual, page.items.filter { it.lessonId == lesson.id }.map { it.id }.toSet())
+            assertEquals(page.items.size, page.total)
+            assertTrue(index.list(actor, query.copy(offset = page.total)).items.isEmpty())
+        }
+        val both = candidates.map { it.id }.toSet()
+        checkViewer(admin, both)
+        checkViewer(teacher, both)
+        checkViewer(auth(delegate), both)
+        checkViewer(outsider, emptySet())
+        students.forEachIndexed { i, student -> checkViewer(student, setOf(candidates[i].id)) }
+        jdbc.update("update teacher_delegation set revoked_at=? where id=?", now, grant)
+        checkViewer(auth(delegate), emptySet())
+        jdbc.update("insert into lesson_admission(id,lesson_id,subject,status,revision,created_at,updated_at,row_version) values(?,?,?,'KICKED',1,?,?,0)",
+            UUID.randomUUID(), lesson.id, students.first().token.requireSubject(), now, now)
+        checkViewer(students.first(), emptySet())
+    }
+
     @Test fun `database rejects material-less ordinary documents and invalid board context`() {
         val (lesson, teacher, _) = fixture()
         val board = service.ensure(teacher, lesson.id, null)

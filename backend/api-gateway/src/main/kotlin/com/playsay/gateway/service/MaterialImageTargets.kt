@@ -19,6 +19,7 @@ internal data class MaterialImageTarget(
     val imageUrlField: String,
     val node: ObjectNode,
     val previousAssetId: UUID?,
+    val positional: Boolean,
 )
 
 internal fun materialImageTargets(
@@ -74,6 +75,7 @@ internal fun materialImageTargets(
                             imageUrlField = "url",
                             node = blockObject,
                             previousAssetId = decision.previousAssetId,
+                            positional = blockObject.path("id").asText("").isBlank(),
                         ),
                     )
                 }
@@ -122,6 +124,7 @@ internal fun materialImageTargets(
                                 imageUrlField = "imageUrl",
                                 node = pairObject,
                                 previousAssetId = decision.previousAssetId,
+                                positional = blockObject.path("id").asText("").isBlank() || pairObject.path("id").asText("").isBlank(),
                             ),
                         )
                     }

@@ -44,7 +44,7 @@ try {
     await context.route(url=>url.pathname.startsWith('/api/'),route=>{
      const url=route.request().url();
      const room=new URL(route.request().frame().url()).searchParams.get('room');
-     route.fulfill({json:url.endsWith('/token')?{websocketUrl:socketUrl,documentId:room,yjsDocumentId:room,token:'synthetic'}:url.includes('material-annotation')?{content:{activePageId:'page-1',elements:[]}}:[]});
+     route.fulfill({json:url.endsWith('/token')?{websocketUrl:socketUrl,documentId:room,yjsDocumentId:room,token:'synthetic'}:url.includes('material-annotation')?{materialId:'image',content:{activePageId:'page-1',elements:[]}}:[]});
     });
     const teacher=await context.newPage(); const student=await context.newPage();
     teacher.on('pageerror',e=>{errors.push(e.message);console.log('PAGE',e.message)});teacher.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text())});student.on('pageerror',e=>errors.push(e.message));

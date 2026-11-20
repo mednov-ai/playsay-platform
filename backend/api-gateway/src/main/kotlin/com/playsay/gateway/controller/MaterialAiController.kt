@@ -92,6 +92,7 @@ class MaterialAiController(
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Lesson material with generated images"),
+            ApiResponse(responseCode = "409", description = "An image target changed during generation", content = [Content()]),
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
             ApiResponse(responseCode = "403", description = "Current user cannot edit material", content = [Content()]),
             ApiResponse(responseCode = "404", description = "Material not found", content = [Content()]),

@@ -478,6 +478,7 @@ export function LessonWorkspace({
                 teacherName={session.teacherName ?? displayName}
                 teacherSubject={session.teacherSubject}
               /> : <LessonTaskCanvas
+                actorSubject={profile?.subject ?? session.identity}
                 canControlPages={!isParallelWork}
                 collaborationControls={null}
                 lessonId={session.lessonId}

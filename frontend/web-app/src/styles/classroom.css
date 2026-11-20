@@ -3469,3 +3469,11 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 
 .playsay-classroom-primary .playsay-workbench[data-library-game-covered=true]{flex:0 0 auto}
 .playsay-workbench[data-library-game-covered=true]>:not(.playsay-whiteboard-tabs){display:none!important}
+
+.playsay-annotation-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem 1rem;
+  padding: .5rem 1rem;
+}

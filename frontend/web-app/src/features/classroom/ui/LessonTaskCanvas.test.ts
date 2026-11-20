@@ -230,6 +230,7 @@ beforeEach(() => {
     value: MouseEvent,
   });
   apiMocks.fetchAnnotation.mockResolvedValue({
+    materialId: material.id,
     content: {
       activePageId: "page-1",
       coordinateSpace: "material-page",
@@ -540,6 +541,7 @@ describe("LessonTaskCanvas", () => {
 
   it("keeps anchored text aligned while a focused image scrolls", async () => {
     apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      materialId: flowImageMaterial.id,
       content: {
         activePageId: "page-1",
         coordinateSpace: "material-page",
@@ -624,6 +626,7 @@ describe("LessonTaskCanvas", () => {
 
   it("reanchors a legacy page element when it is selected over a flow image", async () => {
     apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      materialId: flowImageMaterial.id,
       content: {
         activePageId: "page-1",
         coordinateSpace: "material-page",
@@ -685,6 +688,7 @@ describe("LessonTaskCanvas", () => {
   it("does not let a stale REST annotation replace connected live elements", async () => {
     const setElements = vi.fn();
     apiMocks.fetchAnnotation.mockResolvedValueOnce({
+      materialId: material.id,
       content: {
         activePageId: "page-1",
         coordinateSpace: "material-page",
@@ -1270,6 +1274,7 @@ describe("LessonTaskCanvas", () => {
 
   it("erases a sparse stroke by crossing the middle of its segment while pressed", async () => {
     apiMocks.fetchAnnotation.mockResolvedValue({
+    materialId: material.id,
       content: {
         activePageId: "page-1",
         coordinateSpace: "material-page",
@@ -1340,7 +1345,7 @@ describe("LessonTaskCanvas", () => {
       return domRect({ height: 0, left: 0, top: 0, width: 0 });
     });
     let resolvePoll!: (value: unknown) => void;
-    apiMocks.fetchAnnotation.mockResolvedValueOnce({ content: { activePageId: "page-static", elements: [] } })
+    apiMocks.fetchAnnotation.mockResolvedValueOnce({ materialId: staticImageMaterial.id, content: { activePageId: "page-static", elements: [] } })
       .mockImplementationOnce(() => new Promise((resolve) => { resolvePoll = resolve; }));
     const jpeg = { ...staticImageMaterial, document: { pages: [{ ...staticImageMaterial.document.pages[0], blocks: [{ ...staticImageMaterial.document.pages[0].blocks[0], url: "https://example.test/worksheet.jpeg" }] }] } };
     const { container, unmount } = render(createElement(StudentLiveWorkspace, {

@@ -414,6 +414,8 @@ paths:
                 $ref: "#/components/schemas/MaterialAnnotationResponse"
         "400":
           description: Invalid annotation payload
+        "409":
+          description: The assigned material differs from expectedMaterialId
         "401":
           description: Missing or invalid bearer token
         "404":
@@ -2591,6 +2593,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LessonMaterialResponse"
+        "409":
+          description: An image target changed during generation
         "401":
           description: Missing or invalid bearer token
         "403":
@@ -7315,6 +7319,11 @@ components:
       properties:
         content:
           $ref: "#/components/schemas/JsonNode"
+        expectedMaterialId:
+          type:
+          - string
+          - "null"
+          format: uuid
       required:
       - content
     MaterialAnnotationResponse:

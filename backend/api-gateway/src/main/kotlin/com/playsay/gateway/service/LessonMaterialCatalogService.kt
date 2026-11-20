@@ -112,7 +112,7 @@ class LessonMaterialCatalogService(
     ): LessonMaterialResponse {
         requireEditable(authentication, materialId, MetaData.ErrorCodes.MATERIAL_EDIT_FORBIDDEN)
         val values = materialRequestValidator.validate(request)
-        val entity = lessonMaterialRepo.findById(materialId).orElse(null)
+        val entity = lessonMaterialRepo.lockById(materialId)
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         gameReferences?.validate(values.document, objectMapper.readTree(entity.document))
         YoutubeVideoSupport.clearMetadataForChangedSources(objectMapper.readTree(entity.document), values.document)
@@ -168,6 +168,12 @@ class LessonMaterialCatalogService(
     fun requireActive(materialId: UUID): LessonMaterialRow =
         requireExisting(materialId).takeIf { material -> material.status != MetaData.MaterialStatuses.ARCHIVED }
             ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+
+    @Transactional
+    fun lockForAssetUpdate(materialId: UUID) {
+        lessonMaterialRepo.lockById(materialId)
+            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
+    }
 
     @Transactional(readOnly = true)
     fun requireEditable(

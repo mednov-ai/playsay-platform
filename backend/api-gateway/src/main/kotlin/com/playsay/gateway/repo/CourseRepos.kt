@@ -4,9 +4,11 @@ import com.playsay.gateway.entity.CourseEntity
 import com.playsay.gateway.entity.CurriculumTopicEntity
 import com.playsay.gateway.entity.LessonTemplateCardEntity
 import com.playsay.gateway.entity.LessonTemplateEntity
+import jakarta.persistence.LockModeType
 import java.time.Instant
 import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 
 data class CourseSummaryRow(
@@ -95,6 +97,10 @@ interface CurriculumTopicRepo : JpaRepository<CurriculumTopicEntity, UUID> {
 }
 
 interface LessonTemplateRepo : JpaRepository<LessonTemplateEntity, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select t from LessonTemplateEntity t where t.id = :id")
+    fun lockForMaterialRead(id: UUID): LessonTemplateEntity?
+
     fun deleteByCourseId(courseId: UUID): Long
 
     fun deleteByIdAndCourseId(id: UUID, courseId: UUID): Long

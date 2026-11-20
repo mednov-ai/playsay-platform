@@ -714,16 +714,6 @@ export function LessonTaskCanvas({
 
   return (
     <div className="playsay-task-board" data-presentation-mode={presentationMode} data-read-only={readOnlyAnnotation ? "true" : undefined}>
-      {conflictDraftAvailable && !readOnlyAnnotation ? (
-        <div className="playsay-annotation-recovery">
-          <span role="status" aria-live="polite" aria-atomic="true">{t(recoveryFailed ? "classroom.annotation.recoverFailed" : "classroom.annotation.materialChanged")}</span>
-          <Button type="button" variant="outline" disabled={recovering || (annotationSync != null && !annotationSync.ready)} onClick={async () => {
-            setRecovering(true);
-            setRecoveryFailed(false);
-            try { await recoverConflictDraft(); } catch { setRecoveryFailed(true); } finally { setRecovering(false); }
-          }}>{t("classroom.annotation.recoverDraft")}</Button>
-        </div>
-      ) : null}
       {!readOnlyAnnotation && presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
         <AnnotationToolbar
           annotationColor={annotationColor}
@@ -745,6 +735,16 @@ export function LessonTaskCanvas({
 
       <div className="playsay-task-page">
         <div className="playsay-task-document" ref={taskDocumentRef}>
+          {conflictDraftAvailable && !readOnlyAnnotation ? (
+            <div className="playsay-task-collaboration-status playsay-annotation-recovery">
+              <span role="status" aria-live="polite" aria-atomic="true">{t(recoveryFailed ? "classroom.annotation.recoverFailed" : "classroom.annotation.materialChanged")}</span>
+              <Button type="button" variant="outline" disabled={recovering || (annotationSync != null && !annotationSync.ready)} onClick={async () => {
+                setRecovering(true);
+                setRecoveryFailed(false);
+                try { await recoverConflictDraft(); } catch { setRecoveryFailed(true); } finally { setRecovering(false); }
+              }}>{t("classroom.annotation.recoverDraft")}</Button>
+            </div>
+          ) : null}
       {annotationSync?.status === "error" || annotationSync?.status === "reconnecting" || annotationSync?.status === "disconnected" ? (
         <div className="playsay-task-collaboration-status" role="status">
           <span>{t("classroom.collaborationRecovery.unsaved")}</span>

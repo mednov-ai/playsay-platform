@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
 import {
   fetchScheduledLessonMaterialAnnotation,
   saveScheduledLessonMaterialAnnotation,
@@ -31,6 +31,8 @@ import {
   type AnnotationTool,
 } from "../model/annotation";
 
+import { draftSession, forgetConflictDraft, readConflictDraft, retainConflictDraft, subscribeConflictDrafts } from "./annotationConflictDrafts";
+import { AnnotationHandoff, mergeLocalDraft } from "./annotationHandoff";
 import { createAnnotationPersistence } from "./annotationPersistence";
 
 type LiveAnnotationSync = {
@@ -76,12 +78,14 @@ type ActiveInteraction =
 
 export function useLessonAnnotation({
   controlledAnnotation,
+  actorSubject,
   initialPageId,
   liveAnnotation,
   lessonId,
   materialId,
 }: {
   controlledAnnotation?: ControlledAnnotationSync | null;
+  actorSubject?: string | null;
   initialPageId?: string | null;
   liveAnnotation?: LiveAnnotationSync | null;
   lessonId: string;
@@ -105,9 +109,9 @@ export function useLessonAnnotation({
   const localDraftRef = useRef<AnnotationElement[]>([]);
   const localBaselineRef = useRef<AnnotationElement[]>([]);
   const localDirtyRef = useRef(false);
-  const persistenceTargetRef = useRef({ lessonId, materialId, live: Boolean(liveAnnotation) });
+  const persistenceTargetRef = useRef({ actorSubject, lessonId, materialId, live: Boolean(liveAnnotation) });
   const contextRef = useRef<string | null>(null);
-  const handoffRef = useRef<{ baseline: AnnotationElement[]; draft: AnnotationElement[]; observedIds: Set<string> } | null>(null);
+  const handoffRef = useRef<AnnotationHandoff | null>(null);
   const legacySeedRef = useRef<AnnotationContent | null>(null);
   const liveAnnotationRef = useRef<LiveAnnotationSync | null>(liveAnnotation ?? null);
   const liveElementCountRef = useRef(0);
@@ -119,15 +123,14 @@ export function useLessonAnnotation({
   const textEditBeforeRef = useRef<AnnotationElement | null>(null);
   const undoHistoryRef = useRef<AnnotationHistoryEntry[]>([]);
   const pendingHandoff = handoffPending ? handoffRef.current : null;
-  const deletedHandoffIds = new Set(pendingHandoff && liveAnnotation
-    ? [...pendingHandoff.observedIds].filter((id) => !liveAnnotation.elements.some((element) => element.id === id))
-    : []);
   const annotationElements = controlledAnnotation?.elements ?? (liveAnnotation && pendingHandoff
-    ? mergeLocalDraft(liveAnnotation.elements, pendingHandoff.baseline, localAnnotationElements, deletedHandoffIds)
+    ? pendingHandoff.merge(liveAnnotation.elements, localAnnotationElements)
     : liveAnnotation?.elements ?? localAnnotationElements);
   const setAnnotationElements = controlledAnnotation?.setElements ?? liveAnnotation?.setElements ?? setLocalAnnotationElements;
   const normalizedInitialPageId = initialPageId?.trim() || defaultAnnotationPageId;
-  const annotationContextKey = JSON.stringify([lessonId, materialId, controlledAnnotation?.key, normalizedInitialPageId]);
+  const draftKey = JSON.stringify([actorSubject, lessonId, materialId, controlledAnnotation?.key]);
+  const conflictDraft = useSyncExternalStore(subscribeConflictDrafts, () => readConflictDraft(draftKey), () => undefined);
+  const annotationContextKey = JSON.stringify([actorSubject, lessonId, materialId, controlledAnnotation?.key, normalizedInitialPageId]);
   const selectedFontElement = selectedElementId
     ? annotationElements.find((element): element is Extract<AnnotationElement, { kind: "mindMapNode" | "text" }> => (
         element.id === selectedElementId && (element.kind === "text" || element.kind === "mindMapNode")
@@ -137,8 +140,8 @@ export function useLessonAnnotation({
 
   useLayoutEffect(() => {
     liveAnnotationRef.current = liveAnnotation ?? null;
-    persistenceTargetRef.current = { lessonId, materialId, live: Boolean(liveAnnotation) };
-  }, [lessonId, materialId, liveAnnotation]);
+    persistenceTargetRef.current = { actorSubject, lessonId, materialId, live: Boolean(liveAnnotation) };
+  }, [actorSubject, lessonId, materialId, liveAnnotation]);
 
   useEffect(() => {
     elementsRef.current = annotationElements;
@@ -149,6 +152,7 @@ export function useLessonAnnotation({
   }, [liveAnnotation?.elements.length]);
 
   useEffect(() => () => {
+    contextRef.current = null;
     if (pointerFrameRef.current !== null) {
       cancelScheduledPointerFrame(pointerFrameRef.current);
       pointerFrameRef.current = null;
@@ -187,14 +191,14 @@ export function useLessonAnnotation({
     }
     if (hasLiveAnnotation) {
       if (sameContext && localDirtyRef.current) {
-        handoffRef.current = { baseline: localBaselineRef.current, draft: localDraftRef.current, observedIds: new Set(liveAnnotationRef.current?.elements.map((element) => element.id)) };
+        handoffRef.current = new AnnotationHandoff(localBaselineRef.current, localDraftRef.current, liveAnnotationRef.current?.elements ?? []);
         setHandoffPending(!liveAnnotationRef.current?.ready);
         seedLiveAnnotation();
         return;
       }
       let cancelled = false;
       void fetchScheduledLessonMaterialAnnotation(lessonId).then((annotation) => {
-        if (cancelled) return;
+        if (cancelled || (annotation?.materialId !== materialId)) return;
         legacySeedRef.current = annotationContentFromJson(annotation?.content, normalizedInitialPageId);
         seedLiveAnnotation();
       }).catch(() => {
@@ -202,12 +206,17 @@ export function useLessonAnnotation({
       });
       return () => { cancelled = true; };
     }
+    const session = draftSession();
     const persistence = createAnnotationPersistence({
       load: async () => {
         const annotation = await fetchScheduledLessonMaterialAnnotation(lessonId);
+        if (annotation?.materialId !== materialId) throw new Error("Material assignment changed");
         return annotationContentFromJson(annotation?.content, normalizedInitialPageId);
       },
-      save: (content) => saveScheduledLessonMaterialAnnotation(lessonId, { content }),
+      save: (content) => saveScheduledLessonMaterialAnnotation(lessonId, { content, expectedMaterialId: materialId }),
+      onConflict: (baseline, content) => {
+        if (actorSubject) retainConflictDraft(draftKey, session, { baseline, content: annotationContentFromJson(content) });
+      },
       onLoad: (content) => {
         localBaselineRef.current = content.elements;
         localDirtyRef.current = false;
@@ -219,9 +228,38 @@ export function useLessonAnnotation({
     return () => {
       localPersistenceRef.current = null;
       const target = persistenceTargetRef.current;
-      persistence.close({ discardPending: target.live || (target.lessonId === lessonId && target.materialId !== materialId) });
+      persistence.close({ discardPending: target.live || target.actorSubject !== actorSubject || session !== draftSession() || (target.lessonId === lessonId && target.materialId !== materialId) });
     };
-  }, [controlledAnnotation?.key, hasLiveAnnotation, lessonId, materialId, normalizedInitialPageId]);
+  }, [actorSubject, controlledAnnotation?.key, draftKey, hasLiveAnnotation, lessonId, materialId, normalizedInitialPageId]);
+
+  async function recoverConflictDraft() {
+    if (!actorSubject || !conflictDraft || !materialId || controlledAnnotation) return;
+    const session = draftSession();
+    const context = annotationContextKey;
+    const fresh = await fetchScheduledLessonMaterialAnnotation(lessonId);
+    if (session !== draftSession() || contextRef.current !== context || fresh?.materialId !== materialId ||
+        readConflictDraft(draftKey) !== conflictDraft) return;
+    const merge = (current: AnnotationElement[]) => {
+      const present = new Set(current.map((element) => element.id));
+      const deleted = new Set(conflictDraft.baseline.elements.filter((element) => !present.has(element.id)).map((element) => element.id));
+      return mergeLocalDraft(current, conflictDraft.baseline.elements, conflictDraft.content.elements, deleted);
+    };
+    const live = liveAnnotationRef.current;
+    if (live) {
+      if (!live.ready) return;
+      live.setElements(merge);
+    } else {
+      const current = annotationContentFromJson(fresh.content);
+      const restored = merge(current.elements);
+      const body = annotationContentFromElements(restored, current.activePageId);
+      await saveScheduledLessonMaterialAnnotation(lessonId, { expectedMaterialId: materialId, content: body });
+      if (session !== draftSession() || contextRef.current !== context || readConflictDraft(draftKey) !== conflictDraft) return;
+      localPersistenceRef.current?.resume(annotationContentFromJson(body));
+      localBaselineRef.current = restored;
+      replaceLocalElements(restored);
+    }
+    forgetConflictDraft(draftKey, conflictDraft);
+  }
 
   function seedLiveAnnotation() {
     const live = liveAnnotationRef.current;
@@ -229,13 +267,12 @@ export function useLessonAnnotation({
     if (!live || liveSeedAttemptedRef.current) return;
     const handoff = handoffRef.current;
     if (handoff) {
-      const liveIds = new Set(live.elements.map((element) => element.id));
-      const deletedIds = new Set([...handoff.observedIds].filter((id) => !liveIds.has(id)));
       if (!live.ready) {
-        live.elements.forEach((element) => handoff.observedIds.add(element.id));
+        handoff.observe(live.elements);
         return;
       }
-      live.setElements((current) => mergeLocalDraft(current, handoff.baseline, handoff.draft, deletedIds));
+      const transfer = handoff.take();
+      if (transfer) live.setElements(transfer);
       handoffRef.current = null;
       setHandoffPending(false);
       localDirtyRef.current = false;
@@ -270,10 +307,7 @@ export function useLessonAnnotation({
     if (handoff && liveAnnotationRef.current && !liveAnnotationRef.current.ready) {
       const current = elementsRef.current;
       const next = [...updater(current)].sort(compareAnnotationElements);
-      const baselineIds = new Set(handoff.baseline.map((element) => element.id));
-      handoff.baseline = [...handoff.baseline, ...liveAnnotationRef.current.elements.filter((element) => !baselineIds.has(element.id))];
-      handoff.draft = mergeLocalDraft(handoff.draft, current, next, deletedHandoffIds);
-      replaceLocalElements(handoff.draft);
+      replaceLocalElements(handoff.edit(current, next, liveAnnotationRef.current.elements));
       return;
     }
     if (liveAnnotationRef.current) {
@@ -990,6 +1024,8 @@ export function useLessonAnnotation({
 
   return {
     activePageId,
+    conflictDraftAvailable: Boolean(conflictDraft),
+    recoverConflictDraft,
     addMindMapNode,
     annotationColor,
     annotationElements,
@@ -1135,22 +1171,3 @@ function cancelScheduledPointerFrame(frameId: number) {
 const defaultAnnotationPageId = "material";
 const historyLimit = 50;
 const minimumCreatedSize = 36;
-
-// Transfer only locally changed fields; concurrent live elements and fields remain authoritative.
-function mergeLocalDraft(current: AnnotationElement[], baseline: AnnotationElement[], draft: AnnotationElement[], deletedIds: Set<string>): AnnotationElement[] {
-  const before = new Map(baseline.map((element) => [element.id, element]));
-  const after = new Map(draft.map((element) => [element.id, element]));
-  const result = current.filter((element) => !before.has(element.id) || after.has(element.id));
-  for (const element of draft) {
-    if (deletedIds.has(element.id)) continue;
-    const original = before.get(element.id);
-    const index = result.findIndex((candidate) => candidate.id === element.id);
-    if (JSON.stringify(original) === JSON.stringify(element)) continue;
-    if (index === -1) { result.push(element); continue; }
-    const patch = Object.fromEntries(Object.entries(element).filter(([key, value]) => (
-      !original || JSON.stringify(value) !== JSON.stringify(original[key as keyof AnnotationElement])
-    )));
-    result[index] = { ...result[index], ...patch } as AnnotationElement;
-  }
-  return result.sort(compareAnnotationElements);
-}

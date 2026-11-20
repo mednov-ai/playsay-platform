@@ -22,3 +22,9 @@ envelope. Photo-based material drafts accept a source image up to 20 MiB,
 continue to resize and compress it in the browser, and use a 3 MiB JSON
 envelope on the draft endpoint. Pixel, authorization, content, PDF and packet
 checks remain in force.
+
+## Generating illustrations
+
+The synchronous generation endpoint takes a snapshot of eligible blocks and pairs, then calls the provider and uploads each result under a distinct private storage key outside the database transaction. Publication locks the material, checks current edit permission and matches the whole batch against the latest document. Changes to generation inputs, an ambiguous or missing target, or competing regeneration return `409 MATERIAL_IMAGE_TARGET_CHANGED`. Unrelated edits remain in the returned document. Regeneration preserves the public asset ID, existing references and custom tags.
+
+The additive `material_image_object_cleanup` table records staged keys before upload. Publication releases those keys in the same database transaction as the document update. A recurring collector checks asset and game-blob references before deleting eligible abandoned or superseded objects. Previously published keys have a grace interval for readers. During a writer rollback, finish or reconcile in-flight generation before switching writers.

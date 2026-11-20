@@ -255,4 +255,18 @@
     <cve>CVE-2022-27449</cve>
     <cve>CVE-2023-5157</cve>
   </suppress>
+  <suppress until="2026-12-20Z">
+    <notes><![CDATA[Owner: Honey School platform maintainers. Reviewed 2026-11-20. The 11 Java classes in the packaged Quarkus JDBC extension are identical to those in 3.40.1. Exact Central artifact SHA-256 8d91e418094ceddadd851477616e8f4d67d9a755a8cd0afde63d3224c8cc7dca. These advisory records describe database server/client binaries, native PCRE or distro installation scripts. The JAR contains Quarkus integration classes and no bundled driver or native database binary. Evidence: https://github.com/quarkusio/quarkus/tree/3.40.1.1/extensions/jdbc/jdbc-mariadb/runtime and https://repo.maven.apache.org/maven2/io/quarkus/quarkus-jdbc-mariadb/3.40.1.1/ .]]></notes>
+    <packageUrl>pkg:maven/io.quarkus/quarkus-jdbc-mariadb@3.40.1.1</packageUrl>
+    <cve>CVE-2014-0001</cve>
+    <cve>CVE-2015-2325</cve>
+    <cve>CVE-2017-15365</cve>
+    <cve>CVE-2017-15945</cve>
+    <cve>CVE-2017-3302</cve>
+    <cve>CVE-2020-28912</cve>
+    <cve>CVE-2021-46669</cve>
+    <cve>CVE-2022-27385</cve>
+    <cve>CVE-2022-27449</cve>
+    <cve>CVE-2023-5157</cve>
+  </suppress>
 </suppressions>

@@ -146,6 +146,7 @@ export function StudentLiveWorkspace({
       {parallelWork && !groupAnnotationDocumentState.document ? (
         !groupAnnotationDocumentState.error ? <div role="status">{t("classroom.material.loading")}</div> : null
       ) : <LessonTaskCanvas
+        actorSubject={profileSubject}
         collaborationControls={studentSubject ? null : undefined}
         lessonId={lessonId}
         material={material}

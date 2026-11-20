@@ -82,12 +82,13 @@ abstract class MaterialControllerTestFixture {
     @BeforeAll
     fun migrateDatabase() {
         synchronized(migrationLock) {
-            if (!databaseMigrated) {
+            val url = dataSource.connection.use { it.metaData.url }
+            if (url !in migratedDatabases) {
                 SpringLiquibase().apply {
                     this.dataSource = this@MaterialControllerTestFixture.dataSource
                     changeLog = "classpath:db/changelog/db.changelog-master.xml"
                 }.afterPropertiesSet()
-                databaseMigrated = true
+                migratedDatabases.add(url)
             }
         }
     }
@@ -150,6 +151,6 @@ abstract class MaterialControllerTestFixture {
 
     private companion object {
         val migrationLock = Any()
-        var databaseMigrated = false
+        val migratedDatabases = mutableSetOf<String>()
     }
 }

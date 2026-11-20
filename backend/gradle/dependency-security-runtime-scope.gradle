@@ -3,20 +3,24 @@ return { String build, String project, Map dependency, String cve, Map configura
     rules.find { rule ->
         def refs = dependency.projectReferences ?: []
         def packages = (dependency.packages ?: []).collect { it.id }
-        if (rule.kind in ['build-only-direct', 'build-only-detekt']) {
+        if (rule.kind in ['build-only-direct', 'build-only-detekt', 'build-only-kotlin']) {
             def directBuildLogic = rule.kind == 'build-only-direct' && build == 'playsay-backend-build-logic' &&
                 rule.build == build && rule.project == project && project == ':'
             def detektOnly = rule.kind == 'build-only-detekt' && build == 'playsay-backend' &&
                 rule.build == build && rule.projects?.contains(project) && rule.configuration == 'detekt'
-            def expectedRefs = directBuildLogic ? rule.projectReferences : [project.substring(1) + ':detekt']
-            def prefix = directBuildLogic ? build + ':' : project.substring(1) + ':'
-            if ((!directBuildLogic && !detektOnly) ||
+            def compilerOnly = rule.kind == 'build-only-kotlin' && build == 'playsay-backend' &&
+                rule.build == build && rule.projects.contains(project)
+            // Dependency-Check writes the Gradle project name, including for nested contracts.
+            def prefix = directBuildLogic ? build + ':' : project.substring(project.lastIndexOf(':') + 1) + ':'
+            def expectedConfigs = compilerOnly ? rule.configurations : ['detekt']
+            def expectedRefs = directBuildLogic ? rule.projectReferences : expectedConfigs.collect { prefix + it }
+            if ((!directBuildLogic && !detektOnly && !compilerOnly) ||
                 !rule.cves.contains(cve) || packages != [rule.packageUrl] || dependency.sha256 != rule.sha256 ||
                 dependency.fileName != rule.file || refs.toList().sort() != expectedRefs.toList().sort() ||
                 !(backendCoverage?.modules instanceof List) || backendCoverage.modules.empty ||
                 !(backendCoverage.build in ['playsay-backend', 'keycloak-lesson-authenticator'])) return false
             def moduleNames = backendCoverage.modules.collect { it.project } as Set
-            if (detektOnly && !moduleNames.contains(project)) return false
+            if (!directBuildLogic && (backendCoverage.build != build || !moduleNames.contains(project))) return false
             if (backendCoverage.selection == 'all') {
                 if (!(backendCoverage.discoveredProjects instanceof List) ||
                     moduleNames != (backendCoverage.discoveredProjects as Set)) return false

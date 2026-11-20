@@ -44,6 +44,7 @@ class LessonMaterialStore(
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val lessonMaterialAuthoringService: LessonMaterialAuthoringService,
+    private val imagePublication: MaterialImagePublicationService,
     private val materialAssetService: MaterialAssetService,
     private val materialDocumentAssetService: MaterialDocumentAssetService,
     private val materialReadAccessPolicy: MaterialReadAccessPolicy,
@@ -175,19 +176,11 @@ class LessonMaterialStore(
         return lessonMaterialAuthoringService.draftFromUrl(request)
     }
 
-    @Transactional
     fun generateImages(
         authentication: JwtAuthenticationToken,
         materialId: UUID,
         request: MaterialGenerateImagesRequest,
-    ): LessonMaterialResponse {
-        val material = lessonMaterialCatalogService.requireEditable(
-            authentication,
-            materialId,
-            MetaData.ErrorCodes.MATERIAL_IMAGES_FORBIDDEN,
-        )
-        return lessonMaterialAuthoringService.generateImages(material, request)
-    }
+    ): LessonMaterialResponse = imagePublication.generate(authentication, materialId, request)
 
     @Transactional
     fun suggestAcceptedAnswers(
@@ -230,6 +223,7 @@ class LessonMaterialStore(
         assetId: UUID,
         request: MaterialAssetUpdateRequest,
     ): MaterialAssetResponse {
+        lessonMaterialCatalogService.lockForAssetUpdate(materialId)
         lessonMaterialCatalogService.requireEditable(
             authentication,
             materialId,

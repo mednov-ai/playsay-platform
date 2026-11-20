@@ -1,50 +1,38 @@
 package com.playsay.gateway.service
 
-import com.playsay.gateway.dto.MaterialLibraryItemResponse
 import com.playsay.gateway.dto.MaterialLibraryPageResponse
 import com.playsay.gateway.dto.MaterialLibraryQuery
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.repo.CollaborationDocumentRepo
-import com.playsay.gateway.repo.LessonWhiteboardRepo
-import com.playsay.gateway.repo.schedule.LessonRepo
+import com.playsay.gateway.repo.AppUserRepo
+import com.playsay.gateway.repo.LibraryViewer
+import com.playsay.gateway.repo.MaterialLibraryPageRepo
 import com.playsay.gateway.utils.MetaData
+import com.playsay.gateway.utils.requireSubject
+import com.playsay.gateway.utils.toApplicationRoles
+import java.time.Clock
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class MaterialLibraryIndexService(
-    private val materials: LessonMaterialCatalogService,
-    private val boards: LessonWhiteboardRepo,
-    private val access: WhiteboardAccessService,
-    private val documents: CollaborationDocumentRepo,
-    private val lessons: LessonRepo,
+    private val pages: MaterialLibraryPageRepo,
+    private val profiles: UserProfileStore,
+    private val users: AppUserRepo,
+    private val clock: Clock,
 ) {
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun list(authentication: JwtAuthenticationToken, query: MaterialLibraryQuery): MaterialLibraryPageResponse {
         validate(query)
-        val reusable = if (query.kind == "LESSON_WHITEBOARD") emptyList() else materialSummaries(authentication)
-        val lessonBoards = if (query.category == "STUDY" || query.kind == "MATERIAL") emptyList() else boardSummaries(authentication)
-        val filtered = (reusable + lessonBoards).asSequence().filter { it.matches(query) }
-            .sortedWith(compareByDescending<MaterialLibraryItemResponse> { it.updatedAt }.thenBy { it.kind }.thenBy { it.id })
-            .toList()
-        return MaterialLibraryPageResponse(filtered.drop(query.offset).take(query.limit), filtered.size, query.offset, query.limit)
-    }
-
-    private fun materialSummaries(authentication: JwtAuthenticationToken) = materials.list(authentication).map {
-        MaterialLibraryItemResponse(it.id, "MATERIAL", it.title, it.isLessonMaterial, it.updatedAt,
-            createdAt = it.createdAt, cefrLevel = it.cefrLevel, topicTags = it.topicTags, skillTags = it.skillTags,
-            ageBand = it.ageBand, estimatedDurationMin = it.estimatedDurationMin, status = it.status)
-    }
-
-    private fun boardSummaries(authentication: JwtAuthenticationToken) = boards.findAll().mapNotNull { board ->
-        try {
-            access.requireRead(authentication, board.lessonId, board)
-            val updatedAt = maxOf(board.updatedAt, documents.findById(board.documentId).orElse(null)?.updatedAt ?: board.updatedAt)
-            MaterialLibraryItemResponse(board.id, "LESSON_WHITEBOARD", lessons.findScheduleRowById(board.lessonId)?.lessonTitle,
-                true, updatedAt, lessonId = board.lessonId, createdAt = board.createdAt)
-        } catch (_: ProjectResponseException) { null }
+        val admin = authentication.authorities.any { it.authority == MetaData.Authorities.ADMIN }
+        val teacher = authentication.authorities.any { it.authority == MetaData.Authorities.TEACHER }
+        if (query.kind != "LESSON_WHITEBOARD" && teacher && !admin) profiles.currentUserId(authentication)
+        val actor = users.findByKeycloakSubject(authentication.token.requireSubject())
+        val roles = actor?.roles.toApplicationRoles()
+        val viewer = LibraryViewer(actor?.id, admin, teacher, admin && "ADMIN" in roles, teacher && "TEACHER" in roles)
+        return pages.list(viewer, query, clock.instant())
     }
 
     private fun validate(query: MaterialLibraryQuery) {
@@ -53,11 +41,4 @@ class MaterialLibraryIndexService(
             throw ProjectResponseException.localized(HttpStatus.BAD_REQUEST, MetaData.ErrorCodes.COLLABORATION_SCOPE_INVALID)
         }
     }
-
-    private fun MaterialLibraryItemResponse.matches(query: MaterialLibraryQuery): Boolean =
-        (query.category == "ALL" || isLessonMaterial == (query.category == "LESSON")) &&
-            (query.level.isNullOrBlank() || cefrLevel.equals(query.level, ignoreCase = true)) &&
-            (query.topic.isNullOrBlank() || topicTags.any { it.contains(query.topic, ignoreCase = true) }) &&
-            (query.skill.isNullOrBlank() || skillTags.any { it.contains(query.skill, ignoreCase = true) }) &&
-            (query.query.isNullOrBlank() || title.orEmpty().contains(query.query, ignoreCase = true))
 }

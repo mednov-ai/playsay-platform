@@ -1776,6 +1776,9 @@ export const en = {
       lesson: "Lesson",
     },
     annotation: {
+      materialChanged: "The material changed. Your edits are still in this tab.",
+      recoverDraft: "Recover my edits",
+      recoverFailed: "Could not recover the edits. Your draft is still in this tab.",
       toolbar: "Task tools",
       pointer: "Pointer",
       pen: "Pen",

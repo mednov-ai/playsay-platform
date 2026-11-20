@@ -69,15 +69,16 @@ rules.findAll { it.kind == 'build-only-direct' }.each { r ->
     assert !classify(r.build, r.project, dep, r.cves[0], configs, rules, keycloakMissingServer)
     checks += 18
 }
-rules.findAll { it.kind == 'build-only-detekt' }.each { r ->
+rules.findAll { it.kind in ['build-only-detekt', 'build-only-kotlin'] }.each { r ->
     def purl = r.packageUrl =~ /^pkg:maven\/([^\/]+)\/([^@]+)@(.+)$/
     assert purl.matches()
     def coordinate = "${purl[0][1]}:${purl[0][2]}:${purl[0][3]}"
     def artifact = [coordinate: coordinate, file: r.file, sha256: r.sha256, directory: false]
-    def configs = [detekt: [artifact]]
+    def scopeNames = r.configurations ?: ['detekt']
+    def configs = scopeNames.collectEntries { name -> [(name): [artifact]] }
     r.projects.each { project ->
         def dep = [fileName: r.file, sha256: r.sha256, packages: [[id: r.packageUrl]],
-                   projectReferences: [project.substring(1) + ':detekt']]
+                   projectReferences: scopeNames.collect { project.tokenize(':').last() + ':' + it }]
         def coverage = [build: 'playsay-backend', selection: project.substring(1),
             discoveredProjects: [project], modules: [[project: project,
                 configurations: [[name: 'runtimeClasspath', artifacts: []]]]]]
@@ -94,10 +95,11 @@ rules.findAll { it.kind == 'build-only-detekt' }.each { r ->
         def missingProject = coverage + [selection: 'other-service',
             modules: [[project: ':other-service', configurations: [[name: 'runtimeClasspath', artifacts: []]]]]]
         assert !classify(r.build, project, dep, r.cves[0], configs, rules, missingProject)
-        checks += 9
+        assert !classify(r.build, project, dep + [projectReferences: dep.projectReferences + ['another:detekt']], r.cves[0], configs, rules, coverage)
+        checks += 10
     }
 }
-def expectedBuildOnly = rules.findAll { it.kind in ['build-only-direct', 'build-only-detekt'] }.collect { it.sha256 }.toSet()
+def expectedBuildOnly = rules.findAll { it.kind in ['build-only-direct', 'build-only-detekt', 'build-only-kotlin'] }.collect { it.sha256 }.toSet()
 def imageBoundary = new File(root, 'backend/keycloak-lesson-authenticator/server-runtime/build-only-risk-sha256.txt')
     .readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }.toSet()
 assert !expectedBuildOnly.empty && imageBoundary == expectedBuildOnly

@@ -32,3 +32,13 @@ tasks.withType<Test> {
     maxHeapSize = "512m"
     jvmArgs("-XX:MaxMetaspaceSize=256m")
 }
+
+// This image uses the module directory as its Docker context.
+val prepareDockerRuntime by tasks.registering(Copy::class) {
+    from(rootProject.file("gradle/prepare-temurin-jre.sh"))
+    into(layout.buildDirectory.dir("docker"))
+}
+
+tasks.named("bootJar") {
+    dependsOn(prepareDockerRuntime)
+}

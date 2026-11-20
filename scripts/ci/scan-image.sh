@@ -71,12 +71,16 @@ set -e
 case "$conversion_result" in
   0) ;;
   42)
-    if ! sh "$(dirname "$0")/accept-stack-upgrade-keycloak-findings.sh" \
+    if sh "$(dirname "$0")/accept-stack-upgrade-keycloak-findings.sh" \
       "$REPORT_DIR/blocking.json" "$REPORT_DIR/accepted-stack-hotfix.txt"; then
+      echo "Scoped stack hotfix: exact Keycloak findings accepted by owner; raw report retained."
+    elif sh "$(dirname "$0")/accept-classroom-dev-keycloak-findings.sh" \
+      "$REPORT_DIR/blocking.json" "$REPORT_DIR/accepted-classroom-dev.txt"; then
+      echo "Classroom DEV candidate: five owner-accepted Keycloak OS findings; raw report retained."
+    else
       echo "Blocking findings; image was not published." >&2
       exit 42
     fi
-    echo "Scoped stack hotfix: exact Keycloak findings accepted by owner; raw report retained."
     ;;
   *) echo "Report conversion failed; image was not published." >&2; exit 1 ;;
 esac

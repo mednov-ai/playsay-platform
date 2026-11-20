@@ -76,3 +76,17 @@ policy; the scanner enforces this before publication and the runtime-scope
 tests verify the boundary logic. The current
 [stack-upgrade evidence](security/2026-11-03-stack-upgrade-local.md#jvm-build-only-boundary)
 retains the candidate-specific inventories and explains the limits.
+
+## Kotlin compiler and Gradle plugin runtime boundary
+
+Jenkins gateway builds 248 and 249 reported 83 blocking rows in backend and 16 in build-logic on 2026-11-20. They reference 15 distinct artifacts. The gateway archive contained 188 nested libraries. None matched those artifacts by name or SHA-256. The nine runtime classpaths in the gateway build also contained none of the reported hashes. A separate inventory of all backend modules identified the projects and Kotlin compiler configurations in the policy.
+
+For each new build, the gate verifies the advisory, exact Maven package and file hash, and the complete set of configuration references for each project. Kotlin ABI validation and compiler tools can appear in the explicitly listed tool configurations. The dependency-management plugin and its build dependencies have separate references in the Gradle plugin build. The gate compares every selected server runtime by both coordinate and hash. Keycloak also checks its server dependencies. A production classpath match, an incomplete inventory, or a new reference keeps the finding blocking. The Boot JAR and Keycloak image builds verify the package hashes again. Raw advisories remain in the scan reports.
+
+The runtime images retain the Temurin Ubuntu system libraries. The container download stage installs the official Temurin 25.0.5.1+2 JRE and verifies the published SHA-256 for each architecture supported by the pinned Ubuntu base. The original 25.0.5+8 JRE directory is removed before copying the verified archive. This closes the November 2026 JVM patch gap while the official image tag still ships 25.0.5+8. Remove the download stage when a pinned official image supplies the patched or newer JRE and passes the same checks.
+
+### Classroom DEV Keycloak decision, 20 November 2026
+
+The owner accepted five High OS findings for the current classroom/materials DEV candidate, conditional on successful full scans for all its other affected components. The reviewed Keycloak 26.8.2 base is `quay.io/keycloak/keycloak@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3`. CVE-2026-91403 matches `java-21-openjdk-headless 1:21.0.13.1.2-1.2.el9`. CVE-2026-119373, CVE-2026-119374, CVE-2026-119379 and CVE-2026-119586 match `sqlite-libs 3.34.1-11.el9_8`. These are unresolved runtime findings.
+
+Retain the full dependency, image and blocking reports, the five matched rows, the exact source and image digests for this delivery. Review all other affected components' successful candidate scans before merging the platform PR into develop. The Keycloak check binds the DEV merge to its original develop parent, the reviewed Keycloak source tree and the candidate branch content. Only the candidate scan and this single DEV merge are eligible.

@@ -217,6 +217,7 @@ class ScheduledMaterialController(
         value = [
             ApiResponse(responseCode = "200", description = "Material annotation saved"),
             ApiResponse(responseCode = "400", description = "Invalid annotation payload", content = [Content()]),
+            ApiResponse(responseCode = "409", description = "The assigned material differs from expectedMaterialId", content = [Content()]),
             ApiResponse(responseCode = "401", description = "Missing or invalid bearer token", content = [Content()]),
             ApiResponse(responseCode = "404", description = "Scheduled lesson or material not found", content = [Content()]),
         ],

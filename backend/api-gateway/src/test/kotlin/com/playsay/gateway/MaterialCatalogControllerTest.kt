@@ -36,6 +36,41 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
 class MaterialCatalogControllerTest : MaterialControllerTestFixture() {
+    @Test
+    fun `stale material save cannot write into the new assignment`() {
+        val teacher = authentication(subject = "teacher-1", username = "teacher.one", role = "ROLE_TEACHER")
+        val student = authentication(subject = "student-1", username = "student.one", role = "ROLE_STUDENT")
+        val a = materialCrudController.create(teacher, LessonMaterialRequest(title = "Initial", status = "PUBLISHED")).body!!
+        val b = materialCrudController.create(teacher, LessonMaterialRequest(title = "Next", status = "PUBLISHED")).body!!
+        val lesson = scheduleController.create(teacher, ScheduledLessonRequest(
+            materialId = a.id, scheduledStart = activeLessonStart(), scheduledEnd = activeLessonEnd(),
+            type = "INDIVIDUAL", participantSubjects = listOf("student-1"),
+        )).body!!
+        val content = objectMapper.readTree("""{"schemaVersion":1,"strokes":[{"id":"a"}]}""")
+        val save = MaterialAnnotationRequest(content, a.id)
+        assertEquals(a.id, scheduledMaterialController.saveScheduledLessonMaterialAnnotation(student, lesson.id, save).materialId)
+        val row = lessonRepo.findById(lesson.id).orElseThrow()
+        row.materialId = b.id
+        lessonRepo.saveAndFlush(row)
+        val denied = assertFailsWith<ResponseStatusException> {
+            scheduledMaterialController.saveScheduledLessonMaterialAnnotation(student, lesson.id, save)
+        }
+        assertEquals(HttpStatus.CONFLICT, denied.statusCode)
+        assertEquals(null, lessonMaterialAnnotationRepo.findByLessonIdAndMaterialId(lesson.id, b.id))
+        assertEquals(content, objectMapper.readTree(lessonMaterialAnnotationRepo.findByLessonIdAndMaterialId(lesson.id, a.id)!!.content))
+        assertEquals(b.id, scheduledMaterialController.saveScheduledLessonMaterialAnnotation(student, lesson.id, MaterialAnnotationRequest(content)).materialId)
+        val outsider = authentication(subject = "absent", role = "ROLE_STUDENT")
+        val outsiderError = assertFailsWith<ProjectResponseException> { scheduledMaterialController.saveScheduledLessonMaterialAnnotation(outsider, lesson.id, save) }
+        assertEquals(HttpStatus.NOT_FOUND, outsiderError.statusCode)
+        val jdbc = org.springframework.jdbc.core.JdbcTemplate(dataSource)
+        jdbc.update("insert into lesson_admission(id,lesson_id,subject,status,revision,created_at,updated_at,row_version) values(?,?,?,'KICKED',1,?,?,0)",
+            UUID.randomUUID(), lesson.id, "student-1", Instant.now(), Instant.now())
+        val kickedError = assertFailsWith<ProjectResponseException> { scheduledMaterialController.saveScheduledLessonMaterialAnnotation(student, lesson.id, save) }
+        assertEquals(HttpStatus.FORBIDDEN, kickedError.statusCode)
+        assertTrue(listOf(outsiderError, kickedError).none { it.message.orEmpty().contains(b.id.toString()) })
+
+    }
+
     @Autowired lateinit var parallelAnnotationRepo: LessonMaterialParallelAnnotationRepo
     @Test
     fun `parallel legacy annotations stay teacher-only and student writes are isolated`() {

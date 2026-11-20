@@ -2,23 +2,16 @@ package com.playsay.gateway.service
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.playsay.gateway.dto.LessonMaterialDraftResponse
-import com.playsay.gateway.dto.LessonMaterialResponse
 import com.playsay.gateway.dto.MaterialAiDraftRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionItem
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsRequest
 import com.playsay.gateway.dto.MaterialAnswerSuggestionsResponse
-import com.playsay.gateway.dto.MaterialGenerateImagesRequest
 import com.playsay.gateway.dto.MaterialUrlImportRequest
 import com.playsay.gateway.error.ProjectResponseException
-import com.playsay.gateway.mapper.LessonMaterialResponseMapper
-import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.LessonMaterialRow
 import com.playsay.gateway.utils.MetaData
-import java.time.Instant
-import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -28,15 +21,11 @@ private const val materialUrlImportPromptTextLimit = 6_000
 
 @Component
 class LessonMaterialAuthoringService(
-    private val lessonMaterialRepo: LessonMaterialRepo,
     private val materialAiDraftService: MaterialAiDraftService,
     private val materialAnswerSuggestionService: MaterialAnswerSuggestionService,
-    private val materialImageGenerationService: MaterialImageGenerationService,
     private val materialUrlImportService: MaterialUrlImportService,
     private val messageProvider: MessageProvider,
     private val materialRequestValidator: MaterialRequestValidator,
-    private val lessonMaterialResponseMapper: LessonMaterialResponseMapper,
-    private val materialAssetService: MaterialAssetService,
 ) {
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
 
@@ -95,48 +84,6 @@ class LessonMaterialAuthoringService(
                 sourceTitle = imported.title,
                 sourceFetchedChars = imported.text.length,
             ),
-        )
-    }
-
-    @Transactional
-    fun generateImages(material: LessonMaterialRow, request: MaterialGenerateImagesRequest): LessonMaterialResponse {
-        val blockId = materialRequestValidator.optionalClean(request.blockId, "blockId", 80)
-        val maxImages = (request.maxImages ?: 12).coerceIn(1, 12)
-        val document = objectMapper.readTree(material.document).deepCopy<ObjectNode>()
-        val regenerate = request.regenerate == true
-        val existingAssets = materialAssetService.findAssets(material.id).associateBy { asset -> asset.id }
-        val targets = materialImageTargets(document, blockId, maxImages, regenerate, existingAssets, objectMapper, messageProvider)
-        if (targets.isEmpty()) {
-            return lessonMaterialResponseMapper.toResponse(material)
-        }
-
-        val replacedAssetIds = mutableListOf<UUID>()
-        targets.forEach { target ->
-            val generated = materialImageGenerationService.generate(
-                MaterialImageGenerationInput(
-                    prompt = target.imagePrompt,
-                    alt = target.imageAlt,
-                ),
-            )
-            val assetId = materialAssetService.upsertGeneratedImageAsset(material.id, target, generated)
-            if (target.previousAssetId != null && target.previousAssetId != assetId) {
-                replacedAssetIds.add(target.previousAssetId)
-            }
-            target.node.put(target.imageUrlField, "material-asset:$assetId")
-            target.node.put("imageAlt", target.imageAlt)
-        }
-
-        val entity = lessonMaterialRepo.findById(material.id).orElse(null)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        entity.document = objectMapper.writeValueAsString(document)
-        entity.updatedAt = Instant.now()
-        lessonMaterialRepo.save(entity)
-
-        materialAssetService.cleanupReplacedGeneratedAssets(material.id, replacedAssetIds.distinct())
-
-        return lessonMaterialResponseMapper.toResponse(
-            lessonMaterialRepo.findRowById(material.id)
-                ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND),
         )
     }
 

@@ -7,7 +7,7 @@ RUN gradle --no-daemon clean jar
 
 FROM gradle:8.14.3-jdk21-alpine AS server-runtime-build
 USER root
-# Maven version/checksum match the official Keycloak 26.8.1 wrapper.
+# Maven version/checksum match the official Keycloak 26.8.2 wrapper.
 RUN wget -q https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.zip -O /tmp/maven.zip \
     && printf '%s  %s\n' 'ed41650d42485cfc243fad22158caf9cbb5dc408ce7a09ddb94dd42a019de929ca43065bfa450612cf12bf78b5cafa3884b96c090de326ff590448c933454af3' '/tmp/maven.zip' | sha512sum -c - \
     && unzip -q /tmp/maven.zip -d /opt \
@@ -27,7 +27,7 @@ RUN /opt/apache-maven-3.9.16/bin/mvn -B -ntp -s settings.xml package \
 
 # Rebuild the complete mutable-jar dependency model with patched Netty and Vert.x.
 # Keycloak implementations and runtime OS/JDK remain on the pinned official image.
-FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332 AS keycloak-build
+FROM quay.io/keycloak/keycloak@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3 AS keycloak-build
 RUN rm -rf /opt/keycloak/lib
 COPY --chown=1000:0 --from=server-runtime-build /workspace/server-runtime/target/lib/ /opt/keycloak/lib/
 COPY --chown=1000:0 --from=server-runtime-build /workspace/server-runtime/target/netty-security-inventory.tsv /opt/keycloak/netty-security-inventory.tsv
@@ -40,7 +40,7 @@ RUN touch -m --date=@1743465600 /opt/keycloak/providers/keycloak-lesson-authenti
     && JAVA_OPTS_KC_HEAP="-Xms128m -Xmx512m" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true --cache=local --http-relative-path=/keycloak/ \
     && cd /opt/keycloak && sha256sum -c server-runtime-sha256.txt
 
-FROM quay.io/keycloak/keycloak@sha256:3f3c5f8e03c614774b4bd9173b88391fefa4153bfc010d8012d59ad825377332
+FROM quay.io/keycloak/keycloak@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
 RUN rm -rf /opt/keycloak/lib
 COPY --chown=1000:0 --from=keycloak-build /opt/keycloak/ /opt/keycloak/
 COPY --chown=1000:0 server-runtime/entrypoint.sh /opt/keycloak/bin/playsay-entrypoint.sh

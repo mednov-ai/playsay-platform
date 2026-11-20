@@ -1776,6 +1776,9 @@ export const fr = {
       lesson: "Cours",
     },
     annotation: {
+      materialChanged: "Le support a changé. Vos modifications sont conservées dans cet onglet.",
+      recoverDraft: "Récupérer mes modifications",
+      recoverFailed: "La récupération a échoué. Votre brouillon est conservé dans cet onglet.",
       toolbar: "Outils de l'exercice",
       pointer: "Curseur",
       pen: "Crayon",

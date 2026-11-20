@@ -221,6 +221,12 @@ export function detectTargetsForPaths(paths, options = {}) {
       continue;
     }
 
+    if (path === "contracts/classroom-game-v1.frames.json") {
+      deployTargets.add("web-app");
+      deployTargets.add("collaboration-service");
+      continue;
+    }
+
     if (path === "contracts/openapi.yaml") {
       deployTargets.add("api-gateway");
       deployTargets.add("web-app");

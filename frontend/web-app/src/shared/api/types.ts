@@ -470,6 +470,7 @@ export type LessonMaterialAnnotation = {
 };
 export type LessonMaterialAnnotationInput = {
   content: LessonMaterialJson;
+  expectedMaterialId?: string;
 };
 export type CollaborationDocumentScope = "INDIVIDUAL" | "GROUP";
 export type CollaborationDocument = {

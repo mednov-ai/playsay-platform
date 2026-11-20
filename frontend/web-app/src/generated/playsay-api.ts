@@ -376,6 +376,8 @@ export interface MaterialSubmissionResponse {
 
 export interface MaterialAnnotationRequest {
   content: JsonNode;
+  /** @nullable */
+  expectedMaterialId?: string | null;
 }
 
 export interface MaterialAnnotationResponse {
@@ -3525,10 +3527,15 @@ export type saveScheduledLessonMaterialAnnotationResponse404 = {
   status: 404
 }
 
+export type saveScheduledLessonMaterialAnnotationResponse409 = {
+  data: void
+  status: 409
+}
+
 export type saveScheduledLessonMaterialAnnotationResponseSuccess = (saveScheduledLessonMaterialAnnotationResponse200) & {
   headers: Headers;
 };
-export type saveScheduledLessonMaterialAnnotationResponseError = (saveScheduledLessonMaterialAnnotationResponse400 | saveScheduledLessonMaterialAnnotationResponse401 | saveScheduledLessonMaterialAnnotationResponse404) & {
+export type saveScheduledLessonMaterialAnnotationResponseError = (saveScheduledLessonMaterialAnnotationResponse400 | saveScheduledLessonMaterialAnnotationResponse401 | saveScheduledLessonMaterialAnnotationResponse404 | saveScheduledLessonMaterialAnnotationResponse409) & {
   headers: Headers;
 };
 
@@ -7875,10 +7882,15 @@ export type generateMaterialImagesResponse404 = {
   status: 404
 }
 
+export type generateMaterialImagesResponse409 = {
+  data: void
+  status: 409
+}
+
 export type generateMaterialImagesResponseSuccess = (generateMaterialImagesResponse200) & {
   headers: Headers;
 };
-export type generateMaterialImagesResponseError = (generateMaterialImagesResponse401 | generateMaterialImagesResponse403 | generateMaterialImagesResponse404) & {
+export type generateMaterialImagesResponseError = (generateMaterialImagesResponse401 | generateMaterialImagesResponse403 | generateMaterialImagesResponse404 | generateMaterialImagesResponse409) & {
   headers: Headers;
 };
 

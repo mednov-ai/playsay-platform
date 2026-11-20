@@ -255,3 +255,49 @@ test('legacy aggregate builds scan each image before migrations and pin each sca
   assert.match(content.slice(migrate, update), /assert-current-branch-head\.sh[\s\S]*run-dev-liquibase-job\.sh/);
   assert.equal((content.slice(update).match(/\.image\.digest = strenv\(IMAGE_DIGEST\)/g) ?? []).length, 7);
 });
+
+test('classroom Keycloak accepts only the five DEV findings on its scan and single develop merge', t => {
+  const f = fixture(t);
+  const input = join(f.workspace, 'blocking.json');
+  const output = join(f.workspace, 'accepted.txt');
+  const rows = join(f.workspace, 'canonical-rows');
+  writeFileSync(input, '{}');
+  f.writeExecutable('trivy', 'while [ "$1" != --output ]; do shift; done\ncp "$TEST_ROWS" "$2"');
+  f.writeExecutable('git', `
+shift 2
+case "$*" in
+  'rev-parse HEAD') echo "$TEST_HEAD" ;;
+  'rev-parse HEAD^1') echo "$TEST_PARENT" ;;
+  'rev-parse HEAD:backend/keycloak-lesson-authenticator') echo "$TEST_KEYCLOAK_TREE" ;;
+  'rev-list --parents -n 1 HEAD') echo 'merge base candidate' ;;
+  'rev-parse HEAD^{tree}') echo candidate_tree ;;
+  'rev-parse HEAD^2^{tree}') echo "$TEST_MERGE_TREE" ;;
+  'merge-base --is-ancestor 70048770afd32a652f8e2312769fc6ebf7a970fc HEAD'|'merge-base --is-ancestor 70048770afd32a652f8e2312769fc6ebf7a970fc HEAD^2') exit "$TEST_ANCESTRY" ;;
+  *) exit 1 ;;
+esac`);
+  const matrix = [
+    'os-pkgs|redhat|HIGH|CVE-2026-91403|java-21-openjdk-headless|1:21.0.13.1.2-1.2.el9',
+    ...['119373', '119374', '119379', '119586'].map(id => `os-pkgs|redhat|HIGH|CVE-2026-${id}|sqlite-libs|3.34.1-11.el9_8`),
+  ];
+  const base = { ...f.env, CI_BRANCH: 'develop', SECURITY_SCAN_ONLY: 'false', TEST_ROWS: rows,
+    IMAGE_REPOSITORY: 'ghcr.io/mednov-ai/playsay-keycloak', TEST_HEAD: commit,
+    TEST_PARENT: '7f5562f2d18969dd314270dfbb9e014f489a0a93', TEST_KEYCLOAK_TREE: 'e350f463f465501a29f9e1618c96d52b013dac3b',
+    TEST_ANCESTRY: '0', TEST_MERGE_TREE: 'candidate_tree' };
+  const check = (lines, overrides = {}) => {
+    writeFileSync(rows, lines.join('\n') + '\n');
+    return spawnSync('sh', [join(root, 'scripts/ci/accept-classroom-dev-keycloak-findings.sh'), input, output],
+      { env: { ...base, ...overrides } }).status;
+  };
+  assert.equal(check(matrix), 0);
+  assert.equal(check(matrix, { CI_BRANCH: 'security-check/harden-classroom-and-materials', DEPLOY_TO_DEV: 'false', SECURITY_SCAN_ONLY: 'true' }), 0);
+  for (const overrides of [{ TEST_PARENT: 'later' }, { TEST_KEYCLOAK_TREE: 'other' }, { TEST_ANCESTRY: '1' },
+    { TEST_HEAD: 'other' }, { TEST_MERGE_TREE: 'conflict-resolution' }, { CI_BRANCH: 'unrelated' },
+    { DEPLOY_TO_PROD: 'true' }, { SECURITY_SCAN_ONLY: 'true' }, { IMAGE_REPOSITORY: 'other' }]) {
+    assert.notEqual(check(matrix, overrides), 0, JSON.stringify(overrides));
+  }
+  for (const changed of [matrix.slice(1), [...matrix, matrix[0]], [matrix[1], ...matrix.slice(1)],
+    [matrix[0].replace('HIGH', 'CRITICAL'), ...matrix.slice(1)], [matrix[0].replace('redhat', 'ubuntu'), ...matrix.slice(1)],
+    [matrix[0].replace('el9', 'el10'), ...matrix.slice(1)], [matrix[0].replace('91403', '99999'), ...matrix.slice(1)]]) {
+    assert.notEqual(check(changed), 0);
+  }
+});

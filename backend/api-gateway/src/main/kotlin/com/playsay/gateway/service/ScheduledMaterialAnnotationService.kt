@@ -5,6 +5,7 @@ import com.playsay.gateway.dto.MaterialAnnotationResponse
 import com.playsay.gateway.dto.UnallocatedAnnotationMaterialPage
 import com.playsay.gateway.dto.UnallocatedAnnotationSnapshotPage
 import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.repo.LessonTemplateRepo
 import com.playsay.gateway.repo.ScheduledMaterialLookupRow
 import com.playsay.gateway.repo.schedule.LessonParticipantRepo
 import com.playsay.gateway.repo.schedule.LessonRepo
@@ -23,6 +24,7 @@ private typealias AnnotationScheduledMaterialLookup = ScheduledMaterialLookupRow
 @Suppress("LongParameterList")
 class ScheduledMaterialAnnotationService(
     private val lessonRepo: LessonRepo,
+    private val templates: LessonTemplateRepo,
     private val lessonParticipantRepo: LessonParticipantRepo,
     private val lessonMaterialCatalogService: LessonMaterialCatalogService,
     private val materialAnnotationService: MaterialAnnotationService,
@@ -47,8 +49,11 @@ class ScheduledMaterialAnnotationService(
         lessonId: UUID,
         request: MaterialAnnotationRequest,
     ): MaterialAnnotationResponse {
-        lockScheduledLesson(lessonId)
-        val context = annotationContext(authentication, lessonId)
+        val lesson = lockScheduledLesson(lessonId)
+        if (request.expectedMaterialId != null && lesson.inheritTemplateMaterial && lesson.materialId == null) {
+            lesson.lessonTemplateId?.let(templates::lockForMaterialRead)
+        }
+        val context = annotationContext(authentication, lessonId, request.expectedMaterialId)
         return context.studentUserId?.let { materialAnnotationService.saveParallel(lessonId, context.materialId, it, request) }
             ?: materialAnnotationService.save(lessonId, context.materialId, request)
     }
@@ -114,7 +119,7 @@ class ScheduledMaterialAnnotationService(
 
     private data class AnnotationContext(val materialId: UUID, val studentUserId: UUID?)
 
-    private fun annotationContext(authentication: JwtAuthenticationToken, lessonId: UUID): AnnotationContext {
+    private fun annotationContext(authentication: JwtAuthenticationToken, lessonId: UUID, expectedMaterialId: UUID? = null): AnnotationContext {
         if (admissionGuard.isKicked(lessonId, authentication)) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
@@ -127,35 +132,19 @@ class ScheduledMaterialAnnotationService(
         if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL && manager) {
             throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         }
-        val materialId = materialIdForAccessibleScheduledLesson(authentication, lessonId)
+        if (!manager && (!lookup.isMaterialVisibleToParticipant(clock.instant()) ||
+                !isLessonParticipant(lessonId, authentication.token.requireSubject()))) {
+            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
+        }
         val studentId = if (lookup.workMode == MetaData.LessonWorkModes.PARALLEL) {
             lessonParticipantRepo.findParticipantRowByLessonIdAndSubject(lessonId, authentication.token.requireSubject())?.userId
                 ?: throw ProjectResponseException.localized(HttpStatus.FORBIDDEN, MetaData.ErrorCodes.COLLABORATION_ACCESS_DENIED)
         } else null
+        if (expectedMaterialId != null && expectedMaterialId != lookup.materialId) {
+            throw ProjectResponseException.localized(HttpStatus.CONFLICT, MetaData.ErrorCodes.ANNOTATION_MATERIAL_CHANGED)
+        }
+        val materialId = lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
         return AnnotationContext(materialId, studentId)
-    }
-
-    private fun materialIdForAccessibleScheduledLesson(authentication: JwtAuthenticationToken, lessonId: UUID): UUID {
-        val lookup = accessibleScheduledMaterial(authentication, lessonId)
-        return lookup.materialId ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-    }
-
-    private fun accessibleScheduledMaterial(authentication: JwtAuthenticationToken, lessonId: UUID): AnnotationScheduledMaterialLookup {
-        val lookup = scheduledMaterialLookup(authentication, lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !lookup.isMaterialVisibleToParticipant(clock.instant())) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        }
-
-        if (!lessonMaterialCatalogService.canManageMaterials(authentication) && !isLessonParticipant(lessonId, authentication.token.requireSubject())) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-        }
-
-        if (lookup.materialId == null) {
-            throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.MATERIAL_NOT_FOUND)
-        }
-        return lookup
     }
 
     private fun scheduledMaterialLookup(lessonId: UUID): AnnotationScheduledMaterialLookup? =
@@ -168,10 +157,8 @@ class ScheduledMaterialAnnotationService(
             lessonRepo.findScheduledMaterialLookupForStudent(lessonId, authentication.token.requireSubject())
         }
 
-    private fun lockScheduledLesson(lessonId: UUID) {
-        lessonRepo.lockById(lessonId)
-            ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
-    }
+    private fun lockScheduledLesson(lessonId: UUID) = lessonRepo.lockById(lessonId)
+        ?: throw ProjectResponseException.localized(HttpStatus.NOT_FOUND, MetaData.ErrorCodes.SCHEDULED_LESSON_NOT_FOUND)
 
     private fun isLessonParticipant(lessonId: UUID, subject: String): Boolean =
         lessonParticipantRepo.countByLessonIdAndStudentSubject(lessonId, subject) > 0

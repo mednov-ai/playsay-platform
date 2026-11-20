@@ -255,90 +255,34 @@ class MaterialAssetService(
             ),
         ).toResponse(objectMapper)
 
-    internal fun upsertGeneratedImageAsset(
+    internal fun publishGeneratedImage(
         materialId: UUID,
         target: MaterialImageTarget,
-        generated: GeneratedMaterialImage,
+        image: PreparedMaterialImage,
     ): UUID {
-        val previousAsset = target.previousAssetId
-            ?.let(::findAsset)
-            ?.takeIf { asset -> asset.materialId == materialId && asset.storageKey?.isNotBlank() == true }
-        if (previousAsset != null) {
-            replaceGeneratedImageAsset(previousAsset, target, generated)
-            return previousAsset.id
+        val previous = target.previousAssetId?.let(::findAsset)?.takeIf {
+            it.materialId == materialId && !it.storageKey.isNullOrBlank()
         }
-        return insertGeneratedImageAsset(materialId, target, generated)
-    }
-
-    fun cleanupReplacedGeneratedAssets(materialId: UUID, assetIds: List<UUID>) {
-        assetIds.forEach { assetId ->
-            val asset = findAsset(assetId)?.takeIf { found -> found.materialId == materialId } ?: return@forEach
-            asset.storageKey?.trim()?.takeIf { key -> key.isNotEmpty() }?.let { key ->
-                runCatching { materialObjectStorage.deleteObject(key) }
-            }
-            runCatching { materialAssetRepo.deleteByIdAndMaterialId(assetId, materialId) }
-        }
+        val asset = previous ?: MaterialAssetEntity(materialId = materialId, createdAt = Instant.now())
+        val tags = previous?.let(::materialAssetTags).orEmpty()
+        asset.kind = "GENERATED_IMAGE"
+        asset.storageKey = image.storageKey
+        asset.provider = "AI"
+        asset.externalUrl = null
+        asset.metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, image, tags))
+        return materialAssetRepo.save(asset).id
     }
 
     private fun findAsset(assetId: UUID): StoredMaterialAsset? =
         materialAssetRepo.findById(assetId).orElse(null)
 
-    private fun insertGeneratedImageAsset(
-        materialId: UUID,
-        target: MaterialImageTarget,
-        generated: GeneratedMaterialImage,
-    ): UUID {
-        val id = UUID.randomUUID()
-        val storageKey = "material-assets/$materialId/$id.${generated.mimeType.materialImageExtension()}"
-        try {
-            materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
-            materialAssetRepo.saveAndFlush(
-                MaterialAssetEntity(
-                    id = id,
-                    materialId = materialId,
-                    kind = "GENERATED_IMAGE",
-                    storageKey = storageKey,
-                    externalUrl = null,
-                    provider = "AI",
-                    metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey)),
-                    createdAt = Instant.now(),
-                ),
-            )
-        } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
-        } catch (exception: RuntimeException) {
-            runCatching { materialObjectStorage.deleteObject(storageKey) }
-            throw exception
-        }
-        return id
-    }
-
-    private fun replaceGeneratedImageAsset(
-        asset: StoredMaterialAsset,
-        target: MaterialImageTarget,
-        generated: GeneratedMaterialImage,
-    ) {
-        val storageKey = requireNotNull(asset.storageKey).trim()
-        try {
-            materialObjectStorage.putObject(storageKey, generated.bytes, generated.mimeType)
-            val existingTags = materialAssetTags(asset)
-            asset.kind = "GENERATED_IMAGE"
-            asset.externalUrl = null
-            asset.provider = "AI"
-            asset.metadata = objectMapper.writeValueAsString(generatedImageMetadata(target, generated, storageKey, existingTags))
-            materialAssetRepo.save(asset)
-        } catch (exception: MaterialObjectStorageException) {
-            throw ProjectResponseException.localized(HttpStatus.BAD_GATEWAY, MetaData.ErrorCodes.MATERIAL_ASSET_STORAGE_FAILED)
-        }
-    }
-
     private fun generatedImageMetadata(
         target: MaterialImageTarget,
-        generated: GeneratedMaterialImage,
-        storageKey: String,
+        image: PreparedMaterialImage,
         existingTags: Iterable<String> = emptyList(),
     ): ObjectNode =
         objectMapper.createObjectNode().apply {
+            val generated = image.metadata
             put("targetType", target.targetType)
             put("blockId", target.blockId)
             put("targetId", target.targetId)
@@ -351,8 +295,8 @@ class MaterialAssetService(
             put("prompt", generated.prompt)
             put("model", generated.model)
             put("mimeType", generated.mimeType)
-            put("storageKey", storageKey)
-            put("byteSize", generated.bytes.size)
+            put("storageKey", image.storageKey)
+            put("byteSize", image.byteSize)
             replace("tags", generatedImageTags(target, generated, existingTags))
             generated.revisedPrompt?.let { value -> put("revisedPrompt", value) }
         }

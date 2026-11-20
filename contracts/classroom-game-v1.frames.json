@@ -1,0 +1,140 @@
+{
+  "baseline": "7f5562f2d18969dd314270dfbb9e014f489a0a93",
+  "subprotocol": "playsay-game-v1",
+  "frames": [
+    {
+      "name": "welcome-shadow",
+      "decoded": {
+        "kind": "welcome",
+        "mode": "shadow"
+      },
+      "hex": "030100117b226d6f6465223a22736861646f77227d"
+    },
+    {
+      "name": "welcome-primary",
+      "decoded": {
+        "kind": "welcome",
+        "mode": "primary"
+      },
+      "hex": "030100127b226d6f6465223a227072696d617279227d"
+    },
+    {
+      "name": "action-request",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "action-request",
+          "request": {
+            "actorId": "peer",
+            "blockId": "b",
+            "runId": "r",
+            "eventId": "e",
+            "id": "e",
+            "at": 1,
+            "actorSequence": 1,
+            "type": "tap",
+            "payload": {
+              "x": 1
+            },
+            "gameId": "game",
+            "stateVersion": "1"
+          }
+        }
+      },
+      "hex": "030101c2017b226b696e64223a22616374696f6e2d72657175657374222c2272657175657374223a7b226163746f724964223a2270656572222c22626c6f636b4964223a2262222c2272756e4964223a2272222c226576656e744964223a2265222c226964223a2265222c226174223a312c226163746f7253657175656e6365223a312c2274797065223a22746170222c227061796c6f6164223a7b2278223a317d2c2267616d654964223a2267616d65222c22737461746556657273696f6e223a2231227d7d"
+    },
+    {
+      "name": "ordered-action",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "ordered-action",
+          "action": {
+            "actorId": "peer",
+            "blockId": "b",
+            "runId": "r",
+            "eventId": "e",
+            "id": "e",
+            "at": 1,
+            "actorSequence": 1,
+            "type": "tap",
+            "payload": {
+              "x": 1
+            },
+            "gameId": "game",
+            "stateVersion": "1",
+            "logicalTime": 1,
+            "authorityRevision": 1
+          }
+        }
+      },
+      "hex": "030102e7017b226b696e64223a226f7264657265642d616374696f6e222c22616374696f6e223a7b226163746f724964223a2270656572222c22626c6f636b4964223a2262222c2272756e4964223a2272222c226576656e744964223a2265222c226964223a2265222c226174223a312c226163746f7253657175656e6365223a312c2274797065223a22746170222c227061796c6f6164223a7b2278223a317d2c2267616d654964223a2267616d65222c22737461746556657273696f6e223a2231222c226c6f676963616c54696d65223a312c22617574686f726974795265766973696f6e223a317d7d"
+    },
+    {
+      "name": "effect",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "effect",
+          "effect": {
+            "actorId": "peer",
+            "blockId": "b",
+            "runId": "r",
+            "eventId": "e",
+            "id": "e",
+            "at": 1,
+            "actorSequence": 1,
+            "type": "sound",
+            "payload": {
+              "x": 1
+            },
+            "gameId": "game",
+            "stateVersion": "1"
+          }
+        }
+      },
+      "hex": "030103bb017b226b696e64223a22656666656374222c22656666656374223a7b226163746f724964223a2270656572222c22626c6f636b4964223a2262222c2272756e4964223a2272222c226576656e744964223a2265222c226964223a2265222c226174223a312c226163746f7253657175656e6365223a312c2274797065223a22736f756e64222c227061796c6f6164223a7b2278223a317d2c2267616d654964223a2267616d65222c22737461746556657273696f6e223a2231227d7d"
+    },
+    {
+      "name": "ack",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "ack",
+          "actorId": "peer",
+          "blockId": "b",
+          "runId": "r",
+          "eventId": "e"
+        }
+      },
+      "hex": "030104477b226b696e64223a2261636b222c226163746f724964223a2270656572222c22626c6f636b4964223a2262222c2272756e4964223a2272222c226576656e744964223a2265227d"
+    },
+    {
+      "name": "resume",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "resume",
+          "blockId": "b",
+          "runId": "r",
+          "requesterId": "peer",
+          "lastRevision": 1
+        }
+      },
+      "hex": "030105517b226b696e64223a22726573756d65222c22626c6f636b4964223a2262222c2272756e4964223a2272222c227265717565737465724964223a2270656572222c226c6173745265766973696f6e223a317d"
+    },
+    {
+      "name": "recovery-required",
+      "decoded": {
+        "kind": "message",
+        "message": {
+          "kind": "recovery-required",
+          "blockId": "b",
+          "runId": "r",
+          "requesterId": "peer"
+        }
+      },
+      "hex": "0301064b7b226b696e64223a227265636f766572792d7265717569726564222c22626c6f636b4964223a2262222c2272756e4964223a2272222c227265717565737465724964223a2270656572227d"
+    }
+  ]
+}

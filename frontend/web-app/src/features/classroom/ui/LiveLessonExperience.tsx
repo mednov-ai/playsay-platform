@@ -130,7 +130,7 @@ export function LiveLessonExperience({
   const rawViewportMode = useClassroomViewportMode(groupWorkspace || !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const groupFloating = groupWorkspace && viewportMode !== "desktop";
-  const videoExpanded = !groupFloating && classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
+  const videoExpanded = !externalActivityFocus && !groupFloating && classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
   const tabletFloating = groupFloating || viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
@@ -141,7 +141,7 @@ export function LiveLessonExperience({
       : videoOnly
         ? "videoOnly"
         : "lesson";
-  const showWorkspace = groupFloating || whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const showWorkspace = externalActivityFocus || groupFloating || whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],

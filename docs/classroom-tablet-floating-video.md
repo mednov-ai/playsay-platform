@@ -14,6 +14,6 @@ The production baseline used by this hotfix does not include the standalone whit
 
 ## Adaptive group placement
 
-On desktop the teacher sees full-width learner cards in one column when the whole roster fits at its normal proportions. Reserved learner slots take part in the height calculation before cameras connect. A shorter panel uses equal grid cells.
+On desktop the teacher sees full-width participant cards in one column when the whole roster fits at its normal proportions. Reserved learner slots take part in the height calculation before cameras connect. A shorter panel uses equal grid cells.
 
-During group material work, tablet teachers can dock and resize the whole roster together, with a separate self-preview. On phones the same window carries the roster for a teacher and the pinned teacher for a learner. Placement is evaluated again on rotation and when controls change. If the roster or controls leave no suitable corner, video uses a separate row and the roster can scroll. Screen sharing and external activities keep their presentation priority.
+During group material work, tablet teachers can dock and resize the whole roster together, including their own camera in an equally sized cell. On phones the same window carries the roster for a teacher and the pinned teacher for a learner. Placement is evaluated again on rotation and when controls change. If the roster or controls leave no suitable corner, video uses a separate row and the roster can scroll. Screen sharing and external activities keep their presentation priority.

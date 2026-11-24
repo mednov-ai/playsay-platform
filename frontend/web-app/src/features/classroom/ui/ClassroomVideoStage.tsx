@@ -110,6 +110,10 @@ export function ClassroomVideoStage({
     state: (teacherSubject && participantPresence[teacherSubject]) || "OFFLINE",
   };
   const localCamera = cameraSlots.find(slot => slot.kind === "track" && slot.trackRef.participant.isLocal);
+  const teacherGridSlot: ClassroomVideoSlot = localCamera ?? {
+    kind: "placeholder", subject: teacherSubject ?? "", displayName: teacherName?.trim() || t("classroom.connection.teacher"), state: "ONLINE",
+  };
+  const groupSlots = groupTeacher ? groupRosterSlots(expectedParticipants, cameraSlots, teacherGridSlot) : [];
   const featuredSlot = groupLearner ? pinnedTeacher : cameraSlots[0];
   const stripSlots = groupLearner
     ? (activeScreenShareTrack ? [pinnedTeacher] : cameraSlots.filter(slot => slot !== teacherCamera))
@@ -268,8 +272,7 @@ export function ClassroomVideoStage({
 
   const learnerGrid = groupTeacher && (
     <div className="playsay-group-camera-panel">
-      <GroupLearnerGrid slots={groupRosterSlots(expectedParticipants, cameraSlots)} showLearnerConnectionDots={showLearnerConnectionDots} />
-      {localCamera && <div className="playsay-group-self-preview"><ClassroomVideoSlotView slot={localCamera} /></div>}
+      <GroupLearnerGrid slots={groupSlots} showLearnerConnectionDots={showLearnerConnectionDots} />
     </div>
   );
 
@@ -282,7 +285,7 @@ export function ClassroomVideoStage({
     return (
       <div className="playsay-classroom-conference" data-mode="tablet-floating">
         <div className="playsay-tablet-video-area" data-adaptive={adaptiveFloating}>
-          <ClassroomFloatingWindow adaptive={adaptiveFloating} learnerCount={groupTeacher ? expectedParticipants.length : 0}>
+          <ClassroomFloatingWindow adaptive={adaptiveFloating} participantCount={groupSlots.length}>
             {groupTeacher ? learnerGrid : (
             <div className="playsay-tablet-video-content">
               <div className="playsay-tablet-teacher-video">
@@ -713,12 +716,15 @@ function slotSubject(slot: ClassroomVideoSlot) {
   return slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject;
 }
 
-export function groupRosterSlots(roster: ExpectedParticipant[], slots: ClassroomVideoSlot[]) {
+export function groupRosterSlots(roster: ExpectedParticipant[], slots: ClassroomVideoSlot[], teacher: ClassroomVideoSlot) {
   const bySubject = new Map(slots.map(slot => [slotSubject(slot), slot]));
-  return roster.flatMap(({ subject }) => {
+  const subjects = new Set(roster.map(participant => participant.subject));
+  subjects.delete(slotSubject(teacher));
+  const learners = Array.from(subjects).flatMap(subject => {
     const slot = bySubject.get(subject);
     return slot && (slot.kind === "placeholder" || !slot.trackRef.participant.isLocal) ? [slot] : [];
   });
+  return [...learners, teacher];
 }
 
 export function classroomCameraSlots(

@@ -18,22 +18,43 @@ export const harness = {
     cameras = (reversed ? people.reverse() : people).map(p => track({ ...p, isLocal: p.identity === (teacherView ? teacher.identity : local.identity) }));
     emit();
   },
+  localTeacherCamera: (enabled: boolean) => {
+    cameras = cameras.filter(c => c.participant.identity !== teacher.identity);
+    if (enabled) cameras.push(track({ ...teacher, isLocal: true }));
+    emit();
+  },
   share: (enabled: boolean) => { shares = enabled ? [track(teacher, "screen_share")] : []; emit(); },
   teacherPresent: (enabled: boolean) => { cameras = [track(learner), ...(enabled ? [track(teacher)] : []), track(substitute), track(local)]; emit(); },
-  streamState: () => ({ video: mediaStream?.getVideoTracks()[0]?.readyState ?? null }),
+  streamState: () => ({ video: streams.get(false)?.getVideoTracks()[0]?.readyState ?? null }),
   counts: { roomMounts: 0, roomUnmounts: 0, audioMounts: 0, audioUnmounts: 0 },
 };
-let canvas: HTMLCanvasElement | undefined;
-let mediaStream: MediaStream | undefined;
-function syntheticStream(): MediaStream | undefined {
-  if (mediaStream) return mediaStream;
-  canvas = document.createElement("canvas"); canvas.width = 320; canvas.height = 180;
-  const context = canvas.getContext("2d");
-  if (!context || !canvas.captureStream) return undefined;
-  let frame = 0;
-  setInterval(() => { context.fillStyle = frame++ % 2 ? "#182c40" : "#456790"; context.fillRect(0, 0, 320, 180); }, 100);
-  mediaStream = canvas.captureStream(10);
-  return mediaStream;
+const streams = new Map<boolean, MediaStream>();
+function syntheticStream(portrait: boolean): MediaStream | undefined {
+  const existing = streams.get(portrait);
+  if (existing) return existing;
+  const canvas = document.createElement("canvas");
+  canvas.width = portrait ? 180 : 320;
+  canvas.height = portrait ? 320 : 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !canvas.captureStream) return undefined;
+  const draw = () => {
+    const { width, height } = canvas;
+    ctx.fillStyle = portrait ? "#36635b" : "#385475";
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = "#ffdb66"; ctx.lineWidth = 5;
+    ctx.strokeRect(4, 4, width - 8, height - 8);
+    ctx.save(); ctx.translate(width / 2, height / 2);
+    ctx.fillStyle = "#f7d6bc"; ctx.beginPath(); ctx.ellipse(0, 0, 46, 58, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#242c39";
+    for (const x of [-16, 16]) { ctx.beginPath(); ctx.arc(x, -8, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = "#633d3a"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 9, 18, 0.15, Math.PI - 0.15); ctx.stroke();
+    ctx.restore();
+  };
+  draw(); setInterval(draw, 100);
+  const stream = canvas.captureStream(10);
+  streams.set(portrait, stream);
+  return stream;
 }
 export function LiveKitRoom({ children, className }: { children: ReactNode; className: string }) {
   useEffect(() => { harness.counts.roomMounts++; return () => { harness.counts.roomUnmounts++; }; }, []);
@@ -46,7 +67,8 @@ export function useTracks(sources: Array<{ source: string } | string>) {
 }
 export function ParticipantTile({ trackRef }: { trackRef: ReturnType<typeof track> }) {
   const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => { if (ref.current) { ref.current.srcObject = syntheticStream() ?? null; void ref.current.play().catch(() => undefined); } }, []);
+  const portrait = trackRef.participant.identity === "student-2";
+  useEffect(() => { if (ref.current) { ref.current.srcObject = syntheticStream(portrait) ?? null; void ref.current.play().catch(() => undefined); } }, [portrait]);
   return <div className="lk-participant-tile" data-subject={trackRef.participant.identity}><video className="lk-participant-media-video" autoPlay muted playsInline ref={ref} /><span>{trackRef.participant.name}</span></div>;
 }
 export function RoomAudioRenderer() { useEffect(() => { harness.counts.audioMounts++; return () => { harness.counts.audioUnmounts++; }; }, []); return <audio data-testid="mock-room-audio" />; }

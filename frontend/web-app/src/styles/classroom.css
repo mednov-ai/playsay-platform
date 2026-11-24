@@ -3469,3 +3469,68 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 
 .playsay-classroom-primary .playsay-workbench[data-library-game-covered=true]{flex:0 0 auto}
 .playsay-workbench[data-library-game-covered=true]>:not(.playsay-whiteboard-tabs){display:none!important}
+.playsay-group-camera-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  min-width: 0;
+  gap: .25rem;
+  padding: .25rem;
+  overflow: hidden;
+}
+
+.playsay-group-learner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  align-content: start;
+  gap: .25rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.playsay-group-self-preview {
+  justify-self: end;
+  width: 3rem;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: .375rem;
+}
+
+.playsay-group-self-preview .lk-participant-tile,
+.playsay-group-learner-grid .lk-participant-tile {
+  height: 100%;
+  min-height: 0;
+}
+
+.playsay-group-learner-grid .playsay-video-grid-card {
+  container-type: size;
+  aspect-ratio: 16 / 10;
+  min-height: 5rem;
+}
+
+.playsay-group-learner-grid .playsay-video-presence {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  padding: .125rem .25rem;
+  gap: .125rem;
+  line-height: 1.1;
+}
+
+.playsay-group-learner-grid .playsay-video-presence-icon {
+  width: min(30cqh, 30cqw, 3rem);
+  height: min(30cqh, 30cqw, 3rem);
+}
+
+.playsay-video-focus > .playsay-group-camera-panel,
+.playsay-external-activity-video-overlay > .playsay-group-camera-panel {
+  position: absolute;
+  z-index: 3;
+  inset: auto .5rem .5rem auto;
+  width: min(22rem, 75%);
+  height: min(12rem, 44%);
+  pointer-events: auto;
+  background: var(--playsay-video-chrome-muted);
+}
+.playsay-external-activity-video-overlay > .playsay-group-camera-panel {
+  inset: 4rem .5rem auto auto;
+}

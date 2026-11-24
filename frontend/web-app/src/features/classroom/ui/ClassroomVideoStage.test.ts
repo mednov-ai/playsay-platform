@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ScheduledLesson } from "../../../shared/api/playsay";
 import {
   classroomCameraSlots,
+  groupRosterSlots,
   classroomExternalActivityVideo,
   classroomScreenShareTrack,
   classroomTabletSlots,
@@ -26,6 +27,15 @@ describe("classroomCameraSlots", () => {
       "student-2:CHECKING_DEVICES",
       "teacher-1",
     ]);
+  });
+
+  it("keeps roster cells stable across late join, reorder and reconnect", () => {
+    for (const identities of [["student-2"], ["student-2", "student-1"], ["student-1"], ["student-1", "student-2"]]) {
+      const cameras = [track("teacher", true), ...identities.map(id => track(id, false))];
+      const cells = groupRosterSlots(participants, classroomCameraSlots(cameras, participants, {}, true));
+      expect(cells.map(slot => slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject)).toEqual(["student-1", "student-2"]);
+      expect(cells.filter(slot => slot.kind === "track")).toHaveLength(identities.length);
+    }
   });
 
   it("replaces an expected placeholder with the connected LiveKit participant", () => {

@@ -338,6 +338,10 @@ try {
       await page.evaluate(rev => window.integratedFixture.groupCameras(false, false, rev), reversed);
       const teacher = page.locator(".playsay-tablet-teacher-video, .playsay-video-focus").locator(":scope > [data-subject='teacher-1']");
       await teacher.waitFor({ state: "visible" });
+      assert.ok(await teacher.evaluate(tile => {
+        const r = tile.getBoundingClientRect();
+        return tile.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      }), name + " teacher camera unobscured");
     }
     await page.evaluate(() => {
       window.integratedFixture.groupCameras(true, false, false);
@@ -353,6 +357,11 @@ try {
       approx(rect.height, original[0].height, name + " cell height");
       assert.ok(rect.width > 0 && rect.height >= 75);
     }
+    for (const [i, a] of original.entries()) {
+      for (const b of original.slice(i + 1)) {
+        assert.ok(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1, name + " separate cells");
+      }
+    }
     await offline.scrollIntoViewIfNeeded();
     for (const lang of ["ru", "en", "de", "fr"]) {
       await page.evaluate(lang => window.integratedFixture.setLanguage(lang), lang);
@@ -360,6 +369,8 @@ try {
         const bounds = card.getBoundingClientRect();
         return [...card.querySelector(".playsay-video-presence").children].every(child => {
           const rect = child.getBoundingClientRect();
+          const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          if (!top || !card.contains(top)) return false;
           return rect.width > 0 && rect.height > 0 && rect.top >= bounds.top && rect.bottom <= bounds.bottom && rect.left >= bounds.left && rect.right <= bounds.right;
         });
       }), name + " waiting geometry " + lang);
@@ -369,6 +380,17 @@ try {
       await offline.locator(joined ? "[data-subject='student-3']" : ".playsay-video-presence").waitFor();
       assert.equal(await cards.count(), 3);
       approx((await offline.boundingBox()).width, original[2].width, name + " stable width");
+    }
+    if (process.env.GROUP_LAYOUT_SCREENSHOTS) {
+      await page.evaluate(async () => {
+        await window.integratedFixture.setLanguage("ru");
+        window.integratedFixture.groupCameras(true, false, false);
+      });
+      await offline.locator(".playsay-video-presence").waitFor();
+      await page.screenshot({ scale: "css", path: path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name + "-teacher.png") });
+      await page.evaluate(()=>{window.integratedFixture.groupCameras(false,false,false);window.integratedFixture.setTeacher(false);});
+      await page.locator(".playsay-tablet-teacher-video,.playsay-video-focus").first().waitFor();
+      await page.screenshot({ scale: "css", path: path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name + "-learner.png") });
     }
     console.log("PASS group layout", name, original.map(r => [Math.round(r.width), Math.round(r.height)]));
     await context.close();

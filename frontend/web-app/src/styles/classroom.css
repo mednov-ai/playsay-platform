@@ -3504,8 +3504,17 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 
 .playsay-group-learner-grid .playsay-video-grid-card {
   container-type: size;
+  width: 100%;
   aspect-ratio: 16 / 10;
   min-height: 5rem;
+}
+
+.playsay-group-learner-grid .playsay-video-card-label {
+  position: absolute;
+  inset: auto 0 0;
+  padding: .125rem .25rem;
+  color: white;
+  background: rgb(0 0 0 / 70%);
 }
 
 .playsay-group-learner-grid .playsay-video-presence {

@@ -27,7 +27,7 @@ type Gesture = {
 };
 
 /** The positioned parent defines the area in which the window may dock. */
-export function ClassroomFloatingWindow({ children, adaptive = false, learnerCount = 0 }: { children: ReactNode; adaptive?: boolean; learnerCount?: number }) {
+export function ClassroomFloatingWindow({ children, adaptive = false, participantCount = 0 }: { children: ReactNode; adaptive?: boolean; participantCount?: number }) {
   const { t } = useAppTranslation();
   const elementRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLButtonElement>(null);
@@ -39,9 +39,9 @@ export function ClassroomFloatingWindow({ children, adaptive = false, learnerCou
   const [dragPosition, setDragPosition] = useState<FloatingPosition | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Two roster columns share the window with a separate self-preview below.
-  const minimumWidth = learnerCount
-    ? Math.ceil(Math.max(learnerCount === 1 ? 132 : 264, (Math.ceil(learnerCount / 2) * 84 + 42) * FLOATING_ASPECT))
+  // Allow space for two equal columns, their gaps and the window edges.
+  const minimumWidth = participantCount
+    ? Math.ceil(Math.max(participantCount === 1 ? 132 : 264, (Math.ceil(participantCount / 2) * 84 + 12) * FLOATING_ASPECT))
     : FLOATING_MIN_WIDTH;
   const [allowedCorners, setAllowedCorners] = useState<FloatingCorner[]>(["top-left", "top-right", "bottom-left", "bottom-right"]);
   const [reserved, setReserved] = useState(false);

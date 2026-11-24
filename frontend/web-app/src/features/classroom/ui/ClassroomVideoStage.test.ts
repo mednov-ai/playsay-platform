@@ -33,9 +33,10 @@ describe("classroomCameraSlots", () => {
   it("keeps roster cells stable across late join, reorder and reconnect", () => {
     for (const identities of [["student-2"], ["student-2", "student-1"], ["student-1"], ["student-1", "student-2"]]) {
       const cameras = [track("teacher", true), ...identities.map(id => track(id, false))];
-      const cells = groupRosterSlots(participants, classroomCameraSlots(cameras, participants, {}, true));
-      expect(cells.map(slot => slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject)).toEqual(["student-1", "student-2"]);
-      expect(cells.filter(slot => slot.kind === "track")).toHaveLength(identities.length);
+      const teacher = { kind: "track" as const, trackRef: cameras[0] };
+      const cells = groupRosterSlots([...participants, participants[0]], classroomCameraSlots(cameras, participants, {}, true), teacher);
+      expect(cells.map(slot => slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject)).toEqual(["student-1", "student-2", "teacher"]);
+      expect(cells.filter(slot => slot.kind === "track")).toHaveLength(identities.length + 1);
     }
   });
 

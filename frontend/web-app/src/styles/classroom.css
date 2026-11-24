@@ -3390,7 +3390,7 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
 
 .playsay-group-camera-panel {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
   gap: .25rem;
@@ -3411,15 +3411,6 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   grid-template-columns: minmax(0, 1fr);
 }
 
-.playsay-group-self-preview {
-  justify-self: end;
-  width: 3rem;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  border-radius: .375rem;
-}
-
-.playsay-group-self-preview .lk-participant-tile,
 .playsay-group-learner-grid .lk-participant-tile {
   height: 100%;
   min-height: 0;

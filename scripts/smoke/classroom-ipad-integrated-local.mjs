@@ -34,6 +34,53 @@ const { createServer } = await import(pathToFileURL(require.resolve("vite")).hre
 const vite = await createServer({ root: web, configFile: path.join(web, "vite.config.ts"), cacheDir: path.join(fixture, ".vite-cache"), plugins: [mockPlugin], server: { host: "127.0.0.1", port: 0, hmr: false }, optimizeDeps: { entries: [path.join(fixture, "index.html")], exclude: ["@livekit/components-react"] }, logLevel: "error" });
 let browser;
 const approx = (a, b, name) => assert.ok(Math.abs(a - b) <= 3, `${name}: ${a} vs ${b}`);
+async function recordGroupViews(page, device, viewport, teacher) {
+  const folder = process.env.GROUP_LAYOUT_MATRIX;
+  if (!folder) return;
+  await page.setViewportSize(viewport);
+  const controls = page.locator(".playsay-classroom-controls");
+  await page.evaluate(isTeacher => {
+    window.integratedFixture.setMaterial(true);
+    window.integratedFixture.groupCameras(isTeacher, false, false);
+    window.integratedFixture.setTeacher(isTeacher);
+  }, teacher);
+  const record = async mode => {
+    await page.waitForFunction(() => [...document.querySelectorAll(".lk-participant-tile video")].some(v => v.videoWidth && v.getBoundingClientRect().height));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const cameras = await page.locator(".lk-participant-tile").evaluateAll(tiles => tiles.flatMap(tile => {
+      const v = tile.querySelector("video");
+      if (!v) return [];
+      const r = v.getBoundingClientRect();
+      if (!r.width || !r.height) return [];
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return [{ subject:tile.dataset.subject, x:r.x, y:r.y, width:r.width, height:r.height, source:[v.videoWidth,v.videoHeight], fit:getComputedStyle(v).objectFit, centreVisible:tile.contains(hit) }];
+    }));
+    assert.ok(cameras.some(c => c.subject === "teacher-1"), device+" "+mode+" teacher camera");
+    assert.ok(cameras.every(c => c.fit === "contain"), device+" "+mode+" proportional cameras");
+    const key = [device, teacher ? "teacher" : "learner", mode].join("-");
+    await page.screenshot({scale:"css",path:path.join(folder,key+".png")});
+    fs.writeFileSync(path.join(folder,key+".json"),JSON.stringify(cameras,null,2)+"\n");
+  };
+  await controls.waitFor();
+  await record("material");
+  const board = page.locator("#fixture-board");
+  if (await board.isVisible()) {
+    await board.click(); await page.locator(".playsay-whiteboard-stage").waitFor();
+    await record("board"); await page.locator("#fixture-material").click();
+  }
+  await page.locator("#material-toolbar").click();
+  await page.locator('[data-mode="external-activity"]').waitFor();
+  await record("external");
+  await page.locator("#external-stop").click();
+  await page.evaluate(() => window.integratedFixture.share(true));
+  await page.locator('[data-screen-share-active="true"]').waitFor();
+  await record("share");
+  await page.evaluate(() => { window.integratedFixture.share(false); window.integratedFixture.setMaterial(false); });
+  await page.locator('[data-screen-share-active="false"]').waitFor();
+  await record("without-material");
+  await page.evaluate(() => window.integratedFixture.setMaterial(true));
+}
+
 async function expectCorner(page, corner) {
   const area = await page.locator(".playsay-tablet-video-area").boundingBox();
   const pip = await page.locator(".classroom-floating-window").boundingBox();
@@ -206,7 +253,7 @@ try {
     await page.evaluate(() => { window.integratedFixture.groupCameras(true, false, false); window.integratedFixture.setTeacher(true); });
     const tabletRoster = page.locator(".classroom-floating-window .playsay-group-learner-grid");
     await tabletRoster.waitFor();
-    assert.equal(await tabletRoster.locator(":scope > *").count(), 3);
+    assert.equal(await tabletRoster.locator(":scope > *").count(), 4);
     await page.evaluate(() => { window.integratedFixture.groupCameras(false, false, false); window.integratedFixture.setTeacher(false); });
     await page.locator(".classroom-floating-window").waitFor({ state: "visible" });
     const provider = await page.evaluate(() => window.integratedFixture.counts);
@@ -268,7 +315,13 @@ try {
       assert.ok((await grid.boundingBox()).width > 0);
     }
     const original = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
-    assert.equal(original.length, 3);
+    assert.equal(original.length, 4);
+    assert.equal(await cards.locator("[data-subject='teacher-1']").count(), 1);
+    if (name === "desktop") {
+      approx(original[0].y, original[1].y, "first row");
+      approx(original[2].y, original[3].y, "teacher shares the second row");
+      approx(original[1].x, original[3].x, "teacher fills the fourth cell");
+    }
     for (const rect of original) {
       approx(rect.width, original[0].width, name + " cell width");
       approx(rect.height, original[0].height, name + " cell height");
@@ -295,9 +348,15 @@ try {
     for (const joined of [true, false, true]) {
       await page.evaluate(joined => window.integratedFixture.groupCameras(true, joined, true), joined);
       await offline.locator(joined ? "[data-subject='student-3']" : ".playsay-video-presence").waitFor();
-      assert.equal(await cards.count(), 3);
+      assert.equal(await cards.count(), 4);
       approx((await offline.boundingBox()).width, original[2].width, name + " stable width");
     }
+    const teacherCell = cards.last();
+    await page.evaluate(() => window.integratedFixture.localTeacherCamera(false));
+    await teacherCell.locator(".playsay-video-presence").waitFor();
+    assert.equal(await cards.count(), 4);
+    await page.evaluate(() => window.integratedFixture.localTeacherCamera(true));
+    await teacherCell.locator("[data-subject='teacher-1']").waitFor();
     if (process.env.GROUP_LAYOUT_SCREENSHOTS) {
       await page.evaluate(async () => {
         await window.integratedFixture.setLanguage("ru");
@@ -330,6 +389,11 @@ try {
           console.log("PASS rotation", name, orientation, teacherView ? "teacher" : "learner", JSON.stringify(bounds), await page.locator(".playsay-tablet-video-area").getAttribute("data-board-fallback"));
         }
       }
+    }
+    const sizes = [[name, options.viewport]];
+    if (name !== "desktop") sizes.push([name+"-landscape",{width:options.viewport.height,height:options.viewport.width}]);
+    for (const [device, viewport] of sizes) {
+      for (const teacher of [true,false]) await recordGroupViews(page,device,viewport,teacher);
     }
     console.log("PASS group layout", name, original.map(r => [Math.round(r.width), Math.round(r.height)]));
     await context.close();

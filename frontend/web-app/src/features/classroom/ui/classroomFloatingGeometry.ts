@@ -8,9 +8,9 @@ export const FLOATING_MIN_WIDTH = 160;
 export const FLOATING_MAX_WIDTH = 360;
 export const FLOATING_DEFAULT_WIDTH = 224;
 
-export function floatingWidth(requested: number, bounds: FloatingBounds): number {
-  const maxWidth = Math.max(0, Math.min(FLOATING_MAX_WIDTH, bounds.width - FLOATING_INSET * 2, (bounds.height - FLOATING_INSET * 2) * FLOATING_ASPECT));
-  return Math.max(Math.min(FLOATING_MIN_WIDTH, maxWidth), Math.min(maxWidth, requested));
+export function floatingWidth(requested: number, bounds: FloatingBounds, minimumWidth = FLOATING_MIN_WIDTH): number {
+  const maxWidth = Math.max(0, Math.min(Math.max(FLOATING_MAX_WIDTH, minimumWidth + (minimumWidth > FLOATING_MIN_WIDTH ? 80 : 0)), bounds.width - FLOATING_INSET * 2, (bounds.height - FLOATING_INSET * 2) * FLOATING_ASPECT));
+  return Math.max(Math.min(minimumWidth, maxWidth), Math.min(maxWidth, requested));
 }
 
 export function cornerPosition(corner: FloatingCorner, width: number, bounds: FloatingBounds): FloatingPosition {

@@ -71,7 +71,7 @@ vi.mock("./LessonWorkspace", () => ({
 afterEach(() => { cleanup(); permissions.canManage = true; vi.unstubAllGlobals(); });
 
 describe("LiveLessonExperience room context", () => {
-  it("activates tablet layout only for learners with material and preserves the room across screen-share transitions", () => {
+  it("activates tablet layout for both group roles with material and preserves the room across screen-share transitions", () => {
     vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));
     vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 Macintosh", platform: "MacIntel", maxTouchPoints: 5 });
     vi.stubGlobal("innerWidth", 768);
@@ -92,7 +92,10 @@ describe("LiveLessonExperience room context", () => {
     view.rerender(<LiveLessonExperience {...common} session={{ ...session, materialId: null }} />);
     expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
     permissions.canManage = true;
-    view.rerender(<LiveLessonExperience {...common} session={session} />);
+    const teacherSession = { ...session, identity: session.teacherSubject };
+    view.rerender(<LiveLessonExperience {...common} session={teacherSession} />);
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    view.rerender(<LiveLessonExperience {...common} session={{ ...teacherSession, lessonType: "INDIVIDUAL" }} />);
     expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
   });
   it("keeps the video stage and lesson workspace inside the same LiveKit room", () => {

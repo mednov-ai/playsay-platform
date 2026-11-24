@@ -3,6 +3,7 @@ import type { ScheduledLesson } from "../../../shared/api/playsay";
 import {
   classroomCameraSlots,
   groupRosterSlots,
+  rosterFitsColumn,
   classroomExternalActivityVideo,
   classroomScreenShareTrack,
   classroomTabletSlots,
@@ -32,9 +33,10 @@ describe("classroomCameraSlots", () => {
   it("keeps roster cells stable across late join, reorder and reconnect", () => {
     for (const identities of [["student-2"], ["student-2", "student-1"], ["student-1"], ["student-1", "student-2"]]) {
       const cameras = [track("teacher", true), ...identities.map(id => track(id, false))];
-      const cells = groupRosterSlots(participants, classroomCameraSlots(cameras, participants, {}, true));
-      expect(cells.map(slot => slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject)).toEqual(["student-1", "student-2"]);
-      expect(cells.filter(slot => slot.kind === "track")).toHaveLength(identities.length);
+      const teacher = { kind: "track" as const, trackRef: cameras[0] };
+      const cells = groupRosterSlots([...participants, participants[0]], classroomCameraSlots(cameras, participants, {}, true), teacher);
+      expect(cells.map(slot => slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject)).toEqual(["student-1", "student-2", "teacher"]);
+      expect(cells.filter(slot => slot.kind === "track")).toHaveLength(identities.length + 1);
     }
   });
 
@@ -115,3 +117,14 @@ function track(identity: string, isLocal: boolean, source = "camera", trackName?
     source,
   } as Parameters<typeof classroomCameraSlots>[0][number];
 }
+
+describe("desktop roster column", () => {
+  it.each([1, 2, 3])("fits exactly %i cards", count => {
+    const height = count * 100 + (count - 1) * 4;
+    expect(rosterFitsColumn(count, 160, height, 4, 80)).toBe(true);
+    expect(rosterFitsColumn(count, 160, height - 1, 4, 80)).toBe(false);
+  });
+  it("respects minimum card height", () => {
+    expect(rosterFitsColumn(2, 64, 163, 4, 80)).toBe(false);
+  });
+});

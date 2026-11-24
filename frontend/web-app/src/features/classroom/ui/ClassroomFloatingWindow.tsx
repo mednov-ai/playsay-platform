@@ -27,17 +27,24 @@ type Gesture = {
 };
 
 /** The positioned parent defines the area in which the window may dock. */
-export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
+export function ClassroomFloatingWindow({ children, adaptive = false, participantCount = 0 }: { children: ReactNode; adaptive?: boolean; participantCount?: number }) {
   const { t } = useAppTranslation();
   const elementRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLButtonElement>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const suppressResizeClickRef = useRef(false);
   const [bounds, setBounds] = useState<FloatingBounds | null>(null);
-  const [corner, setCorner] = useState<FloatingCorner>("bottom-right");
+  const [preferredCorner, setCorner] = useState<FloatingCorner>("bottom-right");
   const [preferredWidth, setPreferredWidth] = useState(FLOATING_DEFAULT_WIDTH);
   const [dragPosition, setDragPosition] = useState<FloatingPosition | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Allow space for two equal columns, their gaps and the window edges.
+  const minimumWidth = participantCount
+    ? Math.ceil(Math.max(participantCount === 1 ? 132 : 264, (Math.ceil(participantCount / 2) * 84 + 12) * FLOATING_ASPECT))
+    : FLOATING_MIN_WIDTH;
+  const [allowedCorners, setAllowedCorners] = useState<FloatingCorner[]>(["top-left", "top-right", "bottom-left", "bottom-right"]);
+  const [reserved, setReserved] = useState(false);
 
   useLayoutEffect(() => {
     const parent = elementRef.current?.parentElement;
@@ -88,7 +95,27 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
           bottom = Math.min(bottom, stageRect.bottom - rowOffset, workbenchRect.bottom);
         }
       }
-      const needsFallback = Boolean(boardWorkbench && (right - left < FLOATING_MIN_WIDTH + FLOATING_INSET * 2 || bottom - top < FLOATING_MIN_WIDTH / FLOATING_ASPECT + FLOATING_INSET * 2));
+      const usable = { left, top, width: right - left, height: bottom - top };
+      const candidates: FloatingCorner[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
+      const blockers = adaptive && shell ? Array.from(shell.querySelectorAll(
+        ".playsay-workbench button, .playsay-workbench [role=toolbar], .playsay-workbench input, .playsay-classroom-controls, .playsay-video-header"
+      )).map(node => {
+        const r = node.getBoundingClientRect();
+        const shift = node.closest(".playsay-workbench") ? rowOffset : 0;
+        return {left: r.left, right: r.right, top: r.top - shift, bottom: r.bottom - shift};
+      }).filter(r => r.right > r.left && r.bottom > r.top) : [];
+      const measuredWidth = floatingWidth(preferredWidth, usable, minimumWidth);
+      const fits = (place: FloatingCorner) => {
+        const pos = cornerPosition(place, measuredWidth, usable);
+        return blockers.every(r => r.right <= pos.left || r.left >= pos.left + measuredWidth ||
+          r.bottom <= pos.top || r.top >= pos.top + measuredWidth / FLOATING_ASPECT);
+      };
+      const permitted = candidates.filter(fits);
+      const needsFallback = Boolean((adaptive || boardWorkbench) &&
+        (usable.width < minimumWidth + FLOATING_INSET * 2 || usable.height < minimumWidth / FLOATING_ASPECT + FLOATING_INSET * 2 ||
+          !permitted.length));
+      setReserved(needsFallback);
+      setAllowedCorners(previous => previous.join() === permitted.join() ? previous : permitted);
       if (needsFallback !== fallback) {
         parent.dataset.boardFallback = String(needsFallback);
         if (remeasure !== null) cancelAnimationFrame(remeasure);
@@ -107,7 +134,12 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     observer?.observe(parent);
     if (shell) observer?.observe(shell);
     const mutations = shell && typeof MutationObserver !== "undefined" ? new MutationObserver(measure) : null;
-    mutations?.observe(shell!, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-whiteboard-active", "data-expanded"] });
+    if (shell && mutations) mutations.observe(shell, {
+      subtree: true, childList: true, attributes: true,
+      attributeFilter: ["data-whiteboard-active", "data-expanded", "aria-expanded", "hidden", "open"],
+    });
+    const workbench = shell?.querySelector(".playsay-workbench");
+    if (workbench) observer?.observe(workbench);
     measure();
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
@@ -123,13 +155,14 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
       window.visualViewport?.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("scroll", measure);
     };
-  }, []);
+  }, [adaptive, minimumWidth, preferredWidth]);
 
-  const width = bounds ? floatingWidth(preferredWidth, bounds) : FLOATING_DEFAULT_WIDTH;
+  const corner = allowedCorners.includes(preferredCorner) ? preferredCorner : (allowedCorners[0] ?? preferredCorner);
+  const width = bounds ? floatingWidth(preferredWidth, bounds, minimumWidth) : FLOATING_DEFAULT_WIDTH;
   const position = bounds ? (dragPosition ? clampFloatingPosition(dragPosition, width, bounds) : cornerPosition(corner, width, bounds)) : { left: 12, top: 12 };
 
   function startGesture(event: PointerEvent<HTMLElement>, kind: Gesture["kind"]) {
-    if (!bounds || event.button !== 0) return;
+    if ((reserved && adaptive) || !bounds || event.button !== 0) return;
     if (kind === "move" && (event.target as HTMLElement).closest("button, a, input, select, textarea, summary, [role=button], .playsay-tablet-other-list")) return;
     // Keep the native click produced by a short touch on the resize button in WebKit.
     // touch-action on the handle prevents scrolling during the gesture.
@@ -158,7 +191,7 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     } else {
       // The inward-facing edge moves vertically; the opposite corner stays anchored.
       const delta = (corner.startsWith("bottom") ? -dy : dy) * FLOATING_ASPECT;
-      setPreferredWidth(floatingWidth(gesture.width + delta, bounds));
+      setPreferredWidth(floatingWidth(gesture.width + delta, bounds, minimumWidth));
     }
   }
 
@@ -214,6 +247,7 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
     >
       <div className="classroom-floating-window__content">{children}</div>
       <button
+        hidden={reserved && adaptive}
         ref={resizeRef}
         type="button"
         className="classroom-floating-window__resize"
@@ -241,21 +275,21 @@ export function ClassroomFloatingWindow({ children }: { children: ReactNode }) {
             event.preventDefault();
             const grows = event.key === "ArrowRight" || (event.key === "ArrowUp" && corner.startsWith("bottom")) || (event.key === "ArrowDown" && corner.startsWith("top"));
             const delta = grows ? 40 : -40;
-            setPreferredWidth(floatingWidth(width + delta, bounds));
+            setPreferredWidth(floatingWidth(width + delta, bounds, minimumWidth));
           }
         }}
       >
         <span className="classroom-floating-window__grip" aria-hidden="true"><span /><span /><span /></span>
       </button>
-      {menuOpen && (
+      {menuOpen && !(adaptive && reserved) && (
         <div className="classroom-floating-window__menu" style={menuStyle} role="group" aria-label={t("classroom.floatingVideo.options")} onPointerDown={(event) => event.stopPropagation()}>
           {corners.map((item) => (
-            <button key={item.corner} type="button" aria-label={item.label} title={item.label} aria-pressed={corner === item.corner} onClick={() => { setCorner(item.corner); setMenuOpen(false); resizeRef.current?.focus(); }}>
+            <button key={item.corner} type="button" aria-label={item.label} title={item.label} disabled={!allowedCorners.includes(item.corner)} aria-pressed={corner === item.corner} onClick={() => { setCorner(item.corner); setMenuOpen(false); resizeRef.current?.focus(); }}>
               {item.icon}
             </button>
           ))}
-          <button type="button" aria-label={t("classroom.floatingVideo.smaller")} title={t("classroom.floatingVideo.smaller")} onClick={() => bounds && setPreferredWidth(floatingWidth(width - 40, bounds))}><Minus aria-hidden="true" /></button>
-          <button type="button" aria-label={t("classroom.floatingVideo.larger")} title={t("classroom.floatingVideo.larger")} onClick={() => bounds && setPreferredWidth(floatingWidth(width + 40, bounds))}><Plus aria-hidden="true" /></button>
+          <button type="button" aria-label={t("classroom.floatingVideo.smaller")} title={t("classroom.floatingVideo.smaller")} onClick={() => bounds && setPreferredWidth(floatingWidth(width - 40, bounds, minimumWidth))}><Minus aria-hidden="true" /></button>
+          <button type="button" aria-label={t("classroom.floatingVideo.larger")} title={t("classroom.floatingVideo.larger")} onClick={() => bounds && setPreferredWidth(floatingWidth(width + 40, bounds, minimumWidth))}><Plus aria-hidden="true" /></button>
         </div>
       )}
     </div>

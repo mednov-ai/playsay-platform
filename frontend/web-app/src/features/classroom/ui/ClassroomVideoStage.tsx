@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { ConnectionStateToast, ParticipantTile, RoomAudioRenderer, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import { ScreenShare, UserRound, Users, Video } from "lucide-react";
@@ -26,6 +26,7 @@ type ClassroomStripLayout = "single" | "row";
 export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly" | "externalActivity" | "tabletFloating";
 
 export function ClassroomVideoStage({
+  adaptiveFloating = false,
   expectedParticipants,
   lessonId,
   lessonType,
@@ -46,6 +47,7 @@ export function ClassroomVideoStage({
   translationAllowed,
   translationRole,
 }: {
+  adaptiveFloating?: boolean;
   expectedParticipants: ScheduledLesson["participants"];
   lessonId: string;
   lessonType: string;
@@ -108,6 +110,10 @@ export function ClassroomVideoStage({
     state: (teacherSubject && participantPresence[teacherSubject]) || "OFFLINE",
   };
   const localCamera = cameraSlots.find(slot => slot.kind === "track" && slot.trackRef.participant.isLocal);
+  const teacherGridSlot: ClassroomVideoSlot = localCamera ?? {
+    kind: "placeholder", subject: teacherSubject ?? "", displayName: teacherName?.trim() || t("classroom.connection.teacher"), state: "ONLINE",
+  };
+  const groupSlots = groupTeacher ? groupRosterSlots(expectedParticipants, cameraSlots, teacherGridSlot) : [];
   const featuredSlot = groupLearner ? pinnedTeacher : cameraSlots[0];
   const stripSlots = groupLearner
     ? (activeScreenShareTrack ? [pinnedTeacher] : cameraSlots.filter(slot => slot !== teacherCamera))
@@ -266,12 +272,7 @@ export function ClassroomVideoStage({
 
   const learnerGrid = groupTeacher && (
     <div className="playsay-group-camera-panel">
-      <div className="playsay-group-learner-grid">
-        {groupRosterSlots(expectedParticipants, cameraSlots).map(slot => (
-          <ClassroomGridVideoSlot key={slotSubject(slot)} showLearnerConnectionDots={showLearnerConnectionDots} slot={slot} />
-        ))}
-      </div>
-      {localCamera && <div className="playsay-group-self-preview"><ClassroomVideoSlotView slot={localCamera} /></div>}
+      <GroupLearnerGrid slots={groupSlots} showLearnerConnectionDots={showLearnerConnectionDots} />
     </div>
   );
 
@@ -283,8 +284,9 @@ export function ClassroomVideoStage({
       : null;
     return (
       <div className="playsay-classroom-conference" data-mode="tablet-floating">
-        <div className="playsay-tablet-video-area">
-          <ClassroomFloatingWindow>
+        <div className="playsay-tablet-video-area" data-adaptive={adaptiveFloating}>
+          <ClassroomFloatingWindow adaptive={adaptiveFloating} participantCount={groupSlots.length}>
+            {groupTeacher ? learnerGrid : (
             <div className="playsay-tablet-video-content">
               <div className="playsay-tablet-teacher-video">
                 {activeSlot || teacherPlaceholder ? (
@@ -326,6 +328,7 @@ export function ClassroomVideoStage({
                 </details>
               ) : null}
             </div>
+            )}
           </ClassroomFloatingWindow>
         </div>
         <ClassroomTranslationOverlay translation={translation} />
@@ -607,6 +610,33 @@ function translationStatusText(
   return t("classroom.translation.waiting");
 }
 
+export function rosterFitsColumn(count: number, width: number, height: number, gap: number, minimumHeight: number) {
+  return count > 0 && width > 0 && count * Math.max(minimumHeight, width * 10 / 16) + (count - 1) * gap <= height;
+}
+
+function GroupLearnerGrid({ slots, showLearnerConnectionDots }: { slots: ClassroomVideoSlot[]; showLearnerConnectionDots: boolean }) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [column, setColumn] = useState(false);
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || !grid.firstElementChild || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      const card = grid.firstElementChild;
+      if (!card) return;
+      const gap = parseFloat(getComputedStyle(grid).rowGap);
+      const minimumHeight = parseFloat(getComputedStyle(card).minHeight);
+      setColumn(rosterFitsColumn(slots.length, entry.contentRect.width, entry.contentRect.height, gap, minimumHeight));
+    });
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [slots.length]);
+  return (
+    <div className="playsay-group-learner-grid" data-column-fit={column} ref={gridRef}>
+      {slots.map(slot => <ClassroomGridVideoSlot key={slotSubject(slot)} showLearnerConnectionDots={showLearnerConnectionDots} slot={slot} />)}
+    </div>
+  );
+}
+
 function ClassroomGridVideoSlot({
   showLearnerConnectionDots,
   slot,
@@ -686,12 +716,15 @@ function slotSubject(slot: ClassroomVideoSlot) {
   return slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject;
 }
 
-export function groupRosterSlots(roster: ExpectedParticipant[], slots: ClassroomVideoSlot[]) {
+export function groupRosterSlots(roster: ExpectedParticipant[], slots: ClassroomVideoSlot[], teacher: ClassroomVideoSlot) {
   const bySubject = new Map(slots.map(slot => [slotSubject(slot), slot]));
-  return roster.flatMap(({ subject }) => {
+  const subjects = new Set(roster.map(participant => participant.subject));
+  subjects.delete(slotSubject(teacher));
+  const learners = Array.from(subjects).flatMap(subject => {
     const slot = bySubject.get(subject);
     return slot && (slot.kind === "placeholder" || !slot.trackRef.participant.isLocal) ? [slot] : [];
   });
+  return [...learners, teacher];
 }
 
 export function classroomCameraSlots(

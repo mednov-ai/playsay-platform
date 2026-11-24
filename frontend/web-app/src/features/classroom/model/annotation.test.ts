@@ -144,6 +144,7 @@ describe("annotation model", () => {
   });
 
   it("renders svg paths from normalized points", () => {
+    expect(pointsToSvgPath([{ pageId: "p", x: 90, y: 85 }])).toBe("M 90.0 85.0 l 0 0");
     expect(pointsToSvgPath([
       { pageId: "material", x: 1, y: 2 },
       { pageId: "material", x: 3.45, y: 4.56 },

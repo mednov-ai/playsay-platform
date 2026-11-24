@@ -402,9 +402,12 @@ export function pointsToSvgPath(points: AnnotationPoint[]): string {
   }
 
   const [firstPoint, ...rest] = points;
+  const start = `M ${firstPoint.x.toFixed(1)} ${firstPoint.y.toFixed(1)}`;
+  // A round cap needs a segment to paint a tap, even when both endpoints coincide.
+  if (rest.length === 0) return `${start} l 0 0`;
   return rest.reduce(
     (path, point) => `${path} L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
-    `M ${firstPoint.x.toFixed(1)} ${firstPoint.y.toFixed(1)}`,
+    start,
   );
 }
 

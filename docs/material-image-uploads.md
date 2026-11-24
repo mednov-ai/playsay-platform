@@ -28,3 +28,13 @@ checks remain in force.
 The synchronous generation endpoint takes a snapshot of eligible blocks and pairs, then calls the provider and uploads each result under a distinct private storage key outside the database transaction. Publication locks the material, checks current edit permission and matches the whole batch against the latest document. Changes to generation inputs, an ambiguous or missing target, or competing regeneration return `409 MATERIAL_IMAGE_TARGET_CHANGED`. Unrelated edits remain in the returned document. Regeneration preserves the public asset ID, existing references and custom tags.
 
 The additive `material_image_object_cleanup` table records staged keys before upload. Publication releases those keys in the same database transaction as the document update. A recurring collector checks asset and game-blob references before deleting eligible abandoned or superseded objects. Previously published keys have a grace interval for readers. During a writer rollback, finish or reconcile in-flight generation before switching writers.
+
+## Individual desktop lessons
+
+In ordinary view, a dedicated static page with one image or generated image fits
+the whole raster beside the remote camera and drawing tools. The available
+height accounts for navigation and controls. The camera shows the complete
+frame. Image-anchored marks and remote pointers use the original raster
+coordinates on each participant's screen. A tap paints a dot. If the drawn
+image moves or resizes during a stroke, the stroke ends at its last input in
+the original bounds.

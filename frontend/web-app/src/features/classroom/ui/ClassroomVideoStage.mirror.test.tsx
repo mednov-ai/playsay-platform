@@ -164,3 +164,25 @@ describe("local screen-share mirror protection", () => {
     expect(container.querySelector(".playsay-tablet-teacher-video")).toHaveTextContent("Assigned Teacher");
   });
 });
+
+describe("group learner camera", () => {
+  const group = { ...props, lessonType: "GROUP", teacherSubject: "teacher", teacherName: "Assigned Teacher" };
+  const peer = { participant: { identity: "peer", isLocal: false }, source: "camera" };
+  const teacher = { participant: { identity: "teacher", isLocal: false }, source: "camera", publication: { isMuted: true } };
+  for (const mode of ["lesson", "externalActivity", "focusOnly", "videoOnly", "tabletFloating"] as const) {
+    it(`keeps the teacher in ${mode} during camera loss and recovery`, () => {
+      state.cameras = [peer, teacher];
+      const stage = <ClassroomVideoStage {...group} mode={mode} />;
+      const { container, rerender } = render(stage);
+      const primary = () => container.querySelector(".playsay-tablet-teacher-video, .playsay-external-activity-pip, .playsay-video-focus");
+      expect(primary()?.querySelector("video")).toHaveAttribute("data-participant", "teacher");
+      expect(primary()?.querySelector("video")).toHaveAttribute("data-camera-off", "true");
+      state.cameras = [peer];
+      rerender(<ClassroomVideoStage {...group} mode={mode} />);
+      expect(primary()?.querySelector(".playsay-video-presence")).toHaveTextContent("Assigned Teacher");
+      state.cameras = [teacher, peer];
+      rerender(<ClassroomVideoStage {...group} mode={mode} />);
+      expect(primary()?.querySelector("video")).toHaveAttribute("data-participant", "teacher");
+    });
+  }
+});

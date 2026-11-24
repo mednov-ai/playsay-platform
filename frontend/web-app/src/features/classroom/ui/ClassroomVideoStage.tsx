@@ -83,11 +83,14 @@ export function ClassroomVideoStage({
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
   );
+  const groupLesson = lessonType === "GROUP";
+  const groupTeacher = groupLesson && (translationRole === "teacher" || (translationRole === null && showExpectedParticipants));
+  const groupLearner = groupLesson && !groupTeacher;
   const cameraSlots = classroomCameraSlots(
     cameraTracks,
     expectedParticipants,
     participantPresence,
-    showExpectedParticipants,
+    groupLesson ? groupTeacher : showExpectedParticipants,
   );
   const selectedVideoPresent = selectedVideoSubject !== null && cameraSlots.some((slot) => (
     slot.kind === "track" && !slot.trackRef.participant.isLocal && slot.trackRef.participant.identity === selectedVideoSubject
@@ -97,9 +100,19 @@ export function ClassroomVideoStage({
   }, [selectedVideoPresent, selectedVideoSubject]);
   const activeScreenShareTrack = classroomScreenShareTrack(screenShareTracks);
   const screenShareActive = Boolean(activeScreenShareTrack);
-  const featuredSlot = cameraSlots[0];
-  const stripSlots = activeScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
-  const externalActivityVideo = classroomExternalActivityVideo(cameraSlots);
+  const teacherCamera = cameraSlots.find(slot => slot.kind === "track" && !slot.trackRef.participant.isLocal && slot.trackRef.participant.identity === teacherSubject);
+  const pinnedTeacher: ClassroomVideoSlot = teacherCamera ?? {
+    kind: "placeholder",
+    displayName: teacherName?.trim() || t("classroom.connection.teacher"),
+    subject: teacherSubject ?? "",
+    state: (teacherSubject && participantPresence[teacherSubject]) || "OFFLINE",
+  };
+  const localCamera = cameraSlots.find(slot => slot.kind === "track" && slot.trackRef.participant.isLocal);
+  const featuredSlot = groupLearner ? pinnedTeacher : cameraSlots[0];
+  const stripSlots = groupLearner
+    ? (activeScreenShareTrack ? [pinnedTeacher] : cameraSlots.filter(slot => slot !== teacherCamera))
+    : activeScreenShareTrack ? cameraSlots : cameraSlots.slice(1);
+  const externalActivityVideo = classroomExternalActivityVideo(groupLearner ? [pinnedTeacher] : cameraSlots);
   const hasStrip = stripSlots.length > 0;
   const stripLayout = stripSlots.length > 1 ? "row" : "single";
   const canDragStrip = mode === "externalActivity"
@@ -251,8 +264,20 @@ export function ClassroomVideoStage({
     };
   }, [canDragStrip, externalActivityVideo.additionalCount, mode, stripLayout, stripSlots.length]);
 
+  const learnerGrid = groupTeacher && (
+    <div className="playsay-group-camera-panel">
+      <div className="playsay-group-learner-grid">
+        {groupRosterSlots(expectedParticipants, cameraSlots).map(slot => (
+          <ClassroomGridVideoSlot key={slotSubject(slot)} showLearnerConnectionDots={showLearnerConnectionDots} slot={slot} />
+        ))}
+      </div>
+      {localCamera && <div className="playsay-group-self-preview"><ClassroomVideoSlotView slot={localCamera} /></div>}
+    </div>
+  );
+
   if (mode === "tabletFloating" && !activeScreenShareTrack) {
     const { teacherSlot, activeSlot, localSlot, otherSlots } = classroomTabletSlots(cameraSlots, teacherSubject, selectedVideoSubject);
+    const insetSlot = groupLearner && selectedVideoPresent ? pinnedTeacher : localSlot;
     const teacherPlaceholder: ClassroomVideoSlot | null = teacherSubject && !teacherSlot && !activeSlot
       ? { kind: "placeholder", displayName: teacherName?.trim() || t("classroom.connection.teacher"), state: participantPresence[teacherSubject] ?? "OFFLINE", subject: teacherSubject }
       : null;
@@ -274,9 +299,9 @@ export function ClassroomVideoStage({
                   <span className="playsay-tablet-selected-label">{participantDisplayName(activeSlot.trackRef, t("classroom.participantFallback"))}</span>
                 ) : null}
               </div>
-              {localSlot ? (
+              {insetSlot ? (
                 <div className="playsay-tablet-local-video">
-                  <ClassroomVideoSlotView slot={localSlot} />
+                  <ClassroomVideoSlotView slot={insetSlot} />
                 </div>
               ) : null}
               {otherSlots.length || selectedVideoPresent ? (
@@ -327,7 +352,7 @@ export function ClassroomVideoStage({
     return (
       <div className="playsay-classroom-conference" data-layout="pip" data-mode="external-activity">
         <div className="playsay-external-activity-video-overlay" ref={focusRef}>
-          {externalActivityVideo.featuredSlot ? (
+          {groupTeacher ? learnerGrid : externalActivityVideo.featuredSlot ? (
             <div
               className="playsay-external-activity-pip"
               data-draggable="true"
@@ -364,10 +389,10 @@ export function ClassroomVideoStage({
     );
   }
 
-  if (mode === "videoOnly" && !activeScreenShareTrack) {
+  if ((groupTeacher || (mode === "videoOnly" && !groupLearner)) && !activeScreenShareTrack) {
     return (
       <div className="playsay-classroom-conference" data-layout="grid" data-mode="video-only">
-        <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
+        {groupTeacher ? learnerGrid : <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
           {cameraSlots.length > 0
             ? cameraSlots.map((slot) => (
               <ClassroomGridVideoSlot
@@ -382,7 +407,7 @@ export function ClassroomVideoStage({
                 <span>{t("classroom.video.emptyParticipants")}</span>
               </div>
             )}
-        </div>
+        </div>}
         <ClassroomTranslationOverlay translation={translation} />
         <ClassroomControlBar
           canCompleteLesson={canCompleteLesson}
@@ -441,7 +466,7 @@ export function ClassroomVideoStage({
             </span>
           </div>
         ) : null}
-        <div
+        {groupTeacher ? learnerGrid : <div
           className="playsay-video-strip"
           data-draggable={canDragStrip ? "true" : "false"}
           data-empty={hasStrip ? "false" : "true"}
@@ -463,7 +488,7 @@ export function ClassroomVideoStage({
               />
             ))
             : null}
-        </div>
+        </div>}
       </div>
       <ClassroomTranslationOverlay translation={translation} />
       <ClassroomControlBar
@@ -655,6 +680,18 @@ function ClassroomVideoSlotView({ slot }: { slot: ClassroomVideoSlot }) {
       <span>{t(`classroom.presence.${statusKey}`)}</span>
     </div>
   );
+}
+
+function slotSubject(slot: ClassroomVideoSlot) {
+  return slot.kind === "track" ? slot.trackRef.participant.identity : slot.subject;
+}
+
+export function groupRosterSlots(roster: ExpectedParticipant[], slots: ClassroomVideoSlot[]) {
+  const bySubject = new Map(slots.map(slot => [slotSubject(slot), slot]));
+  return roster.flatMap(({ subject }) => {
+    const slot = bySubject.get(subject);
+    return slot && (slot.kind === "placeholder" || !slot.trackRef.participant.isLocal) ? [slot] : [];
+  });
 }
 
 export function classroomCameraSlots(

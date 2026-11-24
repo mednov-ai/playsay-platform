@@ -7,3 +7,5 @@ Dragging the window docks it to the nearest available corner with an inset. A se
 The initial primary video is selected using the lesson's assigned `teacherSubject`, not the order in which remote participants arrive. When a substitute or another participant needs to be shown, the learner can select that participant by name from the participant list; this is a local display choice and does not assert a teacher role. A missing or disabled camera retains its corresponding presence state. Position, size and participant selection do not change the lesson, media tracks or another participant's layout.
 
 The production baseline used by this hotfix does not include the standalone whiteboard introduced later in develop. The integration into that branch must preserve the floating layout for the presented board and verify board gestures, state and media continuity separately.
+
+На групповом уроке автоматический выбор камеры привязан к учителю урока. При явном выборе другого участника учитель остаётся в миниатюре. При потере соединения его место занимает карточка состояния.

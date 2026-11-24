@@ -3407,6 +3407,10 @@ body.playsay-classroom-external-activity-focus .playsay-classroom-shell[data-pre
   overflow: auto;
 }
 
+.playsay-classroom-shell[data-viewport-mode="desktop"] .playsay-group-learner-grid[data-column-fit="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .playsay-group-self-preview {
   justify-self: end;
   width: 3rem;

@@ -107,10 +107,12 @@ export function LiveLessonExperience({
       : null;
   const videoOnly = !session.materialId && !canManageLesson;
   const externalActivityFocus = presentationMode === "external-activity-focus";
-  const rawViewportMode = useClassroomViewportMode(!canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus);
+  const groupWorkspace = session.lessonType === "GROUP" && Boolean(session.materialId) && !screenShareActive && !externalActivityFocus;
+  const rawViewportMode = useClassroomViewportMode(groupWorkspace || !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
-  const videoExpanded = classroomVideoExpanded(viewportMode, screenShareActive);
-  const tabletFloating = viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus;
+  const groupFloating = groupWorkspace && viewportMode !== "desktop";
+  const videoExpanded = !groupFloating && classroomVideoExpanded(viewportMode, screenShareActive);
+  const tabletFloating = groupFloating || viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
     : tabletFloating
@@ -120,7 +122,7 @@ export function LiveLessonExperience({
       : videoOnly
         ? "videoOnly"
         : "lesson";
-  const showWorkspace = shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const showWorkspace = groupFloating || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],
@@ -258,6 +260,7 @@ export function LiveLessonExperience({
 
           <div className="playsay-classroom-room min-h-0 flex-1">
             <ClassroomVideoStage
+              adaptiveFloating={groupFloating && (translationRole === "teacher" || viewportMode !== "tablet")}
               expectedParticipants={session.participants}
               lessonId={session.lessonId}
               lessonType={session.lessonType}

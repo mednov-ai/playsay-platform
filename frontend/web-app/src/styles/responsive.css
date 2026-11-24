@@ -1136,11 +1136,11 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
 }
 
 @media (max-width: 640px) and (orientation: portrait) {
-  .playsay-classroom-shell[data-group-lesson="true"][data-video-expanded="false"][data-video-only="false"][data-presentation-mode="default"] {
+  .playsay-classroom-shell[data-group-lesson="true"][data-tablet-floating="false"][data-video-expanded="false"][data-video-only="false"][data-presentation-mode="default"] {
     grid-template-rows: clamp(13rem, 35dvh, 17.5rem) minmax(0, 1fr);
   }
 
-  .playsay-classroom-shell[data-group-lesson="true"][data-video-expanded="false"][data-presentation-mode="default"] {
+  .playsay-classroom-shell[data-group-lesson="true"][data-tablet-floating="false"][data-video-expanded="false"][data-presentation-mode="default"] {
     .playsay-video-header {
       position: relative;
       inset: auto;
@@ -1273,4 +1273,46 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
       position: absolute;
     }
   }
+}
+.playsay-tablet-video-area .playsay-group-camera-panel {
+  height: 100%;
+  touch-action: none;
+}
+.playsay-tablet-video-area .playsay-group-learner-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(5rem, 1fr);
+}
+.playsay-tablet-video-area .playsay-group-learner-grid:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.playsay-tablet-video-area .playsay-group-learner-grid .playsay-video-grid-card {
+  aspect-ratio: auto;
+  height: 100%;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has([data-adaptive="true"][data-board-fallback="true"]) {
+  grid-template-rows: auto minmax(0, min(8rem, 30dvh)) minmax(0, 1fr) auto;
+}
+.playsay-classroom-shell[data-tablet-floating="true"] .playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] {
+  position: relative;
+  inset: auto;
+  grid-row: 2;
+}
+.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .classroom-floating-window {
+  position: relative;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100%;
+}
+.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-camera-panel {
+  touch-action: pan-y;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has([data-adaptive="true"][data-board-fallback="true"]) :is(.playsay-workbench, .playsay-classroom-primary) {
+  grid-row: 3;
+}
+.playsay-classroom-shell[data-tablet-floating="true"]:has([data-adaptive="true"][data-board-fallback="true"]) .playsay-classroom-conference .playsay-classroom-controls {
+  grid-row: 4;
+}
+
+.classroom-floating-window__resize[hidden] {
+  display: none;
 }

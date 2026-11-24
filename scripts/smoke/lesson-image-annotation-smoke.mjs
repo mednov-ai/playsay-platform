@@ -9,7 +9,7 @@ import { runAssertions } from './fixtures/image-annotation/assertions.mjs';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const requireFrontend = createRequire(resolve(root, 'frontend/package.json'));
 const { createServer } = requireFrontend('vite');
-const react = requireFrontend('@vitejs/plugin-react');
+const react = createRequire(resolve(root, 'frontend/web-app/package.json'))('@vitejs/plugin-react');
 process.chdir(resolve(root, 'frontend/web-app'));
 const cacheDir = await mkdtemp(resolve(tmpdir(), 'honey-image-vite-'));
 const server = await createServer({

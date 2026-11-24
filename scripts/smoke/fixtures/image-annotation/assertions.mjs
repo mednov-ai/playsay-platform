@@ -74,7 +74,7 @@ export async function runAssertions(browser, base, output) {
         const page=await browser.newPage({viewport});
         const room=`matrix-${cases}`;
         await page.goto(`${base}/?size=${size}&layout=${layout}&room=${room}`);
-        await page.locator('[data-anchor-id="image-a"]').waitFor();
+        await page.locator('svg[data-anchor-id="image-a"]').waitFor();
         const a=await draw(page,false);
         const before=await page.evaluate(()=>JSON.stringify(window.fixtureElements));
         for(let i=0;i<5;i++) { await focus(page); await aligned(page,true,[a]); await collapse(page); await aligned(page,false,[a]); }
@@ -85,7 +85,7 @@ export async function runAssertions(browser, base, output) {
         await page.setViewportSize({width:viewport.width-30,height:viewport.height-70});await settle(page);await aligned(page,true,[a,b]);
         if(size==='600x1200' && layout==='FLOW') await page.screenshot({path:`${output}/${viewport.width}-focus.png`});
         await collapse(page);await aligned(page,false,[a,b]);
-        await page.reload();await page.locator('[data-anchor-id="image-a"]').waitFor();await aligned(page,false,[a,b]);
+        await page.reload();await page.locator('svg[data-anchor-id="image-a"]').waitFor();await aligned(page,false,[a,b]);
         await page.close();cases++;
       }
     }
@@ -93,7 +93,7 @@ export async function runAssertions(browser, base, output) {
   console.log(`${cases} desktop/mobile aspect-ratio/layout cases passed (5 focus cycles, reverse drawing, resize, reload)`);
 
   const page=await browser.newPage({viewport:{width:1280,height:800}});
-  await page.goto(`${base}/?fit=cover&room=cover`);await page.locator('[data-anchor-id="image-a"]').waitFor();
+  await page.goto(`${base}/?fit=cover&room=cover`);await page.locator('svg[data-anchor-id="image-a"]').waitFor();
   const cover=await draw(page,false,[.25,.5]);await focus(page);await aligned(page,true,[cover]);await collapse(page);await aligned(page,false,[cover]);
   const generated=await draw(page,false,[.25,.25],'image-b');await focus(page,'image-b');await aligned(page,true,[generated]);
   assert.equal(await page.locator('.playsay-annotation-layer[data-anchor-id]').count(),1,'hidden image anchors must not intercept the focused image');
@@ -115,13 +115,13 @@ export async function runAssertions(browser, base, output) {
   await delayed.mouse.click(pending.x+pending.width/2,pending.y+pending.height/2);
   assert.equal(await delayed.evaluate(()=>window.fixtureElements.length),0,'pending image must not create legacy page coordinates');
   release();
-  await delayed.locator('[data-anchor-id="image-a"]').waitFor();
+  await delayed.locator('svg[data-anchor-id="image-a"]').waitFor();
   const delayedDrawing=await draw(delayed,false);await focus(delayed);await aligned(delayed,true,[delayedDrawing]);
   await delayed.close();
   console.log('Delayed image load and pending-input protection passed');
 
   const shapes=await browser.newPage({viewport:{width:1280,height:800}});
-  await shapes.goto(`${base}/?room=shapes`);await shapes.locator('[data-anchor-id="image-a"]').waitFor();
+  await shapes.goto(`${base}/?room=shapes`);await shapes.locator('svg[data-anchor-id="image-a"]').waitFor();
   await shapes.getByTestId('annotation-tool-rectangle').click();
   const initial=await raster(shapes,false);
   await shapes.mouse.move(initial.left+initial.width*.25,initial.top+initial.height*.25);await shapes.mouse.down();
@@ -150,7 +150,7 @@ export async function runAssertions(browser, base, output) {
   await teacher.setViewportSize({width:1280,height:800});await student.setViewportSize({width:390,height:844});
   await teacher.goto(`${base}/?shared&room=shared`);await student.goto(`${base}/?shared&room=shared`);
   await parallel.goto(`${base}/?shared&room=parallel-student`);
-  await teacher.locator('[data-anchor-id="image-a"]').waitFor();
+  await teacher.locator('svg[data-anchor-id="image-a"]').waitFor();
   const sharedDrawing=await draw(teacher,false);
   await student.waitForFunction(()=>window.fixtureElements.length===1);
   await aligned(student,false,[sharedDrawing]);
@@ -161,7 +161,7 @@ export async function runAssertions(browser, base, output) {
   await teacher.waitForFunction(()=>window.fixtureElements.length===2);
   await aligned(teacher,true,[sharedDrawing,studentDrawing]);
   assert.equal(await parallel.evaluate(()=>window.fixtureElements.length),0,'independent room must stay isolated');
-  await student.reload();await student.locator('[data-anchor-id="image-a"]').waitFor();
+  await student.reload();await student.locator('svg[data-anchor-id="image-a"]').waitFor();
   await aligned(student,false,[sharedDrawing,studentDrawing]);
   await sharedContext.close();
   console.log('Two viewport clients, shared focus/drawing, restoration and independent room passed');

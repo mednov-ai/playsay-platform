@@ -92,7 +92,7 @@ describe("LiveLessonExperience room context", () => {
     view.rerender(<LiveLessonExperience {...common} session={{ ...session, materialId: null }} />);
     expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "videoOnly");
     permissions.canManage = true;
-    const teacherSession = { ...session, identity: session.teacherSubject };
+    const teacherSession = { ...session, identity: "teacher-1" };
     view.rerender(<LiveLessonExperience {...common} session={teacherSession} />);
     expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
     view.rerender(<LiveLessonExperience {...common} session={{ ...teacherSession, lessonType: "INDIVIDUAL" }} />);

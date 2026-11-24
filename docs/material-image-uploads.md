@@ -22,3 +22,13 @@ envelope. Photo-based material drafts accept a source image up to 20 MiB,
 continue to resize and compress it in the browser, and use a 3 MiB JSON
 envelope on the draft endpoint. Pixel, authorization, content, PDF and packet
 checks remain in force.
+
+## Individual desktop lessons
+
+In ordinary view, a dedicated static page with one image or generated image fits
+the whole raster beside the remote camera and drawing tools. The available
+height accounts for navigation and controls. The camera shows the complete
+frame. Image-anchored marks and remote pointers use the original raster
+coordinates on each participant's screen. A tap paints a dot. If the drawn
+image moves or resizes during a stroke, the stroke ends at its last input in
+the original bounds.

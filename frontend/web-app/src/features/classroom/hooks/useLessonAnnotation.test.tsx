@@ -27,6 +27,22 @@ function pointer(x: number, y: number): PointerEvent<SVGSVGElement> {
   return { button: 0, clientX: x, clientY: y, currentTarget: svg, target: svg, pointerId: 1, preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as PointerEvent<SVGSVGElement>;
 }
 
+it("ends an image stroke without a jump when its screen bounds change", () => {
+  const { result } = renderHook(() => {
+    const [elements, setElements] = useState<AnnotationElement[]>([]);
+    return useLessonAnnotation({ lessonId: "lesson", controlledAnnotation: { key: "image", elements, setElements } });
+  });
+  act(() => result.current.setAnnotationTool("pen"));
+  act(() => result.current.beginAnnotation(pointer(100, 150), "board"));
+  const before = result.current.annotationElements;
+  expect(before[0]).toMatchObject({ anchorId: "board", kind: "stroke" });
+  const moved = pointer(850, 700);
+  moved.currentTarget.getBoundingClientRect = () => new DOMRect(500, 30, 600, 400);
+  act(() => result.current.extendAnnotation(moved));
+  act(() => result.current.endAnnotation(moved));
+  expect(result.current.annotationElements).toEqual(before);
+});
+
 describe("concurrent Text gestures", () => {
   for (const mode of ["move", "resize"] as const) {
     for (const initialText of ["", "Before"]) {

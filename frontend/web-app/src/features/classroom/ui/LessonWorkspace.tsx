@@ -270,7 +270,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench" data-presentation-mode={presentationMode}>
+    <section className="playsay-workbench" data-presentation-mode={presentationMode} data-vocabulary-practice={liveVocabulary.practice ? true : undefined}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -359,6 +359,7 @@ export function LessonWorkspace({
           </div>
         ) : null}
 
+        {visibleMaterial && <span className="playsay-image-lesson-title" title={visibleMaterial.title}>{visibleMaterial.title}</span>}
         {visibleMaterial ? (
           <div className="playsay-assignment-strip" aria-label={t("classroom.material.assignedAria")}>
             {materialDocumentBlocks(visibleMaterial).slice(0, 6).map((block, index) => (

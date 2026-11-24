@@ -393,6 +393,7 @@ export function LessonMaterialDocumentView({
           {document.pages.map((item, index) => (
             <button
               aria-label={t("materials.renderer.selectPage", { number: index + 1, title: item.title })}
+              aria-current={item.id === page.id ? "page" : undefined}
               className="playsay-page-picker-button"
               data-active={item.id === page.id ? "true" : "false"}
               disabled={!pagePickerEnabled}

@@ -155,7 +155,41 @@ export function LessonTaskCanvas({
   const [presentationMode, setPresentationMode] = useState<LessonPresentationMode>("default");
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const activePage = document?.pages.find((page) => page.id === activePageId) ?? document?.pages[0] ?? null;
+  const singleImagePage = activePage?.layout === "STATIC_IMAGE" && activePage.blocks.length === 1
+    && ["image", "generatedImage"].includes(activePage.blocks[0].type);
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!singleImagePage || presentationMode !== "default" || typeof ResizeObserver === "undefined") return;
+    const surface = materialSurfaceRef.current;
+    const shell = surface?.closest<HTMLElement>(".playsay-classroom-shell");
+    const workbench = surface?.closest<HTMLElement>(".playsay-workbench");
+    const blocks = surface?.querySelector<HTMLElement>(".playsay-material-blocks-static-image");
+    if (!shell || !workbench || !blocks) return;
+
+    const fitWorkspace = () => {
+      const image = blocks.querySelector("img");
+      if (!image?.naturalHeight || !blocks.clientHeight) return;
+      // Include the toolbars, open side panel and padding in the fitted column.
+      const chromeWidth = workbench.clientWidth - blocks.clientWidth;
+      const rasterWidth = blocks.clientHeight * image.naturalWidth / image.naturalHeight;
+      shell.style.setProperty("--playsay-fitted-workspace", `${Math.ceil(chromeWidth + rasterWidth)}px`);
+    };
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fitWorkspace);
+    });
+    observer.observe(blocks);
+    observer.observe(workbench);
+    blocks.addEventListener("load", fitWorkspace, true);
+    fitWorkspace();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      blocks.removeEventListener("load", fitWorkspace, true);
+      shell.style.removeProperty("--playsay-fitted-workspace");
+    };
+  }, [activePage?.id, material?.id, presentationMode, singleImagePage]);
   const taskDocumentRef = useRef<HTMLDivElement>(null);
   const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");
@@ -600,6 +634,10 @@ export function LessonTaskCanvas({
       event.clientY >= rect.top + visibleBounds.top &&
       event.clientY <= rect.top + visibleBounds.top + visibleBounds.height
     ));
+    if (!anchor && singleImagePage) {
+      annotationSync.updateCursor(null);
+      return;
+    }
     annotationSync.updateCursor(anchor ? {
       anchorId: anchor.id,
       x: clamp01((event.clientX - rect.left - anchor.bounds.left) / anchor.bounds.width),
@@ -639,7 +677,7 @@ export function LessonTaskCanvas({
   }
 
   return (
-    <div className="playsay-task-board" data-presentation-mode={presentationMode}>
+    <div className="playsay-task-board" data-single-image={singleImagePage || undefined} data-presentation-mode={presentationMode}>
       {presentationMode !== "external-activity-focus" && presentationMode !== "html-game-focus" ? (
         <AnnotationToolbar
           annotationColor={annotationColor}
@@ -737,7 +775,7 @@ export function LessonTaskCanvas({
               elements={pageAnnotationElements}
               onAddMindMapNode={addMindMapNode}
               onBegin={(event) => {
-                if (!isOverAnnotationImage(materialSurfaceRef.current, event)) beginAnnotation(event);
+                if (!singleImagePage && !isOverAnnotationImage(materialSurfaceRef.current, event)) beginAnnotation(event);
               }}
               onDeleteSelected={deleteSelectedElement}
               onDeselect={() => setSelectedElementId(null)}

@@ -191,6 +191,8 @@ export function LiveLessonExperience({
       className="playsay-classroom-shell"
       data-presentation-mode={presentationMode}
       data-group-lesson={session.lessonType === "GROUP" ? "true" : undefined}
+      data-image-layout-eligible={session.lessonType === "INDIVIDUAL" && viewportMode === "desktop"
+        && presentationMode === "default" && !screenShareActive}
       data-connection-role={canManageLesson ? "teacher" : "learner"}
       data-media-all-relayed={mediaTransportEvidence.allRelayed ? "true" : "false"}
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}

@@ -1344,3 +1344,7 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   aspect-ratio: auto;
   height: 100%;
 }
+
+.playsay-classroom-shell[data-video-expanded="true"] .playsay-video-focus > .playsay-group-camera-panel {
+  bottom: calc(3.75rem + env(safe-area-inset-bottom));
+}

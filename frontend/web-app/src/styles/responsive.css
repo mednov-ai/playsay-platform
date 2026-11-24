@@ -1292,6 +1292,8 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
       position: absolute;
     }
   }
+}
+
 .playsay-tablet-video-area .playsay-group-camera-panel {
   height: 100%;
   touch-action: none;

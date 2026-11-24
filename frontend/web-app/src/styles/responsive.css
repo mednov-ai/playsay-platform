@@ -1153,3 +1153,65 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   top: 0.25rem;
   bottom: auto;
 }
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .playsay-classroom-shell[data-group-lesson="true"][data-video-expanded="false"][data-video-only="false"][data-presentation-mode="default"] {
+    grid-template-rows: clamp(13rem, 35dvh, 17.5rem) minmax(0, 1fr);
+  }
+
+  .playsay-classroom-shell[data-group-lesson="true"][data-video-expanded="false"][data-presentation-mode="default"] {
+    .playsay-video-header {
+      position: relative;
+      inset: auto;
+      flex: none;
+      padding-block: .25rem;
+      background: var(--playsay-video-header);
+    }
+
+    .playsay-classroom-conference {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+
+    .playsay-video-focus {
+      position: relative;
+      inset: auto;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .playsay-video-strip:not([data-empty="true"]) {
+      position: static;
+      display: flex;
+      flex-direction: column;
+      gap: .125rem;
+      width: min(24vw, 6rem);
+      max-height: 100%;
+      overflow: auto;
+      touch-action: pan-y;
+    }
+
+    .playsay-video-strip .playsay-video-card-label {
+      color: white;
+      background: #151515;
+    }
+
+    .playsay-video-strip .lk-participant-tile {
+      min-height: 0;
+      height: auto;
+    }
+
+    .playsay-classroom-conference .lk-control-bar {
+      position: relative;
+      inset: auto;
+      min-height: 2.8rem;
+      padding-block: .2rem;
+      align-items: center;
+      background: var(--playsay-video-header);
+    }
+
+    .playsay-group-learner-grid {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 6rem), 1fr));
+    }
+  }
+}

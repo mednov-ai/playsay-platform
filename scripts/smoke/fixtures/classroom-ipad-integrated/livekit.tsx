@@ -13,6 +13,11 @@ const listeners = new Set<() => void>();
 let revision = 0;
 const emit = () => { revision += 1; listeners.forEach((fn) => fn()); };
 export const harness = {
+  groupCameras: (teacherView: boolean, joined: boolean, reversed: boolean) => {
+    const people = [learner, teacher, local, ...(joined ? [participant("student-3", false, "Alexandria Long Learner Name")] : [])];
+    cameras = (reversed ? people.reverse() : people).map(p => track({ ...p, isLocal: p.identity === (teacherView ? teacher.identity : local.identity) }));
+    emit();
+  },
   share: (enabled: boolean) => { shares = enabled ? [track(teacher, "screen_share")] : []; emit(); },
   teacherPresent: (enabled: boolean) => { cameras = [track(learner), ...(enabled ? [track(teacher)] : []), track(substitute), track(local)]; emit(); },
   streamState: () => ({ video: mediaStream?.getVideoTracks()[0]?.readyState ?? null }),

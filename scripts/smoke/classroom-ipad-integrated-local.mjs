@@ -60,6 +60,12 @@ async function recordGroupViews(page, device, viewport, teacher) {
     }));
     assert.ok(cameras.some(c => c.subject === "teacher-1"), device+" "+mode+" teacher camera");
     assert.ok(cameras.every(c => c.fit === "contain"), device+" "+mode+" proportional cameras");
+    if (!teacher) assert.ok(cameras.some(c => c.subject === "teacher-1" && c.centreVisible), device+" "+mode+" visible teacher");
+    if (teacher && mode === "share" && await page.locator('[data-video-expanded="true"]').count()) {
+      const panel = await page.locator(".playsay-video-focus > .playsay-group-camera-panel").boundingBox();
+      const bar = await controls.boundingBox();
+      assert.ok(panel.y + panel.height <= bar.y, device+" shared screen controls clear of roster");
+    }
     const key = [device, teacher ? "teacher" : "learner", mode].join("-");
     await page.screenshot({scale:"css",path:path.join(folder,key+".png")});
     fs.writeFileSync(path.join(folder,key+".json"),JSON.stringify(cameras,null,2)+"\n");
@@ -452,6 +458,11 @@ try {
     assert.equal(await cards.count(), 4);
     await page.evaluate(() => window.integratedFixture.localTeacherCamera(true));
     await teacherCell.locator("[data-subject='teacher-1']").waitFor();
+    await teacherCell.scrollIntoViewIfNeeded();
+    assert.ok(await teacherCell.evaluate(card => {
+      const bounds = card.getBoundingClientRect();
+      return card.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+    }), name + " last participant reachable");
     if (process.env.GROUP_LAYOUT_SCREENSHOTS) {
       await page.evaluate(async () => {
         await window.integratedFixture.setLanguage("ru");

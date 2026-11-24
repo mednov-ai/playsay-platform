@@ -1320,7 +1320,7 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
 /* In a short reserved row the roster scrolls horizontally, so a learner's
    name and status stay in the same visible row as their camera. */
 .playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-camera-panel {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   touch-action: pan-x;
 }
@@ -1330,7 +1330,17 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   grid-auto-columns: minmax(min(100%, 6rem), 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
-.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-self-preview {
-  align-self: end;
-  width: 2rem;
+
+.playsay-classroom-shell[data-group-lesson="true"] .lk-participant-tile video.lk-participant-media-video {
+  object-fit: contain;
+  object-position: center;
+}
+
+:is(.playsay-external-activity-video-overlay, .playsay-video-focus) > .playsay-group-camera-panel .playsay-group-learner-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(5rem, 1fr);
+}
+:is(.playsay-external-activity-video-overlay, .playsay-video-focus) > .playsay-group-camera-panel .playsay-video-grid-card {
+  aspect-ratio: auto;
+  height: 100%;
 }

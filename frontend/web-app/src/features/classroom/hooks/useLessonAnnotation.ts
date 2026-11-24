@@ -66,7 +66,7 @@ export type AnnotationReanchorBounds = {
 
 type ActiveInteraction =
   | { acceptUnanchored?: boolean; anchorId?: string; erased: AnnotationStroke[]; mode: "erase"; pptxSlide?: boolean }
-  | { before: AnnotationElement; id: string; mode: "create" }
+  | { before: AnnotationElement; id: string; initialBounds?: DOMRect; mode: "create" }
   | {
       before: AnnotationElement;
       beforeGroup?: AnnotationElement[];
@@ -365,7 +365,10 @@ export function useLessonAnnotation({
     if (!element) {
       return;
     }
-    activeInteractionRef.current = { before: element, id: element.id, mode: "create" };
+    activeInteractionRef.current = {
+      before: element, id: element.id, mode: "create",
+      initialBounds: anchorId ? event.currentTarget.getBoundingClientRect() : undefined,
+    };
     updateElements((current) => [...current, element]);
     setSelectedElementId(element.id);
   }
@@ -377,6 +380,10 @@ export function useLessonAnnotation({
     }
     event.preventDefault();
     const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
+    if (imageBoundsChanged(interaction, event.currentTarget)) {
+      endAnnotation(event);
+      return;
+    }
     pendingInteractionPointRef.current = {
       ...annotationPointFromEvent(event, activePageId, anchorId, interaction.mode === "erase" && Boolean(interaction.pptxSlide)),
       ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
@@ -467,10 +474,12 @@ export function useLessonAnnotation({
       return;
     }
     const anchorId = interaction.mode === "erase" ? interaction.anchorId : interaction.before.anchorId;
-    pendingInteractionPointRef.current = {
-      ...annotationPointFromEvent(event, activePageId, anchorId, interaction.mode === "erase" && Boolean(interaction.pptxSlide)),
-      ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
-    };
+    if (!imageBoundsChanged(interaction, event.currentTarget)) {
+      pendingInteractionPointRef.current = {
+        ...annotationPointFromEvent(event, activePageId, anchorId, interaction.mode === "erase" && Boolean(interaction.pptxSlide)),
+        ...(interaction.mode === "erase" && interaction.acceptUnanchored ? { acceptUnanchored: true } : {}),
+      };
+    }
     cancelPointerFrame();
     flushPendingInteraction();
     activeInteractionRef.current = null;
@@ -1171,3 +1180,11 @@ function cancelScheduledPointerFrame(frameId: number) {
 const defaultAnnotationPageId = "material";
 const historyLimit = 50;
 const minimumCreatedSize = 36;
+
+function imageBoundsChanged(interaction: ActiveInteraction, target: SVGSVGElement) {
+  if (interaction.mode !== "create" || !interaction.initialBounds) return false;
+  const initial = interaction.initialBounds;
+  const current = target.getBoundingClientRect();
+  return current.left !== initial.left || current.top !== initial.top
+    || current.width !== initial.width || current.height !== initial.height;
+}

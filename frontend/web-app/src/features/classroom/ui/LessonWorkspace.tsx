@@ -299,7 +299,7 @@ export function LessonWorkspace({
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
   return (
-    <section className="playsay-workbench" data-work-mode={session.workMode} data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
+    <section className="playsay-workbench" data-vocabulary-practice={liveVocabulary.practice ? true : undefined} data-work-mode={session.workMode} data-presentation-mode={presentationMode} data-whiteboard-active={whiteboard.active} data-library-game-covered={coveredByLibraryGame} style={coveredByLibraryGame && !whiteboard.enabled ? { display: "none" } : undefined}>
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -400,6 +400,7 @@ export function LessonWorkspace({
           </div>
         ) : null}
 
+        {visibleMaterial && <span className="playsay-image-lesson-title" title={visibleMaterial.title}>{visibleMaterial.title}</span>}
         {visibleMaterial ? (
           <div className="playsay-assignment-strip" aria-label={t("classroom.material.assignedAria")}>
             {materialDocumentBlocks(visibleMaterial).slice(0, 6).map((block, index) => (

@@ -1216,6 +1216,82 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   }
 }
 
+.playsay-image-lesson-title {
+  display: none;
+}
+
+/* A dedicated image page in the ordinary individual desktop lesson. */
+@media (min-width: 981px) and (pointer: fine) {
+  main > section:has(.playsay-classroom-shell[data-image-layout-eligible="true"] .playsay-workbench:not([data-vocabulary-practice], [data-whiteboard-active="true"], [data-library-game-covered="true"]) [data-single-image="true"]) {
+    max-width: none;
+  }
+
+  .playsay-classroom-shell[data-image-layout-eligible="true"]:has(.playsay-workbench:not([data-vocabulary-practice], [data-whiteboard-active="true"], [data-library-game-covered="true"]) [data-single-image="true"]) {
+    --workspace-width: max(34rem, var(--playsay-fitted-workspace, 100%));
+    grid-template-columns: clamp(18.5rem, calc(100% - var(--workspace-width)), 32rem)
+      minmax(0, min(var(--workspace-width), calc(100% - 18.5rem)));
+    justify-content: center;
+
+    & .playsay-video-focus .lk-participant-tile .lk-participant-media-video[data-lk-source="camera"] {
+      object-fit: contain;
+    }
+
+    & .playsay-video-rail {
+      container-type: inline-size;
+    }
+
+    & .playsay-classroom-room {
+      flex: 0 1 auto;
+      height: min(100%, calc(56.25cqw + 5rem));
+    }
+
+    & .playsay-assignment-strip {
+      display: none;
+    }
+
+    & .playsay-image-lesson-title {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: .875rem;
+      font-weight: 700;
+    }
+
+    & .playsay-task-document {
+      padding: .5rem;
+    }
+
+    & .playsay-task-document-surface,
+    & .playsay-static-image-page {
+      height: 100%;
+    }
+
+    & .playsay-static-image-page {
+      display: flex;
+      flex-direction: column;
+    }
+
+    & .playsay-material-blocks-static-image {
+      flex: 1 1 0;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    & .playsay-rendered-image-static {
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    & .playsay-rendered-image-static img {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      object-fit: contain;
+    }
+
+    & .playsay-rendered-image-static .playsay-material-focus-trigger {
+      position: absolute;
+    }
+  }
 .playsay-tablet-video-area .playsay-group-camera-panel {
   height: 100%;
   touch-action: none;

@@ -1316,3 +1316,21 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
 .classroom-floating-window__resize[hidden] {
   display: none;
 }
+
+/* In a short reserved row the roster scrolls horizontally, so a learner's
+   name and status stay in the same visible row as their camera. */
+.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-camera-panel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  touch-action: pan-x;
+}
+.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-learner-grid {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(min(100%, 6rem), 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.playsay-tablet-video-area[data-adaptive="true"][data-board-fallback="true"] .playsay-group-self-preview {
+  align-self: end;
+  width: 2rem;
+}

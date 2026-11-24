@@ -3,6 +3,7 @@ import type { ScheduledLesson } from "../../../shared/api/playsay";
 import {
   classroomCameraSlots,
   groupRosterSlots,
+  rosterFitsColumn,
   classroomExternalActivityVideo,
   classroomScreenShareTrack,
   classroomTabletSlots,
@@ -115,3 +116,14 @@ function track(identity: string, isLocal: boolean, source = "camera", trackName?
     source,
   } as Parameters<typeof classroomCameraSlots>[0][number];
 }
+
+describe("desktop roster column", () => {
+  it.each([1, 2, 3])("fits exactly %i cards", count => {
+    const height = count * 100 + (count - 1) * 4;
+    expect(rosterFitsColumn(count, 160, height, 4, 80)).toBe(true);
+    expect(rosterFitsColumn(count, 160, height - 1, 4, 80)).toBe(false);
+  });
+  it("respects minimum card height", () => {
+    expect(rosterFitsColumn(2, 64, 163, 4, 80)).toBe(false);
+  });
+});

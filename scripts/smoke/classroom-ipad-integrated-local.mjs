@@ -298,10 +298,11 @@ try {
     await page.locator(".classroom-floating-window").waitFor({ state: "visible" });
     const afterExternal = await page.evaluate(() => ({ ...window.integratedFixture.counts }));
     assert.deepEqual(afterExternal, beforeExternal, "room and audio renderer must remain mounted across external activity transitions");
-    await page.evaluate(() => window.integratedFixture.setTeacher(true));
-    await page.waitForFunction(() => document.querySelector(".playsay-classroom-shell")?.getAttribute("data-tablet-floating") === "false");
-    assert.equal(await page.locator(".classroom-floating-window").count(), 0);
-    await page.evaluate(() => window.integratedFixture.setTeacher(false));
+    await page.evaluate(() => { window.integratedFixture.groupCameras(true, false, false); window.integratedFixture.setTeacher(true); });
+    const tabletRoster = page.locator(".classroom-floating-window .playsay-group-learner-grid");
+    await tabletRoster.waitFor();
+    assert.equal(await tabletRoster.locator(":scope > *").count(), 3);
+    await page.evaluate(() => { window.integratedFixture.groupCameras(false, false, false); window.integratedFixture.setTeacher(false); });
     await page.locator(".classroom-floating-window").waitFor({ state: "visible" });
     const provider = await page.evaluate(() => window.integratedFixture.counts);
     assert.equal(provider.roomMounts, 1); assert.equal(provider.roomUnmounts, 0);
@@ -350,6 +351,17 @@ try {
     const cards = page.locator(".playsay-group-learner-grid > *");
     const offline = cards.nth(2);
     await offline.waitFor();
+    if (name === "desktop") {
+      const grid = page.locator(".playsay-group-learner-grid");
+      await page.setViewportSize({ width: 1365, height: 1500 });
+      await page.waitForFunction(() => document.querySelector(".playsay-group-learner-grid")?.getAttribute("data-column-fit") === "true");
+      const stacked = await cards.evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().toJSON()));
+      assert.ok(stacked.every(r => Math.abs(r.x - stacked[0].x) < 1 && Math.abs(r.width - stacked[0].width) < 1));
+      assert.ok(stacked[2].y >= stacked[1].bottom && stacked[1].y >= stacked[0].bottom);
+      await page.setViewportSize(options.viewport);
+      await page.waitForFunction(() => document.querySelector(".playsay-group-learner-grid")?.getAttribute("data-column-fit") === "false");
+      assert.ok((await grid.boundingBox()).width > 0);
+    }
     const original = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
     assert.equal(original.length, 3);
     for (const rect of original) {
@@ -391,6 +403,34 @@ try {
       await page.evaluate(()=>{window.integratedFixture.groupCameras(false,false,false);window.integratedFixture.setTeacher(false);});
       await page.locator(".playsay-tablet-teacher-video,.playsay-video-focus").first().waitFor();
       await page.screenshot({ scale: "css", path: path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name + "-learner.png") });
+    }
+    if (name !== "desktop") {
+      const rotation = page.viewportSize();
+      for (const [orientation, viewport] of [
+        ["portrait", rotation], ["landscape", { width: rotation.height, height: rotation.width }],
+      ]) {
+        await page.setViewportSize(viewport);
+        for (const teacherView of [true, false]) {
+          await page.evaluate(isTeacher => {
+            window.integratedFixture.groupCameras(isTeacher, false, true);
+            window.integratedFixture.setTeacher(isTeacher);
+          }, teacherView);
+          const content = teacherView ? ".playsay-group-learner-grid" : ".playsay-tablet-teacher-video [data-subject='teacher-1']";
+          await page.locator(".playsay-tablet-video-area " + content).waitFor();
+          await page.locator("#material-input").fill("ok");
+          await page.locator("#material-content").click();
+          const bounds = await page.locator(".classroom-floating-window").boundingBox();
+          assert.ok(bounds && bounds.width > 0 && bounds.height > 0);
+          if (process.env.GROUP_LAYOUT_SCREENSHOTS) await page.screenshot({scale:"css",path:path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name+"-"+orientation+"-"+(teacherView?"teacher":"learner")+".png")});
+          await page.locator("#fixture-board").click();
+          await page.locator(".playsay-whiteboard-stage").waitFor();
+          await page.locator(".playsay-tablet-video-area " + content).waitFor();
+          if (process.env.GROUP_LAYOUT_SCREENSHOTS) await page.screenshot({scale:"css",path:path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name+"-"+orientation+"-"+(teacherView?"teacher":"learner")+"-board.png")});
+          await page.locator("#fixture-material").click();
+          await page.locator("#material-input").waitFor();
+          console.log("PASS rotation", name, orientation, teacherView ? "teacher" : "learner", JSON.stringify(bounds), await page.locator(".playsay-tablet-video-area").getAttribute("data-board-fallback"));
+        }
+      }
     }
     console.log("PASS group layout", name, original.map(r => [Math.round(r.width), Math.round(r.height)]));
     await context.close();

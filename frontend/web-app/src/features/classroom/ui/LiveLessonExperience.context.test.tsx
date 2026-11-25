@@ -157,7 +157,22 @@ describe("LiveLessonExperience room context", () => {
     view.rerender(<LiveLessonExperience {...common} session={teacherSession} />);
     expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
     view.rerender(<LiveLessonExperience {...common} session={{ ...teacherSession, lessonType: "INDIVIDUAL" }} />);
-    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "lesson");
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "tabletFloating");
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
+  });
+  it("opens the individual task on a landscape phone and returns to video in the same room", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ addEventListener: vi.fn(), matches: query.includes("landscape") || query.includes("pointer: coarse"), removeEventListener: vi.fn() }));
+    vi.stubGlobal("innerWidth", 844);
+    vi.stubGlobal("innerHeight", 390);
+    const session = { ...classroomSession(), lessonType: "INDIVIDUAL" as const, identity: "student-1" };
+    render(<LiveLessonExperience materials={[]} onAssignMaterial={vi.fn()} onComplete={vi.fn()} onLeave={vi.fn()} onMediaLifecycleChange={vi.fn()} onRetryMedia={vi.fn()} profile={null} recoveryPhase="idle" session={session} />);
+    const provider = screen.getByTestId("livekit-room");
+    expect(screen.getByTestId("video-stage")).toHaveAttribute("data-mode", "focusOnly");
+    fireEvent.click(screen.getByRole("button", { name: "classroom.actions.showLessonMaterial" }));
+    expect(screen.getByTestId("lesson-workspace")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "classroom.actions.showLessonVideo" }));
+    expect(screen.queryByTestId("lesson-workspace")).not.toBeInTheDocument();
+    expect(screen.getByTestId("livekit-room")).toBe(provider);
   });
   it("keeps a material-free learner's board visible across screen-share transitions", () => {
     vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), matches: false, removeEventListener: vi.fn() }));

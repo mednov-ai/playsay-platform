@@ -169,6 +169,20 @@ describe("group learner camera", () => {
   const group = { ...props, lessonType: "GROUP", teacherSubject: "teacher", teacherName: "Assigned Teacher" };
   const peer = { participant: { identity: "peer", isLocal: false }, source: "camera" };
   const teacher = { participant: { identity: "teacher", isLocal: false }, source: "camera", publication: { isMuted: true } };
+  it("keeps the assigned teacher in the first material card through camera loss and recovery", () => {
+    state.cameras = [peer, teacher];
+    const stage = () => <ClassroomVideoStage {...group} cameraColumn />;
+    const { container, rerender } = render(stage());
+    const cards = () => container.querySelectorAll(".playsay-video-grid-card");
+    expect(cards()[0].querySelector("video")).toHaveAttribute("data-participant", "teacher");
+    expect(cards()[1].querySelector("video")).toHaveAttribute("data-participant", "peer");
+    state.cameras = [peer];
+    rerender(stage());
+    expect(cards()[0]).toHaveTextContent("Assigned Teacher");
+    state.cameras = [teacher, peer];
+    rerender(stage());
+    expect(cards()[0].querySelector("video")).toHaveAttribute("data-participant", "teacher");
+  });
   for (const mode of ["lesson", "externalActivity", "focusOnly", "videoOnly", "tabletFloating"] as const) {
     it(`keeps the teacher in ${mode} during camera loss and recovery`, () => {
       state.cameras = [peer, teacher];

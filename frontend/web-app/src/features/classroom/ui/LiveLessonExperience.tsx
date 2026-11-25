@@ -20,6 +20,7 @@ import {
   ClassroomMediaConnectionObserver,
   type ClassroomMediaConnectionLifecycle,
 } from "./ClassroomMediaConnectionObserver";
+import { LessonPagePickerHost } from "../model/lessonPagePickerHost";
 import { LessonWorkspace } from "./LessonWorkspace";
 import type { LessonPresentationMode } from "./LessonTaskCanvas";
 import { useAppTranslation } from "../../../shared/i18n";
@@ -126,12 +127,17 @@ export function LiveLessonExperience({
   const videoOnly = !session.materialId && !canManageLesson && !liveVocabulary.practice && !libraryGame.launch && !whiteboardPresented;
   const externalActivityFocus = presentationMode === "external-activity-focus" && !whiteboardPresented;
   const libraryGameActive = Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented);
+  const materialView = Boolean(session.materialId) && !screenShareActive && !externalActivityFocus
+    && !libraryGameActive && !whiteboardPresented && !liveVocabulary.practice;
+  const [landscapeTaskOpen, setLandscapeTaskOpen] = useState(false);
   const groupWorkspace = session.lessonType === "GROUP" && Boolean(session.materialId || whiteboardPresented) && !screenShareActive && !externalActivityFocus && !libraryGameActive;
-  const rawViewportMode = useClassroomViewportMode(groupWorkspace || !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive);
+  const rawViewportMode = useClassroomViewportMode(materialView || groupWorkspace || !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive);
   const viewportMode = effectiveClassroomViewportMode(rawViewportMode, canManageLesson);
   const groupFloating = groupWorkspace && viewportMode !== "desktop";
-  const videoExpanded = !externalActivityFocus && !groupFloating && classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
-  const tabletFloating = groupFloating || viewportMode === "tablet" && !canManageLesson && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive;
+  const canSwitchLandscapeTask = materialView && session.lessonType === "INDIVIDUAL" && viewportMode === "mobileLandscape";
+  const landscapeMaterial = canSwitchLandscapeTask && landscapeTaskOpen;
+  const videoExpanded = !landscapeMaterial && !externalActivityFocus && !groupFloating && classroomVideoExpanded(viewportMode, screenShareActive) && !whiteboardPresented;
+  const tabletFloating = groupFloating || viewportMode === "tablet" && (materialView || !canManageLesson) && !videoOnly && !screenShareActive && !externalActivityFocus && !libraryGameActive;
   const classroomVideoMode: ClassroomVideoMode = externalActivityFocus
     ? "externalActivity"
     : tabletFloating
@@ -141,7 +147,11 @@ export function LiveLessonExperience({
       : videoOnly
         ? "videoOnly"
         : "lesson";
-  const showWorkspace = externalActivityFocus || groupFloating || whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const showWorkspace = landscapeMaterial || externalActivityFocus || groupFloating || whiteboardPresented || shouldShowLessonWorkspace({ canManageLesson, screenShareActive, videoOnly, viewportMode });
+  const cameraColumn = materialView && classroomVideoMode === "lesson";
+  const individualTools = materialView && session.lessonType === "INDIVIDUAL" && (cameraColumn || tabletFloating);
+  const [vocabularyHost, setVocabularyHost] = useState<HTMLDivElement | null>(null);
+  const [pagePickerHost, setPagePickerHost] = useState<HTMLDivElement | null>(null);
   const liveKitRoomOptions = useMemo(
     () => lessonLiveKitRoomOptions(session.mediaChoices.audioOutputDeviceId),
     [session.mediaChoices.audioOutputDeviceId],
@@ -212,8 +222,7 @@ export function LiveLessonExperience({
       className="playsay-classroom-shell"
       data-presentation-mode={whiteboardPresented ? "default" : presentationMode}
       data-group-lesson={session.lessonType === "GROUP" ? "true" : undefined}
-      data-image-layout-eligible={session.lessonType === "INDIVIDUAL" && viewportMode === "desktop"
-        && presentationMode === "default" && !screenShareActive}
+      data-camera-column={cameraColumn || undefined}
       data-connection-role={canManageLesson ? "teacher" : "learner"}
       data-media-all-relayed={mediaTransportEvidence.allRelayed ? "true" : "false"}
       data-media-peer-connections={mediaTransportEvidence.peerConnectionCount}
@@ -275,11 +284,18 @@ export function LiveLessonExperience({
               learnerSubjects={session.participants.map((participant) => participant.subject)}
             />
             <h1 title={session.lessonTitle}>{session.lessonTitle}</h1>
+            {canSwitchLandscapeTask && (
+              <Button className="playsay-landscape-task-toggle" onClick={() => setLandscapeTaskOpen(open => !open)} type="button" variant="outline">
+                {t(landscapeMaterial ? "classroom.actions.showLessonVideo" : "classroom.actions.showLessonMaterial")}
+              </Button>
+            )}
             {libraryGame.canControl && session.workMode === "SHARED" ? <Button variant="outline" onClick={() => setGamePickerOpen(true)}>{t("games.title")}</Button> : null}
           </div>
 
           <div className="playsay-classroom-room min-h-0 flex-1">
             <ClassroomVideoStage
+              cameraColumn={cameraColumn}
+              floatingVocabularyRef={individualTools && tabletFloating ? setVocabularyHost : undefined}
               adaptiveFloating={groupFloating && (translationRole === "teacher" || viewportMode !== "tablet")}
               expectedParticipants={session.participants}
               lessonId={session.lessonId}
@@ -302,8 +318,9 @@ export function LiveLessonExperience({
               translationRole={translationRole}
             />
           </div>
+          {individualTools && !tabletFloating && <div className="playsay-camera-vocabulary" ref={setVocabularyHost} />}
+          {cameraColumn && viewportMode === "desktop" && <div className="playsay-camera-pages" ref={setPagePickerHost} />}
         </section>
-
 
         {gamePickerOpen ? <HtmlGamePicker selectLabelKey="games.start" onClose={() => setGamePickerOpen(false)} onSelect={async (game) => { await libraryGame.start(game); setGamePickerOpen(false); }} /> : null}
         {showWorkspace || libraryGame.launch ? <div className="playsay-classroom-primary">
@@ -311,18 +328,22 @@ export function LiveLessonExperience({
         {libraryGame.launch ? <LessonLibraryGameStage key={libraryGame.launch.id} launch={libraryGame.launch} name={displayName} authority={libraryGame.canControl} protocolReady={libraryGame.protocolReady} minimized={gameMinimized} suspended={whiteboardPresented} onMinimize={setGameMinimized} onStop={() => libraryGame.stop(libraryGame.launch!.id)} /> : null}
         {showWorkspace || libraryGame.launch ? (
           <div className="contents">
-          <LessonWorkspace
-            coveredByLibraryGame={Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented)}
-            onWhiteboardActiveChange={setTeacherBoardPresented}
-            displayName={displayName}
-            liveVocabulary={liveVocabulary}
-            materials={materials}
-            onAssignMaterial={onAssignMaterial}
-            onPresentationModeChange={mode => { if (!whiteboardPresented) setPresentationMode(mode); }}
-            presentationMode={presentationMode}
-            profile={profile}
-            session={session}
-          />
+          <LessonPagePickerHost.Provider value={pagePickerHost}>
+            <LessonWorkspace
+              vocabularyHost={individualTools ? vocabularyHost : null}
+              showVocabularyPreview={viewportMode === "desktop"}
+              coveredByLibraryGame={Boolean(libraryGame.launch && !gameMinimized && !whiteboardPresented)}
+              onWhiteboardActiveChange={setTeacherBoardPresented}
+              displayName={displayName}
+              liveVocabulary={liveVocabulary}
+              materials={materials}
+              onAssignMaterial={onAssignMaterial}
+              onPresentationModeChange={mode => { if (!whiteboardPresented) setPresentationMode(mode); }}
+              presentationMode={presentationMode}
+              profile={profile}
+              session={session}
+            />
+          </LessonPagePickerHost.Provider>
           </div>
         ) : null}
         </div> : null}

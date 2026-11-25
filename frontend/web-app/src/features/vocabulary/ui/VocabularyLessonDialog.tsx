@@ -38,6 +38,7 @@ export function VocabularyLessonDialog({
   onStartPractice,
   recipientSubjects = [],
   source,
+  showPreview = false,
   triggerClassName = "mt-2",
   triggerLabelClassName,
 }: {
@@ -46,6 +47,7 @@ export function VocabularyLessonDialog({
   onStartPractice?: () => void;
   recipientSubjects?: string[];
   source: Omit<CreateVocabularyEntry, "sourceText">;
+  showPreview?: boolean;
   triggerClassName?: string;
   triggerLabelClassName?: string;
 }) {
@@ -76,6 +78,16 @@ export function VocabularyLessonDialog({
   const [reconnecting, setReconnecting] = useState(false);
   const [highlightedEntryId, setHighlightedEntryId] = useState<string | null>(null);
 
+  const [preview, setPreview] = useState<{ owner: string; lesson: string; entries: VocabularyEntry[] } | null>(null);
+  const lessonId = source.lessonId;
+  useEffect(() => {
+    if (!showPreview || !ownerSubject || !lessonId || open) return;
+    let active = true;
+    void fetchVocabularyOverview(ownerSubject, lessonId, 3).then(result => {
+      if (active) setPreview({ owner: ownerSubject, lesson: lessonId, entries: result.lessonEntries.slice(0, 3) });
+    }).catch(() => { if (active) setPreview(null); });
+    return () => { active = false; };
+  }, [showPreview, ownerSubject, lessonId, open]);
   const refreshOverview = useCallback(async () => {
     if (!open) return;
     setLoading(true);
@@ -409,6 +421,11 @@ export function VocabularyLessonDialog({
         <BookOpen aria-hidden="true" className="h-4 w-4" />
         <span className={triggerLabelClassName}>{t("vocabulary.lessonMenu.label")}</span>
       </Button>
+      {showPreview && preview && preview.owner === ownerSubject && preview.lesson === lessonId && preview.entries.length > 0 && (
+        <ul className="playsay-camera-words">
+          {preview.entries.map(entry => <li key={entry.id}><strong>{entry.sourceText}</strong> {entry.translation}</li>)}
+        </ul>
+      )}
       {modal}
     </div>
   );

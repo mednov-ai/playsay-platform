@@ -27,6 +27,8 @@ export type ClassroomVideoMode = "lesson" | "videoOnly" | "focusOnly" | "externa
 
 export function ClassroomVideoStage({
   adaptiveFloating = false,
+  cameraColumn = false,
+  floatingVocabularyRef,
   expectedParticipants,
   lessonId,
   lessonType,
@@ -48,6 +50,8 @@ export function ClassroomVideoStage({
   translationRole,
 }: {
   adaptiveFloating?: boolean;
+  cameraColumn?: boolean;
+  floatingVocabularyRef?: (node: HTMLDivElement | null) => void;
   expectedParticipants: ScheduledLesson["participants"];
   lessonId: string;
   lessonType: string;
@@ -270,27 +274,31 @@ export function ClassroomVideoStage({
     };
   }, [canDragStrip, externalActivityVideo.additionalCount, mode, stripLayout, stripSlots.length]);
 
-  const learnerGrid = groupTeacher && (
+  const roster = groupTeacher ? groupSlots : groupLearner ? [pinnedTeacher, ...stripSlots] : cameraSlots;
+  const rosterGrid = (groupTeacher || cameraColumn) && (
     <div className="playsay-group-camera-panel">
-      <GroupLearnerGrid slots={groupSlots} showLearnerConnectionDots={showLearnerConnectionDots} />
+      <GroupLearnerGrid slots={roster} showLearnerConnectionDots={showLearnerConnectionDots} />
     </div>
   );
 
   if (mode === "tabletFloating" && !activeScreenShareTrack) {
-    const { teacherSlot, activeSlot, localSlot, otherSlots } = classroomTabletSlots(cameraSlots, teacherSubject, selectedVideoSubject);
+    const individualTeacher = !groupLesson && showExpectedParticipants;
+    const partner = individualTeacher ? expectedParticipants[0] : null;
+    const partnerSubject = individualTeacher ? partner?.subject : teacherSubject;
+    const { teacherSlot, activeSlot, localSlot, otherSlots } = classroomTabletSlots(cameraSlots, partnerSubject, selectedVideoSubject);
     const insetSlot = groupLearner && selectedVideoPresent ? pinnedTeacher : localSlot;
-    const teacherPlaceholder: ClassroomVideoSlot | null = teacherSubject && !teacherSlot && !activeSlot
-      ? { kind: "placeholder", displayName: teacherName?.trim() || t("classroom.connection.teacher"), state: participantPresence[teacherSubject] ?? "OFFLINE", subject: teacherSubject }
+    const partnerPlaceholder: ClassroomVideoSlot | null = partnerSubject && !teacherSlot && !activeSlot
+      ? { kind: "placeholder", displayName: individualTeacher ? partner?.displayName || partner?.username || partnerSubject : teacherName?.trim() || t("classroom.connection.teacher"), state: participantPresence[partnerSubject] ?? "OFFLINE", subject: partnerSubject }
       : null;
     return (
       <div className="playsay-classroom-conference" data-mode="tablet-floating">
         <div className="playsay-tablet-video-area" data-adaptive={adaptiveFloating}>
-          <ClassroomFloatingWindow adaptive={adaptiveFloating} participantCount={groupSlots.length}>
-            {groupTeacher ? learnerGrid : (
+          <ClassroomFloatingWindow footerRef={floatingVocabularyRef} adaptive={adaptiveFloating} participantCount={groupSlots.length}>
+            {groupTeacher ? rosterGrid : (
             <div className="playsay-tablet-video-content">
               <div className="playsay-tablet-teacher-video">
-                {activeSlot || teacherPlaceholder ? (
-                  <ClassroomVideoSlotView slot={(activeSlot ?? teacherPlaceholder)!} />
+                {activeSlot || partnerPlaceholder ? (
+                  <ClassroomVideoSlotView slot={(activeSlot ?? partnerPlaceholder)!} />
                 ) : (
                   <div className="playsay-video-presence" role="status">
                     <span className="playsay-video-presence-icon"><UserRound aria-hidden="true" /></span>
@@ -355,7 +363,7 @@ export function ClassroomVideoStage({
     return (
       <div className="playsay-classroom-conference" data-layout="pip" data-mode="external-activity">
         <div className="playsay-external-activity-video-overlay" ref={focusRef}>
-          {groupTeacher ? learnerGrid : externalActivityVideo.featuredSlot ? (
+          {groupTeacher ? rosterGrid : externalActivityVideo.featuredSlot ? (
             <div
               className="playsay-external-activity-pip"
               data-draggable="true"
@@ -392,10 +400,11 @@ export function ClassroomVideoStage({
     );
   }
 
-  if ((groupTeacher || (mode === "videoOnly" && !groupLearner)) && !activeScreenShareTrack) {
+  if ((cameraColumn || groupTeacher || (mode === "videoOnly" && !groupLearner)) && !activeScreenShareTrack) {
     return (
-      <div className="playsay-classroom-conference" data-layout="grid" data-mode="video-only">
-        {groupTeacher ? learnerGrid : <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
+      <div className="playsay-classroom-conference" data-layout="grid" data-mode={cameraColumn ? "camera-column" : "video-only"}
+        style={cameraColumn ? { "--camera-count": Math.max(1, roster.length) } as CSSProperties : undefined}>
+        {rosterGrid || <div className="playsay-video-grid" data-count={cameraSlots.length || 1}>
           {cameraSlots.length > 0
             ? cameraSlots.map((slot) => (
               <ClassroomGridVideoSlot
@@ -469,7 +478,7 @@ export function ClassroomVideoStage({
             </span>
           </div>
         ) : null}
-        {groupTeacher ? learnerGrid : <div
+        {groupTeacher ? rosterGrid : <div
           className="playsay-video-strip"
           data-draggable={canDragStrip ? "true" : "false"}
           data-empty={hasStrip ? "false" : "true"}

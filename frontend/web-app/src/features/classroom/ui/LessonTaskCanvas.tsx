@@ -187,38 +187,6 @@ export function LessonTaskCanvas({
   const singleImagePage = activePage?.layout === "STATIC_IMAGE" && activePage.blocks.length === 1
     && ["image", "generatedImage"].includes(activePage.blocks[0].type);
   const materialSurfaceRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (!singleImagePage || presentationMode !== "default" || typeof ResizeObserver === "undefined") return;
-    const surface = materialSurfaceRef.current;
-    const shell = surface?.closest<HTMLElement>(".playsay-classroom-shell");
-    const workbench = surface?.closest<HTMLElement>(".playsay-workbench");
-    const blocks = surface?.querySelector<HTMLElement>(".playsay-material-blocks-static-image");
-    if (!shell || !workbench || !blocks) return;
-
-    const fitWorkspace = () => {
-      const image = blocks.querySelector("img");
-      if (!image?.naturalHeight || !blocks.clientHeight) return;
-      // Include the toolbars, open side panel and padding in the fitted column.
-      const chromeWidth = workbench.clientWidth - blocks.clientWidth;
-      const rasterWidth = blocks.clientHeight * image.naturalWidth / image.naturalHeight;
-      shell.style.setProperty("--playsay-fitted-workspace", `${Math.ceil(chromeWidth + rasterWidth)}px`);
-    };
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(fitWorkspace);
-    });
-    observer.observe(blocks);
-    observer.observe(workbench);
-    blocks.addEventListener("load", fitWorkspace, true);
-    fitWorkspace();
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-      blocks.removeEventListener("load", fitWorkspace, true);
-      shell.style.removeProperty("--playsay-fitted-workspace");
-    };
-  }, [activePage?.id, material?.id, presentationMode, singleImagePage]);
   const taskDocumentRef = useRef<HTMLDivElement>(null);
   const documentScrollBeforeImageFocusRef = useRef<{ left: number; top: number } | null>(null);
   const previousPresentationModeRef = useRef<LessonPresentationMode>("default");

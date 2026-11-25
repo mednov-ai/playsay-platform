@@ -1674,6 +1674,8 @@ export const ru = {
       addHtmlGamePage: "Добавить HTML-игру",
       complete: "Завершить",
       completeLesson: "Завершить занятие",
+      showLessonVideo: "К видео",
+      showLessonMaterial: "К заданию",
       enterFullscreen: "На весь экран",
       exitFullscreen: "Выйти из полноэкранного режима",
       leave: "Выйти",

@@ -290,6 +290,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
 }) {
   const { t } = useAppTranslation();
   const measurementRef = useRef<HTMLSpanElement>(null);
+  const finishMeasurementRef = useRef<(() => void) | null>(null);
   const onElementSizeChangeRef = useRef(onElementSizeChange);
   const label = t(`classroom.annotation.element.${element.kind}`);
   const sizeableTextElement = element.kind === "text" || element.kind === "mindMapNode" ? element : null;
@@ -309,9 +310,7 @@ const AnnotationElementView = memo(function AnnotationElementView({
     let cancelled = false;
     let frameId: number | null = null;
     const measure = () => {
-      if (frameId !== null) cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(() => {
-        frameId = null;
+      frameId = null;
       const measurement = measurementRef.current;
       if (!measurement || cancelled) return;
       const constraints = annotationTextSizingConstraints(sizeableTextElement);
@@ -351,11 +350,19 @@ const AnnotationElementView = memo(function AnnotationElementView({
       ) {
         onElementSizeChangeRef.current(sizeableTextElement.id, nextWidth, nextHeight);
       }
-      });
     };
-    measure();
-    void document.fonts?.ready.then(measure);
+    const scheduleMeasurement = () => {
+      if (!cancelled && frameId === null) frameId = requestAnimationFrame(measure);
+    };
+    finishMeasurementRef.current = () => {
+      if (frameId === null) return;
+      cancelAnimationFrame(frameId);
+      measure();
+    };
+    scheduleMeasurement();
+    void document.fonts?.ready.then(scheduleMeasurement);
     return () => {
+      finishMeasurementRef.current = null;
       cancelled = true;
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
@@ -480,7 +487,10 @@ const AnnotationElementView = memo(function AnnotationElementView({
           <AnnotationTextEditor
             element={element}
             label={label}
-            onFinish={onFinishTextEditing}
+            onFinish={() => {
+              finishMeasurementRef.current?.();
+              onFinishTextEditing();
+            }}
             onMindMapKey={onMindMapKey}
             onTextChange={onTextChange}
             placeholder={element.kind === "stickyNote"

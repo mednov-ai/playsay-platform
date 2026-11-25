@@ -85,6 +85,19 @@ describe("HTML annotation rendering", () => {
     expect(owner).toBe(next.container.querySelector("foreignObject"));
   });
 
+  it("commits the pending text measurement before closing the editor", () => {
+    dimensions();
+    vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    const input = { ...props(), editingElementId: "text-1" };
+    const { getByRole } = render(<AnnotationLayer {...input} />);
+    expect(input.onElementSizeChange).not.toHaveBeenCalled();
+
+    fireEvent.blur(getByRole("textbox"));
+
+    expect(input.onElementSizeChange).toHaveBeenCalledOnce();
+    expect(input.onElementSizeChange).toHaveBeenCalledBefore(vi.mocked(input.onFinishTextEditing));
+  });
+
   it("preserves composition and final input on blur through the portal", () => {
     dimensions();
     const input = { ...props(), editingElementId: "text-1" };

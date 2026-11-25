@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.playsay.gateway.entity.MaterialAssetEntity
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.game.HtmlGameRepository
+import com.playsay.gateway.service.MaterialObjectNotFoundException
 import com.playsay.gateway.service.MaterialObjectStorage
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -19,11 +20,20 @@ class LegacyGameProvenanceService(
     private val mapper: ObjectMapper,
 ) {
     fun bytes(asset: MaterialAssetEntity): ByteArray {
-        val key = repository.alias(asset.id)?.let { repository.blob(it.revisionId)?.storageKey } ?: asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_CONTENT_NOT_FOUND")
-        return objects.getObject(key).bytes
+        // Only library-backed material copies were created without an independent source object.
+        val key = asset.storageKey ?: if (asset.provider == "GAME_LIBRARY") {
+            repository.alias(asset.id)?.let { repository.blob(it.revisionId)?.storageKey }
+        } else null
+        if (key.isNullOrBlank()) gameError(HttpStatus.NOT_FOUND, "GAME_CONTENT_NOT_FOUND")
+        return try {
+            objects.getObject(key).bytes
+        } catch (_: MaterialObjectNotFoundException) {
+            gameError(HttpStatus.NOT_FOUND, "GAME_CONTENT_NOT_FOUND")
+        }
     }
 
     internal fun inspect(asset: MaterialAssetEntity, sourceBytes: ByteArray): LegacyGameOrigin {
+        if (asset.provider == "GAME_LIBRARY" && asset.storageKey == null) return LegacyGameOrigin(asset, null, null, true)
         val hash = gameHash(sourceBytes)
         val visited = mutableSetOf(asset.id)
         var current = asset

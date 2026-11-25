@@ -6,6 +6,9 @@ import com.playsay.gateway.service.MaterialObjectStorage
 import com.playsay.gateway.service.game.HtmlGameLibraryMigrationService
 import java.time.Instant
 import java.util.UUID
+import kotlin.test.assertFailsWith
+import com.playsay.gateway.error.ProjectResponseException
+import com.playsay.gateway.service.MaterialAssetService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() {
     @Autowired private lateinit var gameMaterials: com.playsay.gateway.controller.HtmlGameMaterialController
     @Autowired private lateinit var migration: HtmlGameLibraryMigrationService
+    @Autowired private lateinit var materialAssets: MaterialAssetService
     @Autowired private lateinit var objects: MaterialObjectStorage
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean private lateinit var jdbc: JdbcTemplate
 
@@ -120,6 +124,16 @@ class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() 
         assertEquals("CANDIDATE", jdbc.queryForObject("SELECT outcome FROM html_game_migration_checkpoint WHERE asset_id=?", String::class.java, candidate))
         migration.materials(false)
         assertEquals(0L, migration.reconcile()["unresolved"])
+        val candidateKey = materialAssetRepo.findById(candidate).orElseThrow().storageKey!!
+        val candidateBytes = objects.getObject(candidateKey).bytes
+        val retained = jdbc.queryForObject("SELECT retained_blob_id FROM html_game_migration_checkpoint WHERE asset_id=?", UUID::class.java, candidate)
+        objects.putObject(candidateKey, sourceBytes, "text/html")
+        assertEquals("BLOCKED", migration.batch(true).outcomes.single { it.assetId == candidate }.outcome)
+        assertEquals("BLOCKED", migration.batch(false).outcomes.single { it.assetId == candidate }.outcome)
+        assertFailsWith<ProjectResponseException> { migration.reconcile() }
+        objects.putObject(candidateKey, candidateBytes, "text/html")
+        assertEquals("CANDIDATE", migration.batch(false).outcomes.single { it.assetId == candidate }.outcome)
+        assertEquals(retained, jdbc.queryForObject("SELECT retained_blob_id FROM html_game_migration_checkpoint WHERE asset_id=?", UUID::class.java, candidate))
         val revisions = jdbc.queryForObject("SELECT COUNT(*) FROM html_game_revision", Long::class.java)
         migration.batch(false); migration.materials(false)
         assertEquals(revisions, jdbc.queryForObject("SELECT COUNT(*) FROM html_game_revision", Long::class.java))
@@ -224,6 +238,53 @@ class HtmlGameLibraryMigrationIntegrationTest : MaterialControllerTestFixture() 
         assertTrue(bytes.contentEquals(objects.getObject(cover["storage_key"].toString()).bytes))
         assertTrue(bytes.contentEquals(objects.getObject(key).bytes))
         assertEquals(0L, migration.reconcile()["unresolved"])
+        val storedCover = cover["storage_key"].toString()
+        for (coverKey in listOf(key, storedCover)) {
+            objects.putObject(coverKey, bytes + 1.toByte(), "image/jpeg")
+            assertEquals("BLOCKED", migration.batch(true).outcomes.single().outcome)
+            assertFailsWith<ProjectResponseException> { migration.reconcile() }
+            objects.deleteObject(coverKey)
+            assertEquals("BLOCKED", migration.batch(false).outcomes.single().outcome)
+            assertFailsWith<ProjectResponseException> { migration.reconcile() }
+            objects.putObject(coverKey, bytes, "image/jpeg")
+            assertEquals("MAPPED", migration.batch(false).outcomes.single().outcome)
+            assertEquals(0L, migration.reconcile()["unresolved"])
+        }
+    }
+
+    @Test
+    fun `mapped source and library object are checked independently on inventory resume and cutoff`() {
+        val teacher = authentication(subject = "teacher-1", role = "ROLE_TEACHER")
+        val material = materialCrudController.create(teacher, LessonMaterialRequest(title = "Original")).body!!
+        val bytes = "<html><body>Original</body></html>".toByteArray()
+        val source = legacy(material.id, bytes)
+        val sourceKey = materialAssetRepo.findById(source).orElseThrow().storageKey!!
+        assertEquals("MAPPED", migration.batch(false).outcomes.single().outcome)
+        val alias = jdbc.queryForMap("SELECT a.game_id, a.revision_id, b.storage_key FROM html_game_legacy_alias a JOIN html_game_revision r ON r.id=a.revision_id JOIN html_game_blob b ON b.id=r.blob_id WHERE a.asset_id=?", source)
+        val libraryKey = alias.getValue("storage_key") as String
+        assertTrue(sourceKey != libraryKey)
+
+        val copiedMaterial = materialCrudController.create(teacher, LessonMaterialRequest(title = "Library copy")).body!!
+        val copy = materialAssets.copyAssets(material.id, copiedMaterial.id, setOf(source)).getValue(source)
+        assertEquals(null, materialAssetRepo.findById(copy).orElseThrow().storageKey)
+        assertEquals(2L, migration.reconcile()["mapped"])
+
+        fun assertBlocked() {
+            for (dryRun in listOf(true, false)) {
+                assertEquals("BLOCKED", migration.batch(dryRun).outcomes.single { it.assetId == source }.outcome)
+            }
+            assertFailsWith<ProjectResponseException> { migration.reconcile() }
+        }
+        for (key in listOf(sourceKey, libraryKey)) {
+            objects.putObject(key, "changed".toByteArray(), "text/html")
+            assertBlocked()
+            objects.deleteObject(key)
+            assertBlocked()
+            objects.putObject(key, bytes, "text/html")
+            assertTrue(migration.batch(false).outcomes.all { it.outcome == "MAPPED" })
+            assertEquals(2L, migration.reconcile()["mapped"])
+        }
+        assertEquals(alias["revision_id"], jdbc.queryForObject("SELECT revision_id FROM html_game_legacy_alias WHERE asset_id=?", UUID::class.java, source))
     }
 
     private fun legacy(materialId: UUID, bytes: ByteArray, copiedFrom: UUID? = null): UUID {

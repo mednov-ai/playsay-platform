@@ -7,8 +7,8 @@ import com.playsay.gateway.dto.HtmlGameMigrationOutcome
 import com.playsay.gateway.dto.HtmlGameMigrationResponse
 import com.playsay.gateway.error.ProjectResponseException
 import com.playsay.gateway.repo.MaterialAssetRepo
+import com.playsay.gateway.repo.game.GameAlias
 import com.playsay.gateway.repo.game.HtmlGameRepository
-import com.playsay.gateway.service.MaterialObjectStorage
 import com.playsay.gateway.service.lessonAccessDeadline
 import java.sql.Timestamp
 import java.time.Instant
@@ -23,7 +23,6 @@ class HtmlGameLibraryMigrationService(
     private val repository: HtmlGameRepository,
     private val registration: HtmlGameLegacyRegistrationService,
     private val assets: MaterialAssetRepo,
-    private val objects: MaterialObjectStorage,
     private val mapper: ObjectMapper,
     private val provenance: LegacyGameProvenanceService,
     private val blobs: GameBlobStorageService,
@@ -54,7 +53,9 @@ class HtmlGameLibraryMigrationService(
         requireNotNull(transaction.execute { sourceOutcome(id, dryRun) })
     } catch (error: Exception) {
         val code = (error as? ProjectResponseException)?.errorCode ?: "GAME_MIGRATION_FAILED"
-        if (!dryRun) transaction.executeWithoutResult { checkpoint(id, "BLOCKED", code) }
+        if (!dryRun) transaction.executeWithoutResult {
+            if (repository.migration.retainedCandidate(id).isEmpty()) checkpoint(id, "BLOCKED", code)
+        }
         HtmlGameMigrationOutcome(id, "BLOCKED", code)
     }
 
@@ -62,28 +63,32 @@ class HtmlGameLibraryMigrationService(
         val asset = assets.findById(id).orElseThrow()
         val bytes = provenance.bytes(asset)
         if (bytes.isEmpty()) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
-        val origin = if (repository.alias(id) == null) provenance.inspect(asset, bytes) else LegacyGameOrigin(asset, null, null, true)
+        val existingAlias = repository.alias(id)
+        val origin = provenance.inspect(asset, bytes)
+        if (existingAlias != null && !origin.accepted) gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED")
+        val existingCandidate = repository.migration.retainedCandidate(id).firstOrNull()
+        if (existingCandidate != null) {
+            verifyCandidate(existingCandidate, gameHash(bytes), origin)
+            return HtmlGameMigrationOutcome(id, "CANDIDATE")
+        }
         if (!origin.accepted) {
             if (!dryRun) retainCandidate(id, bytes, origin)
             return HtmlGameMigrationOutcome(id, "CANDIDATE")
         }
         if (dryRun) {
-            registration.validateCover(id, origin.root.id)
+            val coverHash = registration.sourceCoverHash(id, origin.root.id)
+            if (existingAlias != null) verifyPlayable(existingAlias, gameHash(bytes), coverHash)
             return HtmlGameMigrationOutcome(id, "READY")
         }
         val alias = registration.register(id)
-        verifyPlayable(alias.revisionId, alias.sha256)
-        if (alias.sha256 != gameHash(bytes)) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
+        verifyPlayable(alias, gameHash(bytes), registration.sourceCoverHash(id, origin.root.id))
         checkpoint(id, "MAPPED", null, alias.sha256)
         return HtmlGameMigrationOutcome(id, "MAPPED")
     }
 
     private fun retainCandidate(id: UUID, bytes: ByteArray, origin: LegacyGameOrigin) {
         val source = registration.register(origin.sourceAssetId ?: gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED"))
-        val existing = repository.migration.retainedCandidate(id).firstOrNull()
-        val retained = existing?.get("retained_blob_id") as? UUID
-        val blob = if (retained != null && existing["source_sha256"] == gameHash(bytes)) { blobs.read(retained); retained }
-            else blobs.put(source.gameId, bytes, "text/html")
+        val blob = blobs.put(source.gameId, bytes, "text/html")
         checkpoint(id, "CANDIDATE", null, gameHash(bytes), blob, provenance.evidence(origin))
     }
 
@@ -157,20 +162,27 @@ class HtmlGameLibraryMigrationService(
         val hash = gameHash(bytes)
         val alias = repository.alias(id)
         if (alias != null) {
-            if (hash != alias.sha256) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
-            verifyPlayable(alias.revisionId, hash)
+            val origin = provenance.inspect(asset, bytes)
+            verifyPlayable(alias, hash, registration.sourceCoverHash(id, origin.root.id))
             return true
         }
         val entry = repository.migration.retainedCandidate(id).firstOrNull() ?: gameError(HttpStatus.CONFLICT, "GAME_REFERENCE_UNRESOLVED")
-        if (entry["source_sha256"] != hash || gameHash(blobs.read(entry["retained_blob_id"] as UUID)) != hash) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
-        if (provenance.inspect(asset, bytes).accepted) gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED")
+        verifyCandidate(entry, hash, provenance.inspect(asset, bytes))
         return false
     }
 
-    private fun verifyPlayable(revisionId: UUID, hash: String) {
-        val blob = repository.blob(revisionId) ?: gameError(HttpStatus.CONFLICT, "GAME_REFERENCE_UNRESOLVED")
-        if (blob.sha256 != hash || gameHash(objects.getObject(blob.storageKey).bytes) != hash) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
-        repository.blob(revisionId, true)?.let { cover -> if (gameHash(objects.getObject(cover.storageKey).bytes) != cover.sha256) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID") }
+    private fun verifyCandidate(entry: Map<String, Any?>, hash: String, origin: LegacyGameOrigin) {
+        if (entry["source_sha256"] != hash || gameHash(blobs.read(entry["retained_blob_id"] as UUID)) != hash) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
+        if (origin.accepted) gameError(HttpStatus.CONFLICT, "GAME_PROVENANCE_UNRESOLVED")
+    }
+
+    private fun verifyPlayable(alias: GameAlias, sourceHash: String, sourceCoverHash: String?) {
+        val blob = repository.blob(alias.revisionId) ?: gameError(HttpStatus.CONFLICT, "GAME_REFERENCE_UNRESOLVED")
+        if (alias.sha256 != sourceHash || blob.sha256 != sourceHash) gameError(HttpStatus.CONFLICT, "GAME_CONTENT_INVALID")
+        blobs.readVerified(blob)
+        val cover = repository.blob(alias.revisionId, true)
+        if (sourceCoverHash != null && sourceCoverHash != cover?.sha256) gameError(HttpStatus.CONFLICT, "GAME_COVER_INVALID")
+        cover?.let(blobs::readVerified)
     }
 
     private fun verifyReference(block: JsonNode): Boolean {

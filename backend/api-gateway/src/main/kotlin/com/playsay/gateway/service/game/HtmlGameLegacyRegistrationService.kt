@@ -5,6 +5,7 @@ import com.playsay.gateway.repo.LessonMaterialRepo
 import com.playsay.gateway.repo.MaterialAssetRepo
 import com.playsay.gateway.repo.game.GameAlias
 import com.playsay.gateway.repo.game.HtmlGameRepository
+import com.playsay.gateway.service.MaterialObjectNotFoundException
 import com.playsay.gateway.service.MaterialObjectStorage
 import java.sql.Timestamp
 import java.time.Instant
@@ -89,8 +90,9 @@ class HtmlGameLegacyRegistrationService(
         repository.retainAuthoredTitle(title.take(160), Timestamp.from(Instant.now()), alias.gameId, alias.revisionId)
     }
 
-    fun validateCover(assetId: UUID, rootId: UUID) {
-        (repository.legacyCover(assetId, rootId).firstOrNull()?.get("icon_asset_id") as? UUID)?.let(::readCover)
+    fun sourceCoverHash(assetId: UUID, rootId: UUID): String? {
+        val iconId = repository.legacyCover(assetId, rootId).firstOrNull()?.get("icon_asset_id") as? UUID ?: return null
+        return gameHash(readCover(iconId).bytes)
     }
 
     private fun copyCover(gameId: UUID, revisionId: UUID, assetId: UUID) {
@@ -101,7 +103,12 @@ class HtmlGameLegacyRegistrationService(
 
     private fun readCover(assetId: UUID): com.playsay.gateway.service.MaterialObjectContent {
         val asset = assets.findById(assetId).orElse(null) ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND")
-        val content = objects.getObject(asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND"))
+        val key = asset.storageKey ?: gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND")
+        val content = try {
+            objects.getObject(key)
+        } catch (_: MaterialObjectNotFoundException) {
+            gameError(HttpStatus.NOT_FOUND, "GAME_COVER_NOT_FOUND")
+        }
         val declared = content.contentType.substringBefore(';').trim().lowercase(java.util.Locale.ROOT)
         // Historical MinIO objects may lack MIME metadata; retain exact bytes and infer only raster signatures.
         val type = if (declared == "application/octet-stream") {

@@ -1,3 +1,6 @@
+import { useContext } from "react";
+import { createPortal } from "react-dom";
+import { LessonPagePickerHost } from "../../classroom/model/lessonPagePickerHost";
 import { gameContent, gameCover } from "../../../shared/api/games";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, FileText, Loader2, Minimize2, RefreshCw, X } from "lucide-react";
@@ -139,6 +142,7 @@ export function LessonMaterialDocumentView({
   const launchKey = (blockId: string) => gameLaunchId ?? blockId;
   const numericScore = typeof score === "number" && Number.isFinite(score) ? score : null;
   const videoFullscreenAllowed = allowVideoFullscreen ?? mode === "teacherPreview";
+  const pagePickerHost = useContext(LessonPagePickerHost);
   const pagePickerVisible = document.pages.length > 1;
   const pagePickerEnabled = canControlPages || activePageId === undefined;
   const isStaticImagePage = page.layout === "STATIC_IMAGE";
@@ -470,6 +474,32 @@ export function LessonMaterialDocumentView({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [focusedBlock]);
 
+  const pagePicker = pagePickerVisible ? (
+    <nav className="playsay-page-picker" aria-label={t("materials.renderer.pagePicker")}>
+      {document.pages.map((item, index) => (
+        <button
+          aria-label={t("materials.renderer.selectPage", { number: index + 1, title: item.title })}
+          aria-current={item.id === page.id ? "page" : undefined}
+          className="playsay-page-picker-button"
+          data-active={item.id === page.id ? "true" : "false"}
+          disabled={!pagePickerEnabled}
+          key={item.id}
+          onClick={() => {
+            if (onActivePageIdChange) {
+              onActivePageIdChange(item.id);
+            } else {
+              setInternalActivePageId(item.id);
+            }
+          }}
+          type="button"
+        >
+          <span>{index + 1}</span>
+          <strong>{item.title}</strong>
+        </button>
+      ))}
+    </nav>
+  ) : null;
+
   return (
     <div
       className={`playsay-rendered-material${isStaticImagePage ? " playsay-static-image-page" : ""}`}
@@ -489,31 +519,7 @@ export function LessonMaterialDocumentView({
           {material.title}
         </div>
       ) : null}
-      {pagePickerVisible ? (
-        <nav className="playsay-page-picker" aria-label={t("materials.renderer.pagePicker")}>
-          {document.pages.map((item, index) => (
-            <button
-              aria-label={t("materials.renderer.selectPage", { number: index + 1, title: item.title })}
-              aria-current={item.id === page.id ? "page" : undefined}
-              className="playsay-page-picker-button"
-              data-active={item.id === page.id ? "true" : "false"}
-              disabled={!pagePickerEnabled}
-              key={item.id}
-              onClick={() => {
-                if (onActivePageIdChange) {
-                  onActivePageIdChange(item.id);
-                } else {
-                  setInternalActivePageId(item.id);
-                }
-              }}
-              type="button"
-            >
-              <span>{index + 1}</span>
-              <strong>{item.title}</strong>
-            </button>
-          ))}
-        </nav>
-      ) : null}
+      {pagePickerHost && isStaticImagePage && mode === "classroom" ? createPortal(pagePicker, pagePickerHost) : pagePicker}
       {assetLoadState === "loading" ? (
         <div aria-live="polite" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />

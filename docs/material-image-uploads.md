@@ -23,6 +23,10 @@ continue to resize and compress it in the browser, and use a 3 MiB JSON
 envelope on the draft endpoint. Pixel, authorization, content, PDF and packet
 checks remain in force.
 
+## Classroom display
+
+An uploaded single-image page fills the available task width at its original aspect ratio. A tall worksheet scrolls vertically together with its drawing surface. On desktop, cameras occupy a compact left column. Multiple-page navigation sits below the cameras, and an individual lesson also shows the learner’s lesson vocabulary. The image can still be opened in the existing focused view.
+
 ## Generating illustrations
 
 The synchronous generation endpoint takes a snapshot of eligible blocks and pairs, then calls the provider and uploads each result under a distinct private storage key outside the database transaction. Publication locks the material, checks current edit permission and matches the whole batch against the latest document. Changes to generation inputs, an ambiguous or missing target, or competing regeneration return `409 MATERIAL_IMAGE_TARGET_CHANGED`. Unrelated edits remain in the returned document. Regeneration preserves the public asset ID, existing references and custom tags.

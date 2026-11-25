@@ -1646,6 +1646,8 @@ export const en = {
       addHtmlGamePage: "Add HTML game",
       complete: "Complete",
       completeLesson: "Complete lesson",
+      showLessonVideo: "Show video",
+      showLessonMaterial: "Show task",
       enterFullscreen: "Enter fullscreen",
       exitFullscreen: "Exit fullscreen",
       leave: "Leave",

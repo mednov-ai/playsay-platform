@@ -27,7 +27,7 @@ type Gesture = {
 };
 
 /** The positioned parent defines the area in which the window may dock. */
-export function ClassroomFloatingWindow({ children, adaptive = false, participantCount = 0 }: { children: ReactNode; adaptive?: boolean; participantCount?: number }) {
+export function ClassroomFloatingWindow({ children, adaptive = false, participantCount = 0, footerRef }: { children: ReactNode; adaptive?: boolean; participantCount?: number; footerRef?: (node: HTMLDivElement | null) => void }) {
   const { t } = useAppTranslation();
   const elementRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLButtonElement>(null);
@@ -73,7 +73,9 @@ export function ClassroomFloatingWindow({ children, adaptive = false, participan
       // Evaluate whether the board fits in the normal layout, even while the
       // temporary video row shifts the workbench down; otherwise the row could
       // cause its own entrance/exit condition to oscillate on scroll.
-      const rowOffset = fallback ? rect.height : 0;
+      const workspaceLeft = shell?.querySelector(".playsay-classroom-primary")?.getBoundingClientRect().left;
+      const fallbackBesideWorkspace = workspaceLeft !== undefined && workspaceLeft >= rect.right - 1;
+      const rowOffset = fallback && !fallbackBesideWorkspace ? rect.height : 0;
       if (tabs && tabs.getClientRects().length) top = Math.max(top, tabs.getBoundingClientRect().bottom - rowOffset);
       const stage = boardWorkbench?.querySelector(".playsay-whiteboard-stage") ?? null;
       if (stage !== observedBoard) {
@@ -281,6 +283,7 @@ export function ClassroomFloatingWindow({ children, adaptive = false, participan
       >
         <span className="classroom-floating-window__grip" aria-hidden="true"><span /><span /><span /></span>
       </button>
+      {footerRef && <div className="playsay-floating-vocabulary" ref={footerRef} />}
       {menuOpen && !(adaptive && reserved) && (
         <div className="classroom-floating-window__menu" style={menuStyle} role="group" aria-label={t("classroom.floatingVideo.options")} onPointerDown={(event) => event.stopPropagation()}>
           {corners.map((item) => (

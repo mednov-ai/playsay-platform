@@ -1617,6 +1617,8 @@ export const de = {
       addHtmlGamePage: "HTML-Spiel hinzufügen",
       complete: "Beenden",
       completeLesson: "Unterricht beenden",
+      showLessonVideo: "Zum Video",
+      showLessonMaterial: "Zur Aufgabe",
       enterFullscreen: "Vollbild öffnen",
       exitFullscreen: "Vollbild beenden",
       leave: "Verlassen",

@@ -23,12 +23,10 @@ continue to resize and compress it in the browser, and use a 3 MiB JSON
 envelope on the draft endpoint. Pixel, authorization, content, PDF and packet
 checks remain in force.
 
-## Individual desktop lessons
+## Classroom display
 
-In ordinary view, a dedicated static page with one image or generated image fits
-the whole raster beside the remote camera and drawing tools. The available
-height accounts for navigation and controls. The camera shows the complete
-frame. Image-anchored marks and remote pointers use the original raster
-coordinates on each participant's screen. A tap paints a dot. If the drawn
-image moves or resizes during a stroke, the stroke ends at its last input in
-the original bounds.
+An uploaded single-image page fills the available task width at its original aspect ratio. A tall worksheet scrolls vertically together with its drawing surface. On desktop, cameras occupy a compact left column. Multiple-page navigation sits below the cameras, and an individual lesson also shows the learner’s lesson vocabulary. The image can still be opened in the existing focused view.
+
+Image-anchored marks and remote pointers use the original raster coordinates on
+each participant's screen. A tap paints a dot. If the image moves or resizes
+during a stroke, the stroke ends at its last input in the original bounds.

@@ -1201,77 +1201,141 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   display: none;
 }
 
-/* A dedicated image page in the ordinary individual desktop lesson. */
-@media (min-width: 981px) and (pointer: fine) {
-  main > section:has(.playsay-classroom-shell[data-image-layout-eligible="true"] .playsay-workbench:not([data-vocabulary-practice]) [data-single-image="true"]) {
-    max-width: none;
+.playsay-classroom-primary {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.playsay-classroom-primary .playsay-workbench { flex: 1 1 0; }
+.playsay-classroom-shell[data-presentation-mode="external-activity-focus"] .playsay-classroom-primary { grid-column: 1; }
+.playsay-classroom-shell[data-tablet-floating="true"] .playsay-classroom-primary { grid-row: 2; }
+
+/* A picture worksheet uses the available width and scrolls with its annotation surface. */
+main > section:has(.playsay-classroom-shell[data-camera-column="true"]),
+main > section:has(.playsay-classroom-shell[data-tablet-floating="true"]) {
+  max-width: none;
+}
+
+.playsay-workbench:not([data-vocabulary-practice]):has(.playsay-task-board[data-single-image="true"][data-presentation-mode="default"]) {
+  & .playsay-assignment-strip { display: none; }
+  & .playsay-image-lesson-title {
+    display: block;
+    flex: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .875rem;
+    font-weight: 700;
   }
+  & .playsay-task-document { padding: .375rem; }
+  & .playsay-rendered-image-static img { width: 100%; }
+  & .playsay-rendered-image-static .playsay-material-focus-trigger { position: absolute; }
+}
 
-  .playsay-classroom-shell[data-image-layout-eligible="true"]:has(.playsay-workbench:not([data-vocabulary-practice]) [data-single-image="true"]) {
-    --workspace-width: max(34rem, var(--playsay-fitted-workspace, 100%));
-    grid-template-columns: clamp(18.5rem, calc(100% - var(--workspace-width)), 32rem)
-      minmax(0, min(var(--workspace-width), calc(100% - 18.5rem)));
-    justify-content: center;
+.playsay-classroom-shell[data-camera-column="true"][data-viewport-mode="desktop"] {
+  grid-template-columns: clamp(14rem, 17vw, 19rem) minmax(0, 1fr);
 
-    & .playsay-video-focus .lk-participant-tile .lk-participant-media-video[data-lk-source="camera"] {
-      object-fit: contain;
+  & .playsay-video-rail { container-type: inline-size; }
+  & .playsay-classroom-room {
+    display: flex;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 100%;
+  }
+  & .playsay-classroom-conference[data-mode="camera-column"] {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: auto;
+  }
+  & .playsay-group-camera-panel {
+    flex: 0 1 auto;
+    height: calc(var(--camera-count) * (62.5cqw + .25rem) + .5rem);
+  }
+  & .playsay-group-learner-grid:not([data-column-fit="true"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  & .playsay-classroom-controls { flex: none; flex-wrap: wrap; gap: .25rem; padding-inline: .25rem; }
+}
+
+.playsay-classroom-conference[data-mode="camera-column"] > .lk-control-bar { max-height: none; height: auto; }
+.playsay-classroom-conference[data-mode="camera-column"] video.lk-participant-media-video {
+  object-fit: contain;
+}
+.playsay-camera-pages:empty, .playsay-camera-vocabulary:empty { display: none; }
+.playsay-camera-pages, .playsay-camera-vocabulary {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: .375rem;
+}
+.playsay-camera-pages .playsay-page-picker { margin: 0; overflow-x: auto; }
+.playsay-camera-dictionary-button { width: 100%; justify-content: flex-start; }
+.playsay-camera-words { list-style: none; margin: .25rem 0 0; padding: 0; }
+.playsay-camera-words li {
+  padding: .25rem .5rem;
+  overflow-wrap: anywhere;
+  font-size: .875rem;
+}
+.playsay-classroom-shell[data-tablet-floating="true"] .playsay-tablet-video-area:has(.playsay-floating-vocabulary) {
+  bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+.playsay-floating-vocabulary {
+  position: absolute;
+  top: calc(100% + 3px);
+  inset-inline: 0;
+  height: 2.5rem;
+  pointer-events: auto;
+}
+.playsay-floating-vocabulary button { background: hsl(var(--background)); color: hsl(var(--foreground)); }
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .playsay-classroom-shell[data-camera-column="true"][data-viewport-mode="mobilePortrait"] {
+    & .playsay-video-rail, & .playsay-classroom-room, & .playsay-classroom-conference { display: contents; }
+    & .playsay-video-header { position: static; background: var(--playsay-video-chrome); padding: .25rem .5rem; }
+    & .playsay-group-camera-panel { grid-row: 2; padding: .2rem; }
+    & .playsay-group-learner-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    & .playsay-video-grid-card { height: clamp(4rem, 11dvh, 6.5rem); aspect-ratio: auto; min-height: 0; }
+    & .playsay-camera-vocabulary { grid-row: 3; padding: 0 .25rem; }
+    & .playsay-classroom-primary { grid-row: 4; min-height: 0; }
+    & .playsay-classroom-controls { grid-row: 5; position: static; background: var(--playsay-video-chrome); }
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  }
+}
+
+.playsay-landscape-task-toggle { margin-inline-start: auto; flex-shrink: 0; }
+
+.playsay-classroom-shell[data-camera-column="true"][data-viewport-mode="mobileLandscape"] {
+  grid-template-columns: clamp(8rem, 20vw, 11rem) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+
+  & .playsay-video-rail { display: flex; flex-direction: column; min-height: 0; }
+  & .playsay-video-header { position: static; padding: .15rem; }
+  & .playsay-video-header h1, & .playsay-video-live-badge { display: none; }
+  & .playsay-group-learner-grid { grid-template-columns: 1fr; grid-auto-rows: minmax(0, 1fr); }
+  & .playsay-video-grid-card { min-height: 0; height: 100%; aspect-ratio: auto; }
+  & .playsay-classroom-controls { position: static; height: auto; min-height: 2.5rem; flex-wrap: wrap; gap: .125rem; padding: .125rem; }
+  & .playsay-classroom-primary { min-height: 0; min-width: 0; }
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .playsay-task-board[data-single-image="true"][data-presentation-mode="default"]:has(> .playsay-annotation-toolbar) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    & > .playsay-annotation-toolbar {
+      grid-area: 1 / 1;
+      flex-direction: row;
+      overflow: auto hidden;
+      padding: .25rem;
+      border-right: 0;
+      border-bottom: 1px solid hsl(var(--border));
     }
-
-    & .playsay-video-rail {
-      container-type: inline-size;
-    }
-
-    & .playsay-classroom-room {
-      flex: 0 1 auto;
-      height: min(100%, calc(56.25cqw + 5rem));
-    }
-
-    & .playsay-assignment-strip {
-      display: none;
-    }
-
-    & .playsay-image-lesson-title {
-      display: block;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: .875rem;
-      font-weight: 700;
-    }
-
-    & .playsay-task-document {
-      padding: .5rem;
-    }
-
-    & .playsay-task-document-surface,
-    & .playsay-static-image-page {
-      height: 100%;
-    }
-
-    & .playsay-static-image-page {
-      display: flex;
-      flex-direction: column;
-    }
-
-    & .playsay-material-blocks-static-image {
-      flex: 1 1 0;
-      grid-template-rows: minmax(0, 1fr);
-    }
-
-    & .playsay-rendered-image-static {
-      grid-template-rows: minmax(0, 1fr);
-    }
-
-    & .playsay-rendered-image-static img {
-      width: 100%;
-      height: 100%;
-      min-height: 0;
-      object-fit: contain;
-    }
-
-    & .playsay-rendered-image-static .playsay-material-focus-trigger {
-      position: absolute;
-    }
+    & > .playsay-annotation-toolbar > * { flex-shrink: 0; }
+    & .playsay-line-widths { display: flex; align-items: center; }
+    & > .playsay-task-document { grid-area: 2 / 1; }
+    & > .playsay-task-footer { grid-area: 3 / 1; }
   }
 }
 .playsay-tablet-video-area .playsay-group-camera-panel {
@@ -1329,6 +1393,40 @@ body.playsay-classroom-video-expanded main > section > .lesson-extension-offer +
   grid-auto-flow: column;
   grid-auto-columns: minmax(min(100%, 6rem), 1fr);
   grid-template-rows: minmax(0, 1fr);
+}
+
+/* Keep a short landscape phone usable when a full floating roster cannot fit. */
+.playsay-classroom-shell[data-viewport-mode="mobileLandscape"][data-tablet-floating="true"]:has(
+  .playsay-task-board[data-single-image="true"]
+):has(.playsay-tablet-video-area[data-board-fallback="true"]) {
+  grid-template-columns: clamp(10rem, 25vw, 15rem) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+
+  & .playsay-video-header { grid-area: 1 / 1; min-width: 0; }
+  & .playsay-tablet-video-area { grid-area: 2 / 1; }
+  & .playsay-classroom-primary { grid-area: 1 / 2 / 4 / 3; }
+  & .playsay-classroom-conference .playsay-classroom-controls {
+    grid-area: 3 / 1;
+    height: auto;
+    max-height: none;
+    flex-wrap: wrap;
+    gap: .125rem;
+    padding: .125rem;
+  }
+  & .playsay-group-camera-panel { touch-action: pan-y; }
+  & .playsay-group-learner-grid {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-content: start;
+  }
+  & .playsay-group-learner-grid .playsay-video-grid-card { height: auto; min-height: 0; aspect-ratio: 16/10; }
+}
+.playsay-classroom-shell[data-viewport-mode="mobileLandscape"] .playsay-task-board[data-single-image="true"] > .playsay-task-footer {
+  min-height: 0;
+  height: auto;
+  padding-block: .125rem;
 }
 
 .playsay-classroom-shell[data-group-lesson="true"] .lk-participant-tile video.lk-participant-media-video {

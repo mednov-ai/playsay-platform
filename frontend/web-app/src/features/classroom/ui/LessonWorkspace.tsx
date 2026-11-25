@@ -1,5 +1,6 @@
 import { BookOpen, Clock3, Eye, Loader2, PanelRight, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "../../../components/ui/button";
 import { canAssignLessons } from "../../../entities/workspace/model";
 import { formatLessonRange, formatParticipantCount } from "../../../entities/schedule/model";
@@ -48,7 +49,11 @@ export function LessonWorkspace({
   presentationMode,
   profile,
   session,
+  vocabularyHost,
+  showVocabularyPreview = false,
 }: {
+  vocabularyHost?: HTMLElement | null;
+  showVocabularyPreview?: boolean;
   displayName: string;
   materials: LessonMaterial[];
   onAssignMaterial: (lessonId: string, materialId: string | null) => Promise<ScheduledLesson | null>;
@@ -97,6 +102,7 @@ export function LessonWorkspace({
   const [startingVocabularyPractice, setStartingVocabularyPractice] = useState(false);
   const [activityRailOpen, setActivityRailOpen] = useState(() => (
     vocabularyFeatures.personalPracticeV2
+    && !session.materialId
     && typeof window !== "undefined"
     && typeof window.matchMedia === "function"
     && window.matchMedia("(min-width: 1024px)").matches
@@ -269,8 +275,23 @@ export function LessonWorkspace({
 
   const activeParticipantLabel = activeParticipant?.displayName ?? activeParticipant?.username ?? activeParticipant?.subject ?? "";
 
+  const ownerSubject = canMonitorSubmissions ? activeParticipant?.subject : profile?.subject;
+  const vocabulary = (
+    <VocabularyLessonDialog
+      ownerLabel={canMonitorSubmissions ? activeParticipantLabel : undefined}
+      ownerSubject={ownerSubject}
+      onStartPractice={canMonitorSubmissions && vocabularyFeatures.live ? () => void startVocabularyPractice() : undefined}
+      recipientSubjects={canMonitorSubmissions ? session.participants.map((participant) => participant.subject) : undefined}
+      source={{ sourceType: "LESSON", lessonId: session.lessonId, materialId: visibleMaterial?.id,
+        ownerSubject: canMonitorSubmissions ? ownerSubject : undefined }}
+      showPreview={Boolean(vocabularyHost && showVocabularyPreview)}
+      triggerClassName={vocabularyHost ? "playsay-camera-dictionary-button" : canMonitorSubmissions ? "playsay-teacher-toolbar-vocabulary" : "playsay-vocabulary-trigger"}
+      triggerLabelClassName={vocabularyHost ? undefined : canMonitorSubmissions ? "playsay-teacher-toolbar-action-label" : "playsay-vocabulary-trigger-label"}
+    />
+  );
   return (
     <section className="playsay-workbench" data-presentation-mode={presentationMode} data-vocabulary-practice={liveVocabulary.practice ? true : undefined}>
+      {vocabularyHost && createPortal(vocabulary, vocabularyHost)}
       {canMonitorSubmissions ? (
         <TeacherLessonToolbar
           activityRailAction={vocabularyFeatures.personalPracticeV2 ? (
@@ -300,22 +321,7 @@ export function LessonWorkspace({
           selectedMaterialId={selectedMaterialId}
           uploadingHtmlGamePage={uploadingHtmlGamePage}
           uploadingImagePage={uploadingImagePage}
-          vocabularyAction={(
-            <VocabularyLessonDialog
-              ownerLabel={activeParticipantLabel}
-              ownerSubject={activeParticipant?.subject}
-              onStartPractice={vocabularyFeatures.live ? () => void startVocabularyPractice() : undefined}
-              recipientSubjects={session.participants.map((participant) => participant.subject)}
-              source={{
-                sourceType: "LESSON",
-                lessonId: session.lessonId,
-                materialId: visibleMaterial?.id,
-                ownerSubject: activeParticipant?.subject,
-              }}
-              triggerClassName="playsay-teacher-toolbar-vocabulary"
-              triggerLabelClassName="playsay-teacher-toolbar-action-label"
-            />
-          )}
+          vocabularyAction={!vocabularyHost && session.lessonType === "INDIVIDUAL" ? vocabulary : null}
         />
       ) : (
         <header className="playsay-workbench-topbar">
@@ -326,16 +332,7 @@ export function LessonWorkspace({
           </nav>
 
           <div className="playsay-workbench-tools">
-            <VocabularyLessonDialog
-              ownerSubject={profile?.subject}
-              source={{
-                sourceType: "LESSON",
-                lessonId: session.lessonId,
-                materialId: visibleMaterial?.id,
-              }}
-              triggerClassName="playsay-vocabulary-trigger"
-              triggerLabelClassName="playsay-vocabulary-trigger-label"
-            />
+            {!vocabularyHost && session.lessonType === "INDIVIDUAL" ? vocabulary : null}
             <div className="playsay-lesson-statusline">
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="h-4 w-4 text-primary" />

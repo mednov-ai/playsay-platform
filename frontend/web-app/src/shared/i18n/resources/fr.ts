@@ -1617,6 +1617,8 @@ export const fr = {
       addHtmlGamePage: "Ajouter un jeu HTML",
       complete: "Terminer",
       completeLesson: "Terminer le cours",
+      showLessonVideo: "Voir la vidéo",
+      showLessonMaterial: "Voir l’exercice",
       enterFullscreen: "Plein écran",
       exitFullscreen: "Quitter le plein écran",
       leave: "Quitter",

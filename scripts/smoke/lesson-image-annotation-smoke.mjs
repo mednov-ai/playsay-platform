@@ -15,6 +15,8 @@ const cacheDir = await mkdtemp(resolve(tmpdir(), 'honey-image-vite-'));
 const server = await createServer({
   cacheDir,
   configFile: false,
+  // The browser renderer never loads PDF.js's optional native Node canvas.
+  optimizeDeps: { exclude: ['@napi-rs/canvas'] },
   root: resolve(root, 'scripts/smoke/fixtures/image-annotation'),
   plugins: [react.default()],
   resolve: {

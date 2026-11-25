@@ -285,7 +285,7 @@ try {
   await browser.close(); browser = undefined;
   browser = await chromium.launch({ headless: true });
   for (const [name, options] of [
-    ["desktop", { viewport: { width: 1365, height: 900 } }],
+    ["desktop", { viewport: { width: 1365, height: 600 } }],
     ["tablet", devices["iPad (gen 7)"]],
     ["phone", devices["iPhone 13"]],
   ]) {
@@ -295,7 +295,7 @@ try {
     await page.locator(".playsay-classroom-shell").waitFor();
     for (const reversed of [false, true]) {
       await page.evaluate(rev => window.integratedFixture.groupCameras(false, false, rev), reversed);
-      const teacher = page.locator(".playsay-tablet-teacher-video, .playsay-video-focus").locator(":scope > [data-subject='teacher-1']");
+      const teacher = page.locator(".playsay-tablet-teacher-video, .playsay-video-focus, [data-mode='camera-column'] .playsay-video-grid-card:first-child").locator(":scope > [data-subject='teacher-1']");
       await teacher.waitFor({ state: "visible" });
       assert.ok(await teacher.evaluate(tile => {
         const r = tile.getBoundingClientRect();
@@ -311,7 +311,7 @@ try {
     await offline.waitFor();
     if (name === "desktop") {
       const grid = page.locator(".playsay-group-learner-grid");
-      await page.setViewportSize({ width: 1365, height: 1500 });
+      await page.setViewportSize({ width: 1365, height: 900 });
       await page.waitForFunction(() => document.querySelector(".playsay-group-learner-grid")?.getAttribute("data-column-fit") === "true");
       const stacked = await cards.evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().toJSON()));
       assert.ok(stacked.every(r => Math.abs(r.x - stacked[0].x) < 1 && Math.abs(r.width - stacked[0].width) < 1));
@@ -376,7 +376,7 @@ try {
       await offline.locator(".playsay-video-presence").waitFor();
       await page.screenshot({ scale: "css", path: path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name + "-teacher.png") });
       await page.evaluate(()=>{window.integratedFixture.groupCameras(false,false,false);window.integratedFixture.setTeacher(false);});
-      await page.locator(".playsay-tablet-teacher-video,.playsay-video-focus").first().waitFor();
+      await page.locator(".playsay-tablet-teacher-video, .playsay-video-focus, [data-mode='camera-column'] .playsay-video-grid-card").first().waitFor();
       await page.screenshot({ scale: "css", path: path.join(process.env.GROUP_LAYOUT_SCREENSHOTS, name + "-learner.png") });
     }
     if (name !== "desktop") {

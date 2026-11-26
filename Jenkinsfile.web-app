@@ -215,7 +215,7 @@ spec:
             sh 'npm --workspace web-app run lint'
             sh 'npm --workspace web-app run test'
             sh '''
-              if [ "$DEPLOY_TO_DEV" = "true" ]; then
+              if [ "$DEPLOY_TO_DEV" = "true" ] || [ "$DEPLOY_TO_PROD" = "true" ]; then
                 export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                 export VITE_DOCUMENT_MATERIALS_ENABLED=true
                 export VITE_VOCABULARY_PRACTICE_ENABLED=true
@@ -228,9 +228,10 @@ spec:
                 export VITE_VOCABULARY_DELIVERY_POLICIES_ENABLED=true
                 export VITE_VOCABULARY_KEY_NGRAMS_ENABLED=true
                 export VITE_VOCABULARY_GENERATED_MEDIA_ENABLED=true
+              fi
+              if [ "$DEPLOY_TO_DEV" = "true" ]; then
                 export VITE_KEYBOARD_ORIGIN=https://dev.key.honey.school
               elif [ "$DEPLOY_TO_PROD" = "true" ]; then
-                export VITE_EXTERNAL_ACTIVITY_ENABLED=true
                 export VITE_KEYBOARD_ORIGIN=https://key.honey.school
               fi
               npm --workspace web-app run build

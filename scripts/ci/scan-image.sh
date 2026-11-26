@@ -77,6 +77,9 @@ case "$conversion_result" in
     elif sh "$(dirname "$0")/accept-classroom-dev-keycloak-findings.sh" \
       "$REPORT_DIR/blocking.json" "$REPORT_DIR/accepted-classroom-dev.txt"; then
       echo "Classroom DEV candidate: five owner-accepted Keycloak OS findings; raw report retained."
+    elif sh "$(dirname "$0")/accept-game-cutover-keycloak-findings.sh" \
+      "$REPORT_DIR/full.json" "$REPORT_DIR/blocking.json" "$REPORT_DIR/game-cutover-keycloak.txt"; then
+      echo "Game cutover Keycloak: SQLite risk and verified Red Hat CA remediation reviewed; raw reports retained."
     else
       echo "Blocking findings; image was not published." >&2
       exit 42

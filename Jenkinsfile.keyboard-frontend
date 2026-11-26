@@ -191,7 +191,7 @@ spec:
             sh 'npm --workspace keyboard-app run lint'
             sh 'npm --workspace keyboard-app run test'
             sh '''
-              if [ "$DEPLOY_TO_DEV" = "true" ]; then
+              if [ "$DEPLOY_TO_DEV" = "true" ] || [ "$DEPLOY_TO_PROD" = "true" ]; then
                 export VITE_VOCABULARY_TYPED_TARGETS_ENABLED=true
               fi
               npm --workspace keyboard-app run build
